@@ -250,6 +250,15 @@ async function main() {
     console.warn('[api] dream scheduler init failed:', (err as Error).message)
   }
 
+  // Proactive home watcher — nudges the owner when a door/lock is left open.
+  // No-op unless Home Assistant is configured + proactive is enabled.
+  try {
+    const { startHomeWatcher } = await import('../api/home/proactive.js')
+    startHomeWatcher()
+  } catch (err) {
+    console.warn('[api] home watcher init failed:', (err as Error).message)
+  }
+
   await startApiServer({
     port,
     host,
