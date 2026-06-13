@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# rak00n — from-scratch installer for the NVIDIA DGX Spark (aarch64 + Blackwell).
+# orb2 — from-scratch installer for the NVIDIA DGX Spark (aarch64 + Blackwell).
 # Idempotent: safe to re-run. Brings up the whole Docker Compose stack.
 #
 #   bash scripts/install.sh
@@ -30,9 +30,9 @@ fi
 command -v bun >/dev/null 2>&1 || { say "Installing Bun"; curl -fsSL https://bun.sh/install | bash; export PATH="$HOME/.bun/bin:$PATH"; }
 
 # ── 2. local image registry on :5001 (compose pulls localhost:5001/* here) ──
-if ! dk ps --format '{{.Names}}' | grep -qx rak00n-registry; then
+if ! dk ps --format '{{.Names}}' | grep -qx orb2-registry; then
   say "Starting a local image registry on :5001"
-  dk run -d --restart=always -p 5001:5001 --name rak00n-registry registry:2
+  dk run -d --restart=always -p 5001:5001 --name orb2-registry registry:2
 fi
 
 # ── 3. .env from template ──────────────────────────────────────────────────
@@ -40,38 +40,38 @@ if [ ! -f .env ]; then
   say "Creating .env from .env.example"
   cp .env.example .env
   sed -i "s|REPLACE_WITH_RANDOM_SECRET|$(openssl rand -hex 32)|" .env
-  sed -i "s|/home/youruser/rak00n|$REPO|" .env
-  warn "Edit .env to set RAK00N_AUTH_ALLOWED_EMAILS, SMTP, and (optionally) Telegram/WhatsApp."
+  sed -i "s|/home/youruser/orb2|$REPO|" .env
+  warn "Edit .env to set ORB2_AUTH_ALLOWED_EMAILS, SMTP, and (optionally) Telegram/WhatsApp."
 fi
 
 # ── 4. build the images we own (api, ui, whatsapp) ────────────────────────
 say "Building the API bundle"
 bun run build:api
 say "Building + pushing api / ui / whatsapp images"
-dk build -t $REG/rak00n-api:dev -f Dockerfile.api.dev . && dk push $REG/rak00n-api:dev
-dk build -t $REG/rak00n-ui:dev  -f web/Dockerfile web/    && dk push $REG/rak00n-ui:dev
-dk build -t $REG/rak00n-whatsapp:dev services/whatsapp/   && dk push $REG/rak00n-whatsapp:dev
+dk build -t $REG/orb2-api:dev -f Dockerfile.api.dev . && dk push $REG/orb2-api:dev
+dk build -t $REG/orb2-ui:dev  -f web/Dockerfile web/    && dk push $REG/orb2-ui:dev
+dk build -t $REG/orb2-whatsapp:dev services/whatsapp/   && dk push $REG/orb2-whatsapp:dev
 
 # ── 5. GPU service images (need the personaplex:cuda base) ────────────────
 if dk image inspect personaplex:cuda >/dev/null 2>&1; then
   say "Building GPU service images (tts/stt/vision/embed) from personaplex:cuda"
-  for s in tts stt vision embed; do dk build -t rak00n-$s:cuda services/$s/ || warn "build of $s failed"; done
-  dk build -t rak00n-av-webrtc:latest services/av-webrtc/ || warn "av-webrtc build failed"
+  for s in tts stt vision embed; do dk build -t orb2-$s:cuda services/$s/ || warn "build of $s failed"; done
+  dk build -t orb2-av-webrtc:latest services/av-webrtc/ || warn "av-webrtc build failed"
 else
   warn "personaplex:cuda base image not found — skipping GPU service builds."
   warn "Build the base + vLLM image for your box first, then re-run, or build the"
-  warn "GPU services manually: for s in tts stt vision embed; do docker build -t rak00n-\$s:cuda services/\$s/; done"
+  warn "GPU services manually: for s in tts stt vision embed; do docker build -t orb2-\$s:cuda services/\$s/; done"
 fi
 
 # ── 6. start the stack ─────────────────────────────────────────────────────
 say "Starting the stack"
-./scripts/rak00n-stack.sh up
-./scripts/rak00n-stack.sh status
+./scripts/orb2-stack.sh up
+./scripts/orb2-stack.sh status
 
 cat <<EOF
 
-✓ rak00n is starting.
-  Console:  http://localhost:${RAK00N_UI_PORT:-9080}   (HTTPS: https://localhost:${RAK00N_UI_HTTPS_PORT:-9443})
-  Sign in with an email from RAK00N_AUTH_ALLOWED_EMAILS (a code is emailed / Telegrammed).
+✓ orb2 is starting.
+  Console:  http://localhost:${ORB2_UI_PORT:-9080}   (HTTPS: https://localhost:${ORB2_UI_HTTPS_PORT:-9443})
+  Sign in with an email from ORB2_AUTH_ALLOWED_EMAILS (a code is emailed / Telegrammed).
   Remote access over Tailscale:  bash scripts/setup-tailscale.sh
 EOF

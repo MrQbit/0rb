@@ -1,8 +1,8 @@
 """
 ollama_provider.py
 ------------------
-Adds native Ollama support to RAK00N.
-Lets RAK00N route requests to any locally-running Ollama model
+Adds native Ollama support to ORB2.
+Lets ORB2 route requests to any locally-running Ollama model
 (llama3, mistral, codellama, phi3, qwen2, deepseek-coder, etc.)
 without needing an API key.
 

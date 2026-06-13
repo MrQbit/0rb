@@ -1,8 +1,8 @@
 /**
- * RAK00N Managed Credential Installer
+ * ORB2 Managed Credential Installer
  *
  * This script is compiled into a standalone native binary (bun build --compile)
- * and distributed separately from the main rak00n binary.
+ * and distributed separately from the main orb2 binary.
  *
  * At install time it:
  *   1. Reads the encrypted credential blob (built into this binary at compile time)
@@ -10,9 +10,9 @@
  *   3. Writes each credential to the OS keychain
  *   4. Reports success/failure without echoing any key material
  *
- * The RAK00N_BUILD_SECRET is embedded at compile time via --define:
+ * The ORB2_BUILD_SECRET is embedded at compile time via --define:
  *   bun build --compile \
- *     --define 'RAK00N_BUILD_SECRET_DEFINE="<secret>"' \
+ *     --define 'ORB2_BUILD_SECRET_DEFINE="<secret>"' \
  *     installer/index.ts
  *
  * Never distribute the source of this file with real secrets embedded.
@@ -28,10 +28,10 @@ import { ENCRYPTED_CREDENTIALS as GENERATED_ENCRYPTED_CREDENTIALS } from './cred
 
 // ─── Build-time constants (injected via --define at compile time) ─────────────
 // In development these fall back to env vars so tests work without a real secret.
-declare const RAK00N_BUILD_SECRET_DEFINE: string
+declare const ORB2_BUILD_SECRET_DEFINE: string
 
 const BUILD_SECRET: string = (() => {
-  try { return RAK00N_BUILD_SECRET_DEFINE } catch { return process.env.RAK00N_BUILD_SECRET ?? '' }
+  try { return ORB2_BUILD_SECRET_DEFINE } catch { return process.env.ORB2_BUILD_SECRET ?? '' }
 })()
 
 const ENCRYPTED_BLOB_RAW: string = GENERATED_ENCRYPTED_CREDENTIALS
@@ -50,7 +50,7 @@ const EMBEDDED_CLI_MJS_BASE64: string = (() => {
 
 // ─── Key derivation ───────────────────────────────────────────────────────────
 
-const APP_SALT = 'rak00n.managed.credentials.v1'
+const APP_SALT = 'orb2.managed.credentials.v1'
 
 function deriveKey(secret: string): Buffer {
   return createHash('sha256').update(secret + APP_SALT).digest()
@@ -104,8 +104,8 @@ function execSilent(cmd: string, args: string[], input?: string): boolean {
   }
 }
 
-const SERVICE = 'app.rak00n'
-const ACCOUNT = 'rak00n'
+const SERVICE = 'app.orb2'
+const ACCOUNT = 'orb2'
 
 function writeKeychain(slot: string, key: string, value: string): boolean {
   const fullSlot = `${SERVICE}.${slot}${key ? `.${key}` : ''}`
@@ -119,7 +119,7 @@ function writeKeychain(slot: string, key: string, value: string): boolean {
       ])
     }
     case 'linux': {
-      return execSilent('secret-tool', ['store', '--label', `RAK00N ${fullSlot}`, 'rak00n', fullSlot], value)
+      return execSilent('secret-tool', ['store', '--label', `ORB2 ${fullSlot}`, 'orb2', fullSlot], value)
     }
     case 'win32': {
       const script = `
@@ -158,14 +158,14 @@ type InstallLayout = {
 }
 
 function getInstallLayout(): InstallLayout {
-  const rootDir = join(homedir(), '.rak00n')
+  const rootDir = join(homedir(), '.orb2')
   const binDir = join(rootDir, 'bin')
   const libDir = join(rootDir, 'lib')
   const cliPath = join(libDir, 'cli.mjs')
   const launcherPath =
     process.platform === 'win32'
-      ? join(binDir, 'rak00n.cmd')
-      : join(binDir, 'rak00n')
+      ? join(binDir, 'orb2.cmd')
+      : join(binDir, 'orb2')
 
   return { rootDir, binDir, libDir, cliPath, launcherPath }
 }
@@ -189,8 +189,8 @@ function installCliPayload(layout: InstallLayout): boolean {
     const launcher = [
       '@echo off',
       'setlocal',
-      'set "RAK00N_HOME=%USERPROFILE%\\.rak00n"',
-      'node "%RAK00N_HOME%\\lib\\cli.mjs" %*',
+      'set "ORB2_HOME=%USERPROFILE%\\.orb2"',
+      'node "%ORB2_HOME%\\lib\\cli.mjs" %*',
       'endlocal',
       '',
     ].join('\r\n')
@@ -201,8 +201,8 @@ function installCliPayload(layout: InstallLayout): boolean {
   const launcher = [
     '#!/usr/bin/env sh',
     'set -e',
-    'RAK00N_HOME="${RAK00N_HOME:-$HOME/.rak00n}"',
-    'exec node "$RAK00N_HOME/lib/cli.mjs" "$@"',
+    'ORB2_HOME="${ORB2_HOME:-$HOME/.orb2}"',
+    'exec node "$ORB2_HOME/lib/cli.mjs" "$@"',
     '',
   ].join('\n')
   writeFileSync(layout.launcherPath, launcher, 'utf8')
@@ -211,7 +211,7 @@ function installCliPayload(layout: InstallLayout): boolean {
 }
 
 function ensureUnixPathSetup(): { updated: string[] } {
-  const exportLine = 'export PATH="$HOME/.rak00n/bin:$PATH"'
+  const exportLine = 'export PATH="$HOME/.orb2/bin:$PATH"'
   const files = [join(homedir(), '.zshrc'), join(homedir(), '.bashrc')]
   const updated: string[] = []
 
@@ -220,11 +220,11 @@ function ensureUnixPathSetup(): { updated: string[] } {
     if (existsSync(file)) {
       content = readFileSync(file, 'utf8')
     }
-    if (content.includes('.rak00n/bin')) {
+    if (content.includes('.orb2/bin')) {
       continue
     }
 
-    const next = `${content.trimEnd()}\n\n# Added by RAK00N installer\n${exportLine}\n`
+    const next = `${content.trimEnd()}\n\n# Added by ORB2 installer\n${exportLine}\n`
     writeFileSync(file, next, 'utf8')
     updated.push(file)
   }
@@ -234,7 +234,7 @@ function ensureUnixPathSetup(): { updated: string[] } {
 
 function ensureWindowsPathSetup(layout: InstallLayout): boolean {
   const script = [
-    '$target = [Environment]::GetFolderPath("UserProfile") + "\\.rak00n\\bin"',
+    '$target = [Environment]::GetFolderPath("UserProfile") + "\\.orb2\\bin"',
     '$current = [Environment]::GetEnvironmentVariable("Path", "User")',
     'if ([string]::IsNullOrEmpty($current)) {',
     '  [Environment]::SetEnvironmentVariable("Path", $target, "User")',
@@ -256,7 +256,7 @@ function ensureWindowsPathSetup(layout: InstallLayout): boolean {
 function printSuccess(layout: InstallLayout) {
   console.log('')
   console.log('════════════════════════════════════════')
-  console.log('  ✓ RAK00N installed successfully')
+  console.log('  ✓ ORB2 installed successfully')
   console.log('════════════════════════════════════════')
   console.log('')
   console.log(`  Launcher: ${layout.launcherPath}`)
@@ -264,29 +264,29 @@ function printSuccess(layout: InstallLayout) {
   console.log('')
 
   if (process.platform !== 'win32') {
-    console.log('  To start using RAK00N, run:')
+    console.log('  To start using ORB2, run:')
     console.log('')
-    console.log('    source ~/.zshrc && rak00n')
+    console.log('    source ~/.zshrc && orb2')
     console.log('')
-    console.log('  Or open a new terminal and run: rak00n')
+    console.log('  Or open a new terminal and run: orb2')
   } else {
-    console.log('  Open a new terminal and run: rak00n')
+    console.log('  Open a new terminal and run: orb2')
   }
 
   console.log('')
   console.log('  To use your own API key, set OPENAI_API_KEY or ANTHROPIC_API_KEY.')
-  console.log('  Otherwise RAK00N will auto-configure a local Ollama instance.')
+  console.log('  Otherwise ORB2 will auto-configure a local Ollama instance.')
   console.log('')
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log('RAK00N Installer\n')
+  console.log('ORB2 Installer\n')
 
   const layout = getInstallLayout()
   if (!hasNodeRuntime()) {
-    console.error('Installation error: Node.js runtime is required to run the RAK00N CLI launcher.')
+    console.error('Installation error: Node.js runtime is required to run the ORB2 CLI launcher.')
     console.error('Install Node.js 20+ first, then rerun this installer.')
     process.exit(1)
   }
@@ -357,7 +357,7 @@ async function main() {
     }
   } else {
     console.log('No managed credentials bundled.')
-    console.log('On first run, RAK00N will auto-configure a local Ollama instance')
+    console.log('On first run, ORB2 will auto-configure a local Ollama instance')
     console.log('or prompt you to configure a provider.\n')
   }
 

@@ -4,16 +4,16 @@
  * Vercel access token (vercel.com/account/tokens). Optional team id.
  */
 export function vercelEnabled(): boolean {
-  return !!(process.env.RAK00N_VERCEL_TOKEN || '').trim()
+  return !!(process.env.ORB2_VERCEL_TOKEN || '').trim()
 }
 
 const TEXT_EXT = new Set(['html', 'css', 'js', 'mjs', 'json', 'svg', 'txt', 'xml'])
 
 /** Deploy a set of files; returns the public https URL. */
-export async function deployToVercel(files: { path: string; content: Buffer | string }[], name = 'rak00n-share'): Promise<string> {
-  const token = (process.env.RAK00N_VERCEL_TOKEN || '').trim()
-  if (!token) throw new Error('Vercel is not connected (RAK00N_VERCEL_TOKEN unset)')
-  const project = (name.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-+|-+$/g, '').slice(0, 40)) || 'rak00n-share'
+export async function deployToVercel(files: { path: string; content: Buffer | string }[], name = 'orb2-share'): Promise<string> {
+  const token = (process.env.ORB2_VERCEL_TOKEN || '').trim()
+  if (!token) throw new Error('Vercel is not connected (ORB2_VERCEL_TOKEN unset)')
+  const project = (name.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-+|-+$/g, '').slice(0, 40)) || 'orb2-share'
   const apiFiles = files.map(f => {
     const ext = (f.path.split('.').pop() || '').toLowerCase()
     if (typeof f.content === 'string' || TEXT_EXT.has(ext)) {
@@ -21,7 +21,7 @@ export async function deployToVercel(files: { path: string; content: Buffer | st
     }
     return { file: f.path, data: (f.content as Buffer).toString('base64'), encoding: 'base64' as const }
   })
-  const teamId = (process.env.RAK00N_VERCEL_TEAM_ID || '').trim()
+  const teamId = (process.env.ORB2_VERCEL_TEAM_ID || '').trim()
   const url = `https://api.vercel.com/v13/deployments${teamId ? `?teamId=${teamId}` : ''}`
   const r = await fetch(url, {
     method: 'POST',

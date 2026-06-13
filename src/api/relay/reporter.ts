@@ -1,8 +1,8 @@
 /**
- * Relay Reporter — connects a RAK00N instance to the rak00n-relay federation.
+ * Relay Reporter — connects a ORB2 instance to the orb2-relay federation.
  *
  * Phase 2 boot sequence:
- *   1. start() resolves a stable RAK00N_INSTANCE_ID (from env or Redis)
+ *   1. start() resolves a stable ORB2_INSTANCE_ID (from env or Redis)
  *   2. register() POSTs the bootstrap shared secret to
  *      /v1/instances/register and persists the returned
  *      `instance_token` in Redis. Backoff retries (5s/30s/2m/10m/30m)
@@ -16,7 +16,7 @@
  * Status (`getStatus()`) reflects the connection state so /v1/relay/status
  * can surface it for operators without affecting health probes.
  *
- * Each RAK00N instance gets a unique RAK00N_INSTANCE_ID (auto-generated
+ * Each ORB2 instance gets a unique ORB2_INSTANCE_ID (auto-generated
  * and persisted in Redis if not explicitly set via env).
  */
 import { randomUUID } from 'node:crypto'
@@ -24,8 +24,8 @@ import { log } from '../log.js'
 import type { Store } from '../store/store.js'
 import { setRelayState, type ControlState } from '../control/killSwitch.js'
 
-const INSTANCE_ID_KEY = 'rak00n:instance:id'
-const INSTANCE_TOKEN_KEY = 'rak00n:relay:instance_token'
+const INSTANCE_ID_KEY = 'orb2:instance:id'
+const INSTANCE_TOKEN_KEY = 'orb2:relay:instance_token'
 const HEARTBEAT_INTERVAL_MS = 30_000
 const REPORT_TIMEOUT_MS = 5_000
 const REGISTER_BACKOFF_S = [5, 30, 120, 600, 1800] as const
@@ -178,7 +178,7 @@ export class RelayReporter {
   private registerHandle: ReturnType<typeof setTimeout> | null = null
 
   constructor(private config: RelayConfig) {
-    this.memorySyncEnabled = process.env.RAK00N_RELAY_MEMORY_SYNC === 'true'
+    this.memorySyncEnabled = process.env.ORB2_RELAY_MEMORY_SYNC === 'true'
     this.relayUrl = config.relayUrl.replace(/\/+$/, '')
     this.eventSecret = config.eventSecret
     this.instanceId = config.instanceId || ''
@@ -192,7 +192,7 @@ export class RelayReporter {
       if (stored) {
         this.instanceId = stored
       } else {
-        this.instanceId = `rak00n-${randomUUID().slice(0, 8)}`
+        this.instanceId = `orb2-${randomUUID().slice(0, 8)}`
         await store.putKv(INSTANCE_ID_KEY, this.instanceId, 0)
       }
     }
@@ -296,7 +296,7 @@ export class RelayReporter {
           agent_id: this.info?.agentId,
           version: this.info?.version,
           environment: this.info?.environment,
-          tenant_id: process.env.RAK00N_TENANT_ID,
+          tenant_id: process.env.ORB2_TENANT_ID,
         }),
         signal: AbortSignal.timeout(REPORT_TIMEOUT_MS),
       })
@@ -345,7 +345,7 @@ export class RelayReporter {
     const h: Record<string, string> = {
       'Content-Type': 'application/json',
       'X-Relay-Event-Secret': this.eventSecret,
-      'X-Rak00n-Instance-Id': this.instanceId,
+      'X-Orb2-Instance-Id': this.instanceId,
     }
     if (this.instanceToken) {
       h['Authorization'] = `Bearer ${this.instanceToken}`
@@ -377,7 +377,7 @@ export class RelayReporter {
     this.pendingAudit.push({
       ...event,
       instance_id: this.instanceId,
-      tenant_id: process.env.RAK00N_TENANT_ID,
+      tenant_id: process.env.ORB2_TENANT_ID,
     })
   }
 

@@ -2,10 +2,10 @@
  * Local voice backend: whisper.cpp (STT) + energy VAD + Piper (TTS).
  *
  * No external service — runs entirely from two binaries on the host:
- *   RAK00N_WHISPER_BIN    whisper.cpp CLI (default "whisper-cli")
- *   RAK00N_WHISPER_MODEL  GGUF/GGML model path (e.g. ggml-base.en.bin)
- *   RAK00N_PIPER_BIN      Piper CLI (default "piper")
- *   RAK00N_PIPER_MODEL    Piper ONNX voice (e.g. en_US-amy-medium.onnx)
+ *   ORB2_WHISPER_BIN    whisper.cpp CLI (default "whisper-cli")
+ *   ORB2_WHISPER_MODEL  GGUF/GGML model path (e.g. ggml-base.en.bin)
+ *   ORB2_PIPER_BIN      Piper CLI (default "piper")
+ *   ORB2_PIPER_MODEL    Piper ONNX voice (e.g. en_US-amy-medium.onnx)
  *
  * Protocol with the browser (continuous, GPT-style — no push-to-talk):
  *   browser → server : binary PCM16 mono 16 kHz frames (streamed live)
@@ -54,19 +54,19 @@ function buildVocalContext(heard: Heard): string | undefined {
   )
 }
 
-function whisperBin() { return process.env.RAK00N_WHISPER_BIN || 'whisper-cli' }
-function whisperModel() { return process.env.RAK00N_WHISPER_MODEL || '' }
-function piperBin() { return process.env.RAK00N_PIPER_BIN || 'piper' }
-function piperModel() { return process.env.RAK00N_PIPER_MODEL || '' }
-function piperSampleRate() { return Number(process.env.RAK00N_PIPER_SAMPLE_RATE || 22050) }
+function whisperBin() { return process.env.ORB2_WHISPER_BIN || 'whisper-cli' }
+function whisperModel() { return process.env.ORB2_WHISPER_MODEL || '' }
+function piperBin() { return process.env.ORB2_PIPER_BIN || 'piper' }
+function piperModel() { return process.env.ORB2_PIPER_MODEL || '' }
+function piperSampleRate() { return Number(process.env.ORB2_PIPER_SAMPLE_RATE || 22050) }
 
 // Optional GPU voice services (see services/stt, services/tts). When set,
 // STT/TTS are delegated to these HTTP endpoints instead of local binaries,
 // giving GPU faster-whisper transcription and Kokoro neural TTS while the
 // VAD/endpointing/barge-in/agent-turn flow below stays identical.
-function sttUrl() { return (process.env.RAK00N_STT_URL || '').replace(/\/+$/, '') }
-function ttsUrl() { return (process.env.RAK00N_TTS_URL || '').replace(/\/+$/, '') }
-function ttsVoice() { return process.env.RAK00N_TTS_VOICE || 'af_heart' }
+function sttUrl() { return (process.env.ORB2_STT_URL || '').replace(/\/+$/, '') }
+function ttsUrl() { return (process.env.ORB2_TTS_URL || '').replace(/\/+$/, '') }
+function ttsVoice() { return process.env.ORB2_TTS_VOICE || 'af_heart' }
 
 /**
  * Make agent text speakable: drop emoji and markdown punctuation so TTS
@@ -85,9 +85,9 @@ export function cleanForTts(text: string): string {
     .trim()
 }
 
-function vadThreshold() { return Number(process.env.RAK00N_VOICE_VAD_THRESHOLD || 500) }
-function silenceMs() { return Number(process.env.RAK00N_VOICE_SILENCE_MS || 800) }
-function minSpeechMs() { return Number(process.env.RAK00N_VOICE_MIN_SPEECH_MS || 300) }
+function vadThreshold() { return Number(process.env.ORB2_VOICE_VAD_THRESHOLD || 500) }
+function silenceMs() { return Number(process.env.ORB2_VOICE_SILENCE_MS || 800) }
+function minSpeechMs() { return Number(process.env.ORB2_VOICE_MIN_SPEECH_MS || 300) }
 
 /** Cheap health probe for an STT/TTS HTTP service. */
 async function httpOk(url: string): Promise<boolean> {
@@ -258,7 +258,7 @@ class WhisperSession implements VoiceSession {
     if (this.busy || this.closed) return
     this.busy = true
     const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    const wavPath = join(tmpdir(), `rak00n-voice-${stamp}.wav`)
+    const wavPath = join(tmpdir(), `orb2-voice-${stamp}.wav`)
     try {
       writeFileSync(wavPath, wavFromPcm16(pcm, SAMPLE_RATE))
       const heard = await this.transcribe(wavPath)
@@ -364,10 +364,10 @@ class WhisperSession implements VoiceSession {
     }
 
     const model = whisperModel()
-    if (!model) throw new Error('RAK00N_WHISPER_MODEL not set')
+    if (!model) throw new Error('ORB2_WHISPER_MODEL not set')
     // -nt: no timestamps → stdout is plain transcript text.
     const proc = Bun.spawn(
-      [whisperBin(), '-m', model, '-f', wavPath, '-nt', '-l', process.env.RAK00N_WHISPER_LANG || 'auto'],
+      [whisperBin(), '-m', model, '-f', wavPath, '-nt', '-l', process.env.ORB2_WHISPER_LANG || 'auto'],
       { stdout: 'pipe', stderr: 'ignore' },
     )
     const out = await new Response(proc.stdout).text()
@@ -379,7 +379,7 @@ class WhisperSession implements VoiceSession {
     if (ttsUrl()) { await this.speakHttp(text); return }
     if (!piperModel() || !(await which(piperBin()))) return // text-only
     const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    const outWav = join(tmpdir(), `rak00n-tts-${stamp}.wav`)
+    const outWav = join(tmpdir(), `orb2-tts-${stamp}.wav`)
     try {
       const proc = Bun.spawn([piperBin(), '-m', piperModel(), '-f', outWav], {
         stdin: 'pipe',

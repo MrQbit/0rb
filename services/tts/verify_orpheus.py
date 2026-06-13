@@ -6,7 +6,7 @@ before flipping the live engine. Writes /tmp/orpheus_test.wav for a listen.
 """
 import os, wave, numpy as np
 
-os.environ.setdefault("RAK00N_TTS_ENGINE", "orpheus")
+os.environ.setdefault("ORB2_TTS_ENGINE", "orpheus")
 import server  # noqa: E402  (uses the same engine code the service serves)
 
 TEXT = "Oh, that's actually a good one <laugh>. Let me pull it up for you."

@@ -8,7 +8,7 @@
  * clone` against github.com.
  *
  * Storage (Redis):
- *   rak00n:github:user:{oid}   -> JSON { token, login, scopes, granted_at, name?, email? }
+ *   orb2:github:user:{oid}   -> JSON { token, login, scopes, granted_at, name?, email? }
  *
  * The token is the only sensitive bit; we never log it and only emit
  * { login, scopes, granted_at, name, email } back to the client via
@@ -18,7 +18,7 @@
  */
 import type { Store } from '../store/store.js'
 
-const KEY_PREFIX = 'rak00n:github:user:'
+const KEY_PREFIX = 'orb2:github:user:'
 
 export type StoredGitHubToken = {
   token: string
@@ -37,10 +37,10 @@ function keyFor(oid: string): string {
 
 // GitHub user tokens don't expire by default; we still bound them to
 // 30 days so a long-idle user has to re-authenticate. Override with
-// RAK00N_GH_USER_TOKEN_TTL_SECONDS at deploy time.
+// ORB2_GH_USER_TOKEN_TTL_SECONDS at deploy time.
 const TOKEN_TTL_SECONDS = Math.max(
   60 * 60,
-  parseInt(process.env.RAK00N_GH_USER_TOKEN_TTL_SECONDS ?? '', 10) || 30 * 24 * 60 * 60,
+  parseInt(process.env.ORB2_GH_USER_TOKEN_TTL_SECONDS ?? '', 10) || 30 * 24 * 60 * 60,
 )
 
 export async function saveGitHubUserToken(
@@ -91,7 +91,7 @@ export async function fetchGitHubUserProfile(
         Authorization: `Bearer ${token}`,
         Accept: 'application/vnd.github+json',
         'X-GitHub-Api-Version': '2022-11-28',
-        'User-Agent': 'rak00n-api',
+        'User-Agent': 'orb2-api',
       },
     })
     if (!res.ok) return null
@@ -108,7 +108,7 @@ export async function fetchGitHubUserProfile(
             Authorization: `Bearer ${token}`,
             Accept: 'application/vnd.github+json',
             'X-GitHub-Api-Version': '2022-11-28',
-            'User-Agent': 'rak00n-api',
+            'User-Agent': 'orb2-api',
           },
         })
         if (emailsRes.ok) {

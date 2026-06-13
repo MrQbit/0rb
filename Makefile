@@ -9,22 +9,22 @@
 .DEFAULT_GOAL := help
 
 # ── Variables ─────────────────────────────────────────────────────────
-IMAGE_NAME    := rak00n-api
+IMAGE_NAME    := orb2-api
 IMAGE_TAG     ?= dev
 API_PORT      ?= 9080
 VLLM_PORT     ?= 8000
 VLLM_MODEL    ?= Qwen/Qwen3-Coder-Next
 VLLM_SERVED   ?= qwen3-coder-next
-CLUSTER_NAME  ?= rak00n-dev
+CLUSTER_NAME  ?= orb2-dev
 # Host vLLM URL (for DGX Spark where vLLM runs natively)
 VLLM_HOST_URL ?= http://host.k3d.internal:$(VLLM_PORT)/v1
-UI_IMAGE      := rak00n-ui
+UI_IMAGE      := orb2-ui
 UI_PORT       ?= 9081
 BUN           := $(shell command -v bun 2>/dev/null || echo "$$HOME/.bun/bin/bun")
 
 help:
 	@echo "═══════════════════════════════════════════════════════════════"
-	@echo "  rak00n — Personal AI Coding Agent (DGX Spark)"
+	@echo "  orb2 — Personal AI Coding Agent (DGX Spark)"
 	@echo "═══════════════════════════════════════════════════════════════"
 	@echo ""
 	@echo "  DGX Spark (vLLM already running on host):"
@@ -83,7 +83,7 @@ build-api: ensure-deps
 
 # ── Docker ────────────────────────────────────────────────────────────
 REGISTRY      ?= localhost:5001
-CANVAS_IMAGE  := rak00n-canvas
+CANVAS_IMAGE  := orb2-canvas
 
 docker-build: build-api
 	docker build -t $(IMAGE_NAME):$(IMAGE_TAG) -f Dockerfile.api.dev .
@@ -106,8 +106,8 @@ push: docker-build docker-build-ui docker-build-canvas
 
 # Create internal registry and connect to cluster (one-time setup)
 registry:
-	k3d registry create rak00n-registry --port 5001 || true
-	docker network connect k3d-rak00n-dev k3d-rak00n-registry || true
+	k3d registry create orb2-registry --port 5001 || true
+	docker network connect k3d-orb2-dev k3d-orb2-registry || true
 	@echo "✓ Registry at localhost:5001"
 
 # ── Local dev (docker compose) ────────────────────────────────────────
@@ -121,7 +121,7 @@ dev-no-vllm: build-api
 # ── DGX Spark (vLLM on host, everything else in k3d) ──────────────────
 spark: build-api docker-build docker-build-ui
 	@echo "═══════════════════════════════════════════════════════════════"
-	@echo "  rak00n — DGX Spark mode"
+	@echo "  orb2 — DGX Spark mode"
 	@echo "  vLLM on host → k3d (Redis + API + UI console)"
 	@echo "═══════════════════════════════════════════════════════════════"
 	@# 1. Create cluster if needed (expose API and UI ports)
@@ -140,7 +140,7 @@ spark: build-api docker-build docker-build-ui
 	@k3d image import $(UI_IMAGE):$(IMAGE_TAG) -c $(CLUSTER_NAME)
 	@# 3. Helm deploy — no vLLM pod, point API at host vLLM, enable UI
 	@echo "→ Deploying Redis + API + UI (vLLM on host at $(VLLM_HOST_URL))..."
-	helm upgrade --install rak00n deploy/helm/rak00n \
+	helm upgrade --install orb2 deploy/helm/orb2 \
 		--set global.imageTag=$(IMAGE_TAG) \
 		--set global.imagePullPolicy=Never \
 		--set global.imageRepository=$(IMAGE_NAME) \
@@ -155,17 +155,17 @@ spark: build-api docker-build docker-build-ui
 		--set ui.image.pullPolicy=Never \
 		--wait --timeout 120s
 	@# 4. Wait
-	@kubectl -n rak00n rollout status deploy/rak00n-api --timeout=120s
-	@kubectl -n rak00n rollout status deploy/rak00n-ui --timeout=60s
+	@kubectl -n orb2 rollout status deploy/orb2-api --timeout=120s
+	@kubectl -n orb2 rollout status deploy/orb2-ui --timeout=60s
 	@echo ""
 	@echo "═══════════════════════════════════════════════════════════════"
-	@echo "  rak00n is running! (DGX Spark mode)"
+	@echo "  orb2 is running! (DGX Spark mode)"
 	@echo "═══════════════════════════════════════════════════════════════"
 	@echo ""
-	@echo "  Console: kubectl -n rak00n port-forward svc/rak00n-ui $(UI_PORT):80 &"
+	@echo "  Console: kubectl -n orb2 port-forward svc/orb2-ui $(UI_PORT):80 &"
 	@echo "           then open http://localhost:$(UI_PORT)"
 	@echo ""
-	@echo "  API:     kubectl -n rak00n port-forward svc/rak00n-api $(API_PORT):8080 &"
+	@echo "  API:     kubectl -n orb2 port-forward svc/orb2-api $(API_PORT):8080 &"
 	@echo "           curl http://localhost:$(API_PORT)/healthz"
 	@echo ""
 	@echo "  vLLM:    $(VLLM_HOST_URL) (on host)"
@@ -178,8 +178,8 @@ spark: build-api docker-build docker-build-ui
 
 spark-forward:
 	@echo "→ Port-forwarding UI → localhost:$(UI_PORT), API → localhost:$(API_PORT)"
-	@kubectl -n rak00n port-forward svc/rak00n-ui $(UI_PORT):80 &
-	@kubectl -n rak00n port-forward svc/rak00n-api $(API_PORT):8080 &
+	@kubectl -n orb2 port-forward svc/orb2-ui $(UI_PORT):80 &
+	@kubectl -n orb2 port-forward svc/orb2-api $(API_PORT):8080 &
 	@echo ""
 	@echo "  Console: http://localhost:$(UI_PORT)"
 	@echo "  API:     http://localhost:$(API_PORT)"
@@ -199,7 +199,7 @@ k3d-build: build-api docker-build
 	k3d image import $(IMAGE_NAME):$(IMAGE_TAG) -c $(CLUSTER_NAME)
 
 k3d-deploy:
-	helm upgrade --install rak00n deploy/helm/rak00n \
+	helm upgrade --install orb2 deploy/helm/orb2 \
 		--set global.imageTag=$(IMAGE_TAG) \
 		--set global.imagePullPolicy=Never \
 		--set global.imageRepository=$(IMAGE_NAME) \
@@ -209,16 +209,16 @@ k3d-deploy:
 		--wait --timeout 300s
 
 k3d-status:
-	@kubectl -n rak00n get pods,svc,deploy,statefulset 2>/dev/null || \
-		echo "No rak00n namespace found. Run: make k3d"
+	@kubectl -n orb2 get pods,svc,deploy,statefulset 2>/dev/null || \
+		echo "No orb2 namespace found. Run: make k3d"
 
 k3d-logs:
-	kubectl -n rak00n logs deploy/rak00n-api -f
+	kubectl -n orb2 logs deploy/orb2-api -f
 
 k3d-port-forward:
 	@echo "→ Port-forwarding API → localhost:$(API_PORT), vLLM → localhost:$(VLLM_PORT)"
-	@kubectl -n rak00n port-forward svc/rak00n-api $(API_PORT):8080 &
-	@kubectl -n rak00n port-forward svc/rak00n-vllm $(VLLM_PORT):8000 2>/dev/null &
+	@kubectl -n orb2 port-forward svc/orb2-api $(API_PORT):8080 &
+	@kubectl -n orb2 port-forward svc/orb2-vllm $(VLLM_PORT):8000 2>/dev/null &
 	@echo "  API:  http://localhost:$(API_PORT)"
 	@echo "  vLLM: http://localhost:$(VLLM_PORT)"
 	@echo "  Stop: kill %1 %2"
@@ -278,7 +278,7 @@ tailscale-status:
 voice-setup:
 	bash scripts/install-whisper.sh
 
-# Optional full-duplex backend (RAK00N_VOICE_BACKEND=personaplex).
+# Optional full-duplex backend (ORB2_VOICE_BACKEND=personaplex).
 voice-setup-personaplex:
 	bash scripts/install-personaplex.sh
 

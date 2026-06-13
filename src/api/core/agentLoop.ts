@@ -74,7 +74,7 @@ function buildBody(state: LoopState, toolDefs: any[], stream: boolean): any {
     stream,
     ...(stream && { stream_options: { include_usage: true } }),
     // vLLM/Qwen reasoning toggle (ignored by OpenAI/OpenRouter).
-    ...(process.env.RAK00N_DISABLE_THINKING === '1' && {
+    ...(process.env.ORB2_DISABLE_THINKING === '1' && {
       chat_template_kwargs: { enable_thinking: false },
     }),
   }

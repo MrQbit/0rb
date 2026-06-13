@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────────────────
-# rak00n k3d Full Stack Setup
+# orb2 k3d Full Stack Setup
 #
-# One command to deploy the entire rak00n stack into a local k3d
-# cluster: vLLM (Qwen3-Coder-Next) + Redis + rak00n API.
+# One command to deploy the entire orb2 stack into a local k3d
+# cluster: vLLM (Qwen3-Coder-Next) + Redis + orb2 API.
 #
 # Usage:
 #   ./scripts/k3d-setup.sh
@@ -16,13 +16,13 @@
 # ──────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
-CLUSTER_NAME="${RAK00N_K3D_CLUSTER:-rak00n-dev}"
-CHART_DIR="$(cd "$(dirname "$0")/../deploy/helm/rak00n" && pwd)"
+CLUSTER_NAME="${ORB2_K3D_CLUSTER:-orb2-dev}"
+CHART_DIR="$(cd "$(dirname "$0")/../deploy/helm/orb2" && pwd)"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-IMAGE_NAME="rak00n-api"
+IMAGE_NAME="orb2-api"
 IMAGE_TAG="dev"
-API_PORT="${RAK00N_API_PORT:-9080}"
-VLLM_PORT="${RAK00N_VLLM_PORT:-8000}"
+API_PORT="${ORB2_API_PORT:-9080}"
+VLLM_PORT="${ORB2_VLLM_PORT:-8000}"
 
 # Defaults
 FOUNDRY_KEY=""
@@ -67,7 +67,7 @@ for arg in "$@"; do
       echo "  --foundry-key=KEY      Anthropic Foundry API key (fallback)"
       echo "  --foundry-url=URL      Anthropic Foundry URL (fallback)"
       echo "  --foundry-resource=RES Anthropic Foundry resource name"
-      echo "  --cluster=NAME         k3d cluster name (default: rak00n-dev)"
+      echo "  --cluster=NAME         k3d cluster name (default: orb2-dev)"
       echo "  --port=PORT            API port on host (default: 9080)"
       exit 0 ;;
     *) echo "Unknown arg: $arg"; exit 1 ;;
@@ -75,7 +75,7 @@ for arg in "$@"; do
 done
 
 echo "═══════════════════════════════════════════════════════════════"
-echo "  rak00n — Full Stack k3d Setup"
+echo "  orb2 — Full Stack k3d Setup"
 echo "═══════════════════════════════════════════════════════════════"
 echo ""
 echo "  Cluster:    $CLUSTER_NAME"
@@ -117,9 +117,9 @@ else
   echo "✓ Cluster created"
 fi
 
-# ── 3. Build rak00n API ─────────────────────────────────────────────
+# ── 3. Build orb2 API ─────────────────────────────────────────────
 if [ "$SKIP_BUILD" = false ]; then
-  echo "→ Building rak00n API..."
+  echo "→ Building orb2 API..."
   cd "$PROJECT_DIR"
   "$BUN_BIN" install --frozen-lockfile 2>/dev/null || "$BUN_BIN" install
   SKIP_BUILD_SMOKE=1 "$BUN_BIN" run scripts/build-api.ts 2>/dev/null || \
@@ -174,40 +174,40 @@ if [ -n "$FOUNDRY_RESOURCE" ]; then
   HELM_SET+=(--set "llm.foundry.resource=${FOUNDRY_RESOURCE}")
 fi
 
-helm upgrade --install rak00n "$CHART_DIR" \
+helm upgrade --install orb2 "$CHART_DIR" \
   "${HELM_SET[@]}" \
   --wait --timeout 300s
 
 # ── 5. Wait for rollout ─────────────────────────────────────────────
 echo "→ Waiting for pods..."
-kubectl -n rak00n rollout status deploy/rak00n-api --timeout=120s
-kubectl -n rak00n rollout status statefulset/rak00n-redis --timeout=60s 2>/dev/null || true
+kubectl -n orb2 rollout status deploy/orb2-api --timeout=120s
+kubectl -n orb2 rollout status statefulset/orb2-redis --timeout=60s 2>/dev/null || true
 
 if [ "$SKIP_VLLM" = false ]; then
   echo "→ Waiting for vLLM (this may take a few minutes for model download)..."
-  kubectl -n rak00n rollout status deploy/rak00n-vllm --timeout=600s 2>/dev/null || \
-    echo "  (vLLM still loading model — check: kubectl -n rak00n logs deploy/rak00n-vllm -f)"
+  kubectl -n orb2 rollout status deploy/orb2-vllm --timeout=600s 2>/dev/null || \
+    echo "  (vLLM still loading model — check: kubectl -n orb2 logs deploy/orb2-vllm -f)"
 fi
 
 # ── 6. Summary ───────────────────────────────────────────────────────
 echo ""
 echo "═══════════════════════════════════════════════════════════════"
-echo "  rak00n is running!"
+echo "  orb2 is running!"
 echo "═══════════════════════════════════════════════════════════════"
 echo ""
-echo "  API:      kubectl -n rak00n port-forward svc/rak00n-api ${API_PORT}:8080 &"
+echo "  API:      kubectl -n orb2 port-forward svc/orb2-api ${API_PORT}:8080 &"
 echo "            curl http://localhost:${API_PORT}/healthz"
 echo ""
 if [ "$SKIP_VLLM" = false ]; then
-echo "  vLLM:     kubectl -n rak00n port-forward svc/rak00n-vllm ${VLLM_PORT}:8000 &"
+echo "  vLLM:     kubectl -n orb2 port-forward svc/orb2-vllm ${VLLM_PORT}:8000 &"
 echo "            curl http://localhost:${VLLM_PORT}/v1/models"
 echo ""
 fi
 echo "  Chat:     curl -X POST http://localhost:${API_PORT}/v1/chat \\
               -H 'Content-Type: application/json' \\
-              -d '{\"message\": \"Hello rak00n!\", \"model\": \"${VLLM_SERVED_NAME}\"}'"
+              -d '{\"message\": \"Hello orb2!\", \"model\": \"${VLLM_SERVED_NAME}\"}'"
 echo ""
-echo "  Pods:     kubectl -n rak00n get pods"
-echo "  Logs:     kubectl -n rak00n logs deploy/rak00n-api -f"
+echo "  Pods:     kubectl -n orb2 get pods"
+echo "  Logs:     kubectl -n orb2 logs deploy/orb2-api -f"
 echo "  Teardown: ./scripts/k3d-teardown.sh"
 echo ""

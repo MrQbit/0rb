@@ -8,7 +8,7 @@
  *   GET /v1/whatsapp/qr       → image/png while unlinked (202 if not ready)
  */
 function bridgeUrl(): string {
-  return (process.env.RAK00N_WHATSAPP_BRIDGE_URL || 'http://whatsapp:8995').replace(/\/+$/, '')
+  return (process.env.ORB2_WHATSAPP_BRIDGE_URL || 'http://whatsapp:8995').replace(/\/+$/, '')
 }
 
 function jsonResponse(status: number, body: unknown): Response {

@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#06080a" />
-  <title>rak00n</title>
-  <link rel="icon" href="/web/assets/rak00n-logo.svg" type="image/svg+xml" />
+  <title>orb2</title>
+  <link rel="icon" href="/web/assets/orb2-logo.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/vendor/leaflet/leaflet.css" />
   <link rel="stylesheet" href="/orb.css" />
 </head>
@@ -16,7 +16,7 @@
   <!-- minimal chrome -->
   <header id="topbar">
     <div class="left">
-      <img class="brandlogo-r" src="/web/assets/rak00n-logo.svg" alt="rak00n" />
+      <img class="brandlogo-r" src="/web/assets/orb2-logo.svg" alt="orb2" />
       <span class="wordmark">rak<b>00</b>n</span>
       <span id="liveDot" class="status-dot"></span>
     </div>
@@ -54,7 +54,7 @@
         <!-- Access -->
         <div class="set-sec active" data-sec="access">
           <h3>Remote access</h3>
-          <p class="set-muted">Reach rak00n from any device on your tailnet — with camera &amp; mic.</p>
+          <p class="set-muted">Reach orb2 from any device on your tailnet — with camera &amp; mic.</p>
           <div class="set-card">
             <div class="set-kv"><span>Tailscale</span><span id="tsState" class="set-muted small">Checking…</span></div>
             <div class="set-row" id="tsUrlRow" style="display:none;"><a id="setPublicUrl" target="_blank" rel="noopener" class="set-url">—</a><button id="setCopyUrl" class="set-btn ghost">Copy</button></div>
@@ -196,7 +196,7 @@
         <!-- Files -->
         <div class="set-sec" data-sec="files">
           <h3>Files</h3>
-          <p class="set-muted">Files you've shared with rak00n.</p>
+          <p class="set-muted">Files you've shared with orb2.</p>
           <div id="setFilesSummary" class="set-muted small"></div>
           <div id="setFiles" class="set-list"><div class="set-muted">Loading…</div></div>
         </div>
@@ -217,7 +217,7 @@
         <!-- System -->
         <div class="set-sec" data-sec="system">
           <h3>System</h3>
-          <p class="set-muted">The brain + the services that power rak00n.</p>
+          <p class="set-muted">The brain + the services that power orb2.</p>
           <div id="setSystem" class="set-list"><div class="set-muted">Loading…</div></div>
           <details class="apps-conn" style="margin-top:14px;"><summary>Brain endpoint (run in the cloud)</summary>
             <div class="set-card" id="setBrainCfg"><div class="set-muted small">Loading…</div></div>
@@ -245,12 +245,12 @@
   <!-- chat panel (grows from the orb) -->
   <section id="panel" aria-label="chat">
     <div class="panel-head">
-      <div class="title"><b>rak00n</b> <span id="brandModel" style="color:var(--ink-dim);font-size:11px;"></span></div>
+      <div class="title"><b>orb2</b> <span id="brandModel" style="color:var(--ink-dim);font-size:11px;"></span></div>
       <button class="panel-x" id="panelClose" aria-label="Collapse">▾</button>
     </div>
     <div id="messages"><div class="empty-hint">Ask me anything — or tap the orb to talk.</div></div>
     <div class="panel-input">
-      <textarea id="input" rows="1" placeholder="Message rak00n…" autocomplete="off"></textarea>
+      <textarea id="input" rows="1" placeholder="Message orb2…" autocomplete="off"></textarea>
       <button id="sendBtn" class="round-btn" title="Send" aria-label="Send">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/></svg>
       </button>
@@ -265,7 +265,7 @@
       <span class="dock-label" id="audioLabel">Go live</span>
     </button>
     <span class="dock-sep"></span>
-    <button id="camToggle" class="dock-btn cam-off" aria-label="Camera" title="Camera — let rak00n see (off by default)">
+    <button id="camToggle" class="dock-btn cam-off" aria-label="Camera" title="Camera — let orb2 see (off by default)">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
       <span class="dock-label">Camera</span>
     </button>

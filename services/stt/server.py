@@ -1,5 +1,5 @@
 """
-rak00n GPU STT service — SenseVoice (primary) with faster-whisper fallback.
+orb2 GPU STT service — SenseVoice (primary) with faster-whisper fallback.
 
 Why SenseVoice: it transcribes AND, in the same forward pass, recognises the
 speaker's emotion (happy/sad/angry/…) and audio events (laughter, sigh,
@@ -9,8 +9,8 @@ the agent then "hears how you said it", recovering most of what a full
 speech-to-speech Omni model would give, without leaving the stable cascade.
 
 Engine is selectable so the proven path always survives:
-  RAK00N_STT_ENGINE=sensevoice   (default) FunASR SenseVoiceSmall
-  RAK00N_STT_ENGINE=whisper      faster-whisper (CTranslate2), the old engine
+  ORB2_STT_ENGINE=sensevoice   (default) FunASR SenseVoiceSmall
+  ORB2_STT_ENGINE=whisper      faster-whisper (CTranslate2), the old engine
 
 Reached by the API over the compose network at http://stt:8990.
 
@@ -42,22 +42,22 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 log = logging.getLogger("stt")
 
 SAMPLE_RATE = 16000
-ENGINE = os.environ.get("RAK00N_STT_ENGINE", "sensevoice").lower()
-LANG = os.environ.get("RAK00N_STT_LANG", "auto")  # SenseVoice: auto/en/zh/ja/ko/yue
+ENGINE = os.environ.get("ORB2_STT_ENGINE", "sensevoice").lower()
+LANG = os.environ.get("ORB2_STT_LANG", "auto")  # SenseVoice: auto/en/zh/ja/ko/yue
 
 # faster-whisper knobs (fallback engine)
-WHISPER_MODEL = os.environ.get("RAK00N_STT_MODEL", "small.en")
-WHISPER_COMPUTE = os.environ.get("RAK00N_STT_COMPUTE", "float16")
+WHISPER_MODEL = os.environ.get("ORB2_STT_MODEL", "small.en")
+WHISPER_COMPUTE = os.environ.get("ORB2_STT_COMPUTE", "float16")
 
 # SenseVoice knobs. Default to the HuggingFace hub (fast CDN + our HF_TOKEN);
-# set RAK00N_SENSEVOICE_HUB=ms to use ModelScope instead.
-SENSEVOICE_HUB = os.environ.get("RAK00N_SENSEVOICE_HUB", "hf").lower()
+# set ORB2_SENSEVOICE_HUB=ms to use ModelScope instead.
+SENSEVOICE_HUB = os.environ.get("ORB2_SENSEVOICE_HUB", "hf").lower()
 SENSEVOICE_MODEL = os.environ.get(
-    "RAK00N_SENSEVOICE_MODEL",
+    "ORB2_SENSEVOICE_MODEL",
     "FunAudioLLM/SenseVoiceSmall" if SENSEVOICE_HUB == "hf" else "iic/SenseVoiceSmall",
 )
 
-app = FastAPI(title="rak00n-stt", version="2.0")
+app = FastAPI(title="orb2-stt", version="2.0")
 _model = None
 _device = "cpu"
 _engine = ENGINE  # may flip to "faster-whisper" if SenseVoice fails to load
@@ -244,8 +244,8 @@ async def transcribe(request: Request, file: UploadFile | None = File(default=No
 if __name__ == "__main__":
     import uvicorn
 
-    port = int(os.environ.get("RAK00N_STT_PORT", "8990"))
-    if os.environ.get("RAK00N_STT_WARM", "1") == "1":
+    port = int(os.environ.get("ORB2_STT_PORT", "8990"))
+    if os.environ.get("ORB2_STT_WARM", "1") == "1":
         try:
             _transcribe(np.zeros(SAMPLE_RATE // 2, dtype=np.float32))  # 0.5s silence
         except Exception as e:

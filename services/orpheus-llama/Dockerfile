@@ -12,8 +12,8 @@ COPY llama-bin/ /opt/llama/
 RUN chmod +x /opt/llama/llama-server
 
 ENV LD_LIBRARY_PATH=/opt/llama:/usr/local/cuda/lib64:/usr/local/cuda/targets/sbsa-linux/lib \
-    RAK00N_ORPHEUS_GGUF=/models/orpheus-q4_k_m.gguf
+    ORB2_ORPHEUS_GGUF=/models/orpheus-q4_k_m.gguf
 EXPOSE 8081
 # -ngl 99: all layers on GPU. -c 2048: ample for one utterance. --parallel 1:
 # single user. --cont-batching keeps streaming snappy.
-CMD ["sh", "-c", "/opt/llama/llama-server -m \"$RAK00N_ORPHEUS_GGUF\" -ngl 99 --host 0.0.0.0 --port 8081 -c 2048 --parallel 1 --cont-batching"]
+CMD ["sh", "-c", "/opt/llama/llama-server -m \"$ORB2_ORPHEUS_GGUF\" -ngl 99 --host 0.0.0.0 --port 8081 -c 2048 --parallel 1 --cont-batching"]

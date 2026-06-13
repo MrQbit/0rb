@@ -30,8 +30,8 @@ export interface WidgetPlugin {
 }
 
 export function widgetsDir(): string {
-  if (process.env.RAK00N_WIDGETS_DIR) return process.env.RAK00N_WIDGETS_DIR
-  const ws = process.env.RAK00N_API_WORKSPACE_ROOT || process.cwd()
+  if (process.env.ORB2_WIDGETS_DIR) return process.env.ORB2_WIDGETS_DIR
+  const ws = process.env.ORB2_API_WORKSPACE_ROOT || process.cwd()
   return join(ws, '.widgets')
 }
 

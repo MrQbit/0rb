@@ -2,11 +2,11 @@
  * Cost / usage analytics endpoints.
  *
  * Per-turn token usage is recorded in Redis (key
- * `rak00n:cost:session:<id>` -- a JSON-encoded array of records). The
+ * `orb2:cost:session:<id>` -- a JSON-encoded array of records). The
  * total list is bounded; we keep the last 1000 records per session.
  *
  * Pricing: per-model $/Mtok rates from PRICING below. Override via
- * env vars `RAK00N_PRICE_<MODEL>_INPUT` and `RAK00N_PRICE_<MODEL>_OUTPUT`
+ * env vars `ORB2_PRICE_<MODEL>_INPUT` and `ORB2_PRICE_<MODEL>_OUTPUT`
  * (USD per million tokens). Unknown models fall back to the
  * `default` entry.
  *
@@ -24,10 +24,10 @@ function jsonResponse(status: number, body: unknown): Response {
   })
 }
 
-const COST_KEY_PREFIX = 'rak00n:cost:session:'
-const COST_INDEX_KEY = 'rak00n:cost:index'
-const COST_OWNER_PREFIX = 'rak00n:cost:owner:'
-const COST_OWNER_INDEX = 'rak00n:cost:owners'
+const COST_KEY_PREFIX = 'orb2:cost:session:'
+const COST_INDEX_KEY = 'orb2:cost:index'
+const COST_OWNER_PREFIX = 'orb2:cost:owner:'
+const COST_OWNER_INDEX = 'orb2:cost:owners'
 
 export type CostRecord = {
   session_id: string
@@ -52,8 +52,8 @@ const PRICING: Record<string, { input: number; output: number }> = {
 
 function priceFor(model: string): { input: number; output: number } {
   const norm = model.toUpperCase().replace(/[^A-Z0-9]/g, '_')
-  const envIn = process.env[`RAK00N_PRICE_${norm}_INPUT`]
-  const envOut = process.env[`RAK00N_PRICE_${norm}_OUTPUT`]
+  const envIn = process.env[`ORB2_PRICE_${norm}_INPUT`]
+  const envOut = process.env[`ORB2_PRICE_${norm}_OUTPUT`]
   const base = PRICING[model] ?? PRICING.default
   return {
     input: envIn ? Number(envIn) : base.input,

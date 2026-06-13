@@ -1,7 +1,7 @@
 /**
  * Embedded-skill bootstrap.
  *
- * Walks the bundled `dist/skills/` (mounted at `/opt/rak00n-api/skills/`
+ * Walks the bundled `dist/skills/` (mounted at `/opt/orb2-api/skills/`
  * inside the container) and registers each `.md` file with the SDK's
  * `registerBundledSkill()` registry. After this runs, every skill
  * shipped in the image is permanently visible to the agent's
@@ -10,8 +10,8 @@
  *
  * Why this matters: `matchSkill()` already used the embedded set, but
  * the SDK's SkillTool is a SEPARATE codepath that scans
- * `<cwd>/.rak00n/skills/*.md` + the in-process bundled registry. For
- * third-party UIs whose cwd has no `.rak00n/skills` directory the
+ * `<cwd>/.orb2/skills/*.md` + the in-process bundled registry. For
+ * third-party UIs whose cwd has no `.orb2/skills` directory the
  * SkillTool found zero entries and the agent answered "no skills are
  * available".
  *
@@ -34,7 +34,7 @@ export async function bootstrapEmbeddedSkills(): Promise<{
   bootstrapped = true
 
   // RECOVERY TODO (re-platform): this used to register embedded skills into
-  // the legacy core's SDK slash-command registry via rak00n-core's
+  // the legacy core's SDK slash-command registry via orb2-core's
   // registerBundledSkill. The core has no such registry yet; skills
   // are loaded from markdown by the loader (getAllSkills) and matched by
   // ./skills/registry. Until skill matching is re-wired onto the agent core

@@ -2,7 +2,7 @@
  * Widget registry routes for Settings → Apps.
  *   GET  /v1/widgets/registry  (session) → WidgetStatus[]
  *   POST /v1/widgets/toggle    (session) → { id, enabled } → persists on/off
- * On/off is stored as a comma-separated RAK00N_WIDGETS_DISABLED setting (KV +
+ * On/off is stored as a comma-separated ORB2_WIDGETS_DISABLED setting (KV +
  * process.env) so it survives restarts, mirroring the other settings.
  */
 import { readFileSync } from 'node:fs'
@@ -50,8 +50,8 @@ export async function tryWidgetRegistryRoute(req: Request, method: string, pathn
     if (!id || !WIDGET_CATALOG.some(w => w.id === id)) return json(400, { error: 'unknown widget id' })
     const enabled = b.enabled !== false
     const csv = toggleWidgetDisabled(id, enabled)
-    process.env.RAK00N_WIDGETS_DISABLED = csv
-    await store.putKv(`${SETTINGS_KV_PREFIX}RAK00N_WIDGETS_DISABLED`, csv, 0).catch(() => {})
+    process.env.ORB2_WIDGETS_DISABLED = csv
+    await store.putKv(`${SETTINGS_KV_PREFIX}ORB2_WIDGETS_DISABLED`, csv, 0).catch(() => {})
     return json(200, { id, enabled, disabled: csv })
   }
   return null

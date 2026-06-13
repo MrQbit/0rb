@@ -8,15 +8,15 @@
  */
 import { log } from '../log.js'
 
-const TS_BIN = process.env.RAK00N_TAILSCALE_BIN || 'tailscale'
+const TS_BIN = process.env.ORB2_TAILSCALE_BIN || 'tailscale'
 /** The plain-HTTP port `tailscale serve` should proxy to (the UI). */
 function serveTarget(): string {
-  return process.env.RAK00N_TS_SERVE_TARGET || 'http://127.0.0.1:9080'
+  return process.env.ORB2_TS_SERVE_TARGET || 'http://127.0.0.1:9080'
 }
 
 /** Disabled only if explicitly turned off; otherwise we probe the CLI. */
 export function tailscaleConfigured(): boolean {
-  return process.env.RAK00N_TAILSCALE_ENABLED !== '0'
+  return process.env.ORB2_TAILSCALE_ENABLED !== '0'
 }
 
 async function run(args: string[], timeoutMs = 30000): Promise<{ ok: boolean; out: string; err: string }> {

@@ -2,9 +2,9 @@
  * Worker dispatch — creates a K8s Job for each agent turn and proxies
  * events back to the caller via Redis Pub/Sub.
  *
- * When RAK00N_WORKER_MODE=k8s-jobs, handleChat/a2a/requestConsumer call
+ * When ORB2_WORKER_MODE=k8s-jobs, handleChat/a2a/requestConsumer call
  * dispatchToWorker() instead of runAgentTurn() directly. The Job pod
- * runs the same image with RAK00N_MODE=worker, executes one turn, and
+ * runs the same image with ORB2_MODE=worker, executes one turn, and
  * exits. Session state lives in Redis, filesystem is ephemeral.
  *
  * Fallback: if Job creation fails or worker mode is off, callers
@@ -14,8 +14,8 @@ import { randomUUID } from 'node:crypto'
 import type { Store } from './store/store.js'
 import { log } from './log.js'
 
-const WORKER_CHANNEL_PREFIX = 'rak00n:stream:'
-const WORKER_STATE_PREFIX = 'rak00n:worker:'
+const WORKER_CHANNEL_PREFIX = 'orb2:stream:'
+const WORKER_STATE_PREFIX = 'orb2:worker:'
 const DEFAULT_TIMEOUT_MS = 600_000 // 10 min
 
 export type WorkerKnobs = {
@@ -77,7 +77,7 @@ export type WorkerTask = {
   knobs?: WorkerKnobs
   /**
    * Snapshot of the agent + MCP palette at dispatch time. The worker
-   * materializes these into <cwd>/.rak00n/agents/*.md + a synthesized
+   * materializes these into <cwd>/.orb2/agents/*.md + a synthesized
    * .mcp.json before runAgentTurn so the standard loaders pick them
    * up. Discovery and dynamic-agent edits made *after* dispatch are
    * picked up by the next turn (no live reload mid-turn).
@@ -89,7 +89,7 @@ export type WorkerTask = {
    * Internal bridge token. Lets a tool running inside the worker pod
    * call back into the router's API surface (jobs, sub-worker spawn,
    * MCP admin, sandbox, vault) using a short-lived HMAC. Forwarded
-   * via the K8s Job's RAK00N_INTERNAL_TOKEN env var.
+   * via the K8s Job's ORB2_INTERNAL_TOKEN env var.
    */
   bridgeToken?: string
   bridgeUrl?: string
@@ -118,7 +118,7 @@ export type WorkerEvent =
   | { type: 'error'; message: string }
 
 export function isWorkerModeEnabled(): boolean {
-  return process.env.RAK00N_WORKER_MODE === 'k8s-jobs'
+  return process.env.ORB2_WORKER_MODE === 'k8s-jobs'
 }
 
 /**
@@ -213,7 +213,7 @@ export async function enqueueWorkerTask(
   turnId: string,
   task: WorkerTask,
 ): Promise<void> {
-  const key = `rak00n:task:${turnId}`
+  const key = `orb2:task:${turnId}`
   const existing = await store.getKv(key)
   if (existing) {
     log.warn('worker_task_already_enqueued', { turnId, sessionId: task.sessionId })
@@ -232,14 +232,14 @@ export async function dequeueWorkerTask(
   store: Store,
   turnId: string,
 ): Promise<WorkerTask | null> {
-  const raw = await store.getDelKv(`rak00n:task:${turnId}`)
+  const raw = await store.getDelKv(`orb2:task:${turnId}`)
   if (!raw) return null
   return JSON.parse(raw)
 }
 
 // ─── Worker count tracking ───
-const WORKER_ACTIVE_KEY = 'rak00n:workers:active'
-const WORKER_TOTAL_KEY = 'rak00n:workers:total'
+const WORKER_ACTIVE_KEY = 'orb2:workers:active'
+const WORKER_TOTAL_KEY = 'orb2:workers:total'
 
 export async function incrementWorkerCount(store: Store): Promise<void> {
   const active = parseInt(await store.getKv(WORKER_ACTIVE_KEY) || '0', 10)
@@ -270,15 +270,15 @@ export async function launchWorkerJob(
   turnId: string,
   task: WorkerTask,
 ): Promise<{ jobName: string; reused?: boolean }> {
-  const namespace = process.env.RAK00N_WORKER_NAMESPACE || 'rak00n'
-  const image = process.env.RAK00N_WORKER_IMAGE || 'rak00n-api:dev'
-  const sa = process.env.RAK00N_WORKER_SA || 'rak00n-api'
+  const namespace = process.env.ORB2_WORKER_NAMESPACE || 'orb2'
+  const image = process.env.ORB2_WORKER_IMAGE || 'orb2-api:dev'
+  const sa = process.env.ORB2_WORKER_SA || 'orb2-api'
   const redisUrl = process.env.REDIS_URL || ''
   const foundryKey = process.env.ANTHROPIC_FOUNDRY_API_KEY || ''
   const foundryUrl = process.env.ANTHROPIC_FOUNDRY_BASE_URL || ''
   const internalApiUrl =
-    process.env.RAK00N_INTERNAL_API_URL ||
-    `http://rak00n-api.${namespace}.svc.cluster.local:8080`
+    process.env.ORB2_INTERNAL_API_URL ||
+    `http://orb2-api.${namespace}.svc.cluster.local:8080`
   // Mint a short-lived HMAC-bound token so router-side endpoints
   // can authenticate the worker without sharing a long-lived key.
   const { issueBridgeToken } = await import('./internal/bridgeAuth.js')
@@ -287,16 +287,16 @@ export async function launchWorkerJob(
   // Idempotent claim: only one router pod gets to spawn the Job for
   // a given turnId. A duplicate dispatch becomes a no-op so retried
   // requests don't double-charge or double-stream.
-  const claimed = await store.claim(`rak00n:turn:claimed:${turnId}`, 600)
+  const claimed = await store.claim(`orb2:turn:claimed:${turnId}`, 600)
   if (!claimed) {
     log.warn('worker_job_dispatch_skipped_already_claimed', { turnId, sessionId: task.sessionId })
-    return { jobName: `rak00n-worker-${turnId.slice(0, 8)}`, reused: true }
+    return { jobName: `orb2-worker-${turnId.slice(0, 8)}`, reused: true }
   }
 
   // Enqueue task to Redis first
   await enqueueWorkerTask(store, turnId, task)
 
-  const jobName = `rak00n-worker-${turnId.slice(0, 8)}`
+  const jobName = `orb2-worker-${turnId.slice(0, 8)}`
 
   // Read in-cluster credentials
   const { readFileSync } = await import('node:fs')
@@ -308,25 +308,25 @@ export async function launchWorkerJob(
   // chart's files.persistence block), the worker pod gets the SAME
   // volume mounted at the SAME path the api uses for uploads. Without
   // this, a chat that includes an uploaded file ends up with the
-  // agent looking for /workspace/rak00n-files/<sid>/uploads/<id>-<name>
+  // agent looking for /workspace/orb2-files/<sid>/uploads/<id>-<name>
   // and finding nothing -- the file lives in the api pod's emptyDir.
-  // The mount path defaults to RAK00N_FILES_ROOT, falling back to /var/rak00n/files.
+  // The mount path defaults to ORB2_FILES_ROOT, falling back to /var/orb2/files.
   function filesPvc(_sessionId: string): {
     volumes: Array<Record<string, unknown>>
     volumeMounts: Array<Record<string, unknown>>
   } {
-    const claim = process.env.RAK00N_WORKER_FILES_PVC?.trim()
+    const claim = process.env.ORB2_WORKER_FILES_PVC?.trim()
     if (!claim) return { volumes: [], volumeMounts: [] }
     const mountPath =
-      process.env.RAK00N_WORKER_FILES_MOUNT_PATH?.trim() ||
-      process.env.RAK00N_FILES_ROOT?.trim() ||
-      '/var/rak00n/files'
+      process.env.ORB2_WORKER_FILES_MOUNT_PATH?.trim() ||
+      process.env.ORB2_FILES_ROOT?.trim() ||
+      '/var/orb2/files'
     return {
       volumes: [
-        { name: 'rak00n-files', persistentVolumeClaim: { claimName: claim } },
+        { name: 'orb2-files', persistentVolumeClaim: { claimName: claim } },
       ],
       volumeMounts: [
-        { name: 'rak00n-files', mountPath, readOnly: false },
+        { name: 'orb2-files', mountPath, readOnly: false },
       ],
     }
   }
@@ -338,23 +338,23 @@ export async function launchWorkerJob(
       name: jobName,
       namespace,
       labels: {
-        'app.kubernetes.io/name': 'rak00n',
-        'app.kubernetes.io/instance': 'rak00n',
+        'app.kubernetes.io/name': 'orb2',
+        'app.kubernetes.io/instance': 'orb2',
         'app.kubernetes.io/component': 'worker',
-        'rak00n.ai/turn-id': turnId.slice(0, 8),
+        'orb2.ai/turn-id': turnId.slice(0, 8),
       },
     },
     spec: {
-      ttlSecondsAfterFinished: Number(process.env.RAK00N_WORKER_TTL) || 300,
-      activeDeadlineSeconds: Number(process.env.RAK00N_WORKER_DEADLINE) || 600,
+      ttlSecondsAfterFinished: Number(process.env.ORB2_WORKER_TTL) || 300,
+      activeDeadlineSeconds: Number(process.env.ORB2_WORKER_DEADLINE) || 600,
       backoffLimit: 0,
       template: {
         metadata: {
           labels: {
-            'app.kubernetes.io/name': 'rak00n',
-            'app.kubernetes.io/instance': 'rak00n',
+            'app.kubernetes.io/name': 'orb2',
+            'app.kubernetes.io/instance': 'orb2',
             'app.kubernetes.io/component': 'worker',
-            'rak00n.ai/turn-id': turnId.slice(0, 8),
+            'orb2.ai/turn-id': turnId.slice(0, 8),
           },
         },
         spec: {
@@ -363,21 +363,21 @@ export async function launchWorkerJob(
           containers: [{
             name: 'worker',
             image,
-            imagePullPolicy: process.env.RAK00N_WORKER_IMAGE_PULL_POLICY || 'IfNotPresent',
+            imagePullPolicy: process.env.ORB2_WORKER_IMAGE_PULL_POLICY || 'IfNotPresent',
             env: [
-              { name: 'RAK00N_MODE', value: 'worker' },
-              { name: 'RAK00N_WORKER_TURN_ID', value: turnId },
+              { name: 'ORB2_MODE', value: 'worker' },
+              { name: 'ORB2_WORKER_TURN_ID', value: turnId },
               { name: 'REDIS_URL', value: redisUrl },
               { name: 'ANTHROPIC_FOUNDRY_API_KEY', value: foundryKey },
               { name: 'ANTHROPIC_FOUNDRY_BASE_URL', value: foundryUrl },
               { name: 'NODE_ENV', value: 'production' },
-              { name: 'RAK00N_INTERNAL_API_URL', value: internalApiUrl },
-              { name: 'RAK00N_INTERNAL_TOKEN', value: bridgeToken },
-              { name: 'RAK00N_INTERNAL_TURN_ID', value: turnId },
-              { name: 'RAK00N_INTERNAL_SESSION_ID', value: task.sessionId },
+              { name: 'ORB2_INTERNAL_API_URL', value: internalApiUrl },
+              { name: 'ORB2_INTERNAL_TOKEN', value: bridgeToken },
+              { name: 'ORB2_INTERNAL_TURN_ID', value: turnId },
+              { name: 'ORB2_INTERNAL_SESSION_ID', value: task.sessionId },
               ...(task.knobs?.agentDefinition
                 ? [{
-                    name: 'RAK00N_AGENT_DEFINITION_JSON',
+                    name: 'ORB2_AGENT_DEFINITION_JSON',
                     value: JSON.stringify(task.knobs.agentDefinition),
                   }]
                 : []),

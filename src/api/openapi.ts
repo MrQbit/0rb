@@ -1,5 +1,5 @@
 /**
- * Statically-defined OpenAPI 3.1 spec for the RAK00N REST API.
+ * Statically-defined OpenAPI 3.1 spec for the ORB2 REST API.
  *
  * Hand-written rather than generated so we don't need a zod-to-openapi
  * dependency in the compiled binary. Mirrors the route handlers in
@@ -15,9 +15,9 @@ export function buildOpenApiSpec(opts: {
   return {
     openapi: '3.1.0',
     info: {
-      title: `RAK00N Agent API — ${opts.agentId}`,
+      title: `ORB2 Agent API — ${opts.agentId}`,
       description:
-        'REST + SSE surface for the RAK00N coding agent, deployed as an A2A platform agent. Authenticate with a Bearer `rak00n_*` API key minted by an admin via `POST /v1/keys` (or set in the SPA). Every /v1/* call carries the same auth model.',
+        'REST + SSE surface for the ORB2 coding agent, deployed as an A2A platform agent. Authenticate with a Bearer `orb2_*` API key minted by an admin via `POST /v1/keys` (or set in the SPA). Every /v1/* call carries the same auth model.',
       version: opts.version,
       license: { name: 'See LICENSE file' },
     },
@@ -27,7 +27,7 @@ export function buildOpenApiSpec(opts: {
         bearerKey: {
           type: 'http',
           scheme: 'bearer',
-          bearerFormat: 'rak00n_*',
+          bearerFormat: 'orb2_*',
           description:
             'Static API key minted via `POST /v1/keys` (admin-only). Plaintext shown ONCE; only the SHA-256 is persisted server-side.',
         },
@@ -599,7 +599,7 @@ export function buildOpenApiSpec(opts: {
 }
 
 export const SWAGGER_HTML = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>RAK00N API — Swagger UI</title>
+<html lang="en"><head><meta charset="utf-8"><title>ORB2 API — Swagger UI</title>
 <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
 <style>body{margin:0}</style></head>
 <body><div id="swagger-ui"></div>

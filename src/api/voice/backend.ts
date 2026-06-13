@@ -8,8 +8,8 @@
  *   - whisper     (default) local whisper.cpp STT + energy VAD + Piper TTS
  *   - personaplex (optional) Moshi full-duplex speech model on :8998
  *
- * Selected by RAK00N_VOICE_BACKEND (default "whisper"). Both are gated by
- * RAK00N_VOICE_ENABLED=1 at the route layer.
+ * Selected by ORB2_VOICE_BACKEND (default "whisper"). Both are gated by
+ * ORB2_VOICE_ENABLED=1 at the route layer.
  *
  * The interface is shaped for Bun's native ServerWebSocket (callback
  * model, no EventEmitter): the server creates one VoiceSession per
@@ -55,7 +55,7 @@ let cachedId: string | null = null
 
 /** Resolve the configured backend (lazy, cached by id). */
 export async function getVoiceBackend(): Promise<VoiceBackend> {
-  const id = (process.env.RAK00N_VOICE_BACKEND || 'whisper').toLowerCase()
+  const id = (process.env.ORB2_VOICE_BACKEND || 'whisper').toLowerCase()
   if (cached && cachedId === id) return cached
   if (id === 'personaplex') {
     const { PersonaplexBackend } = await import('./personaplexBackend.js')

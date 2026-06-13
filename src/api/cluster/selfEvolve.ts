@@ -4,22 +4,22 @@
  * Runs scripts/self-evolve.sh, which builds the agent's own edited source
  * into a candidate image, validates it in a throwaway sandbox, and — only on
  * success and only when promote=true — ships it to the running prod instance
- * with automatic rollback. Gated by RAK00N_SELF_MODIFY_ENABLED (which also
+ * with automatic rollback. Gated by ORB2_SELF_MODIFY_ENABLED (which also
  * implies the repo + docker socket are mounted into this container).
  */
 import { spawn } from 'node:child_process'
 
 export function selfModifyEnabled(): boolean {
-  return process.env.RAK00N_SELF_MODIFY_ENABLED === '1'
+  return process.env.ORB2_SELF_MODIFY_ENABLED === '1'
 }
 
 export type SelfEvolveInput = { promote?: boolean; timeout_s?: number }
 
 export async function executeSelfEvolve(input: SelfEvolveInput): Promise<string> {
   if (!selfModifyEnabled()) {
-    return 'Self-modify is disabled. Enable RAK00N_SELF_MODIFY_ENABLED=1 and mount the repo (/src) + docker socket into rak00n-api.'
+    return 'Self-modify is disabled. Enable ORB2_SELF_MODIFY_ENABLED=1 and mount the repo (/src) + docker socket into orb2-api.'
   }
-  const src = process.env.RAK00N_SELF_SRC || '/src'
+  const src = process.env.ORB2_SELF_SRC || '/src'
   const script = `${src}/scripts/self-evolve.sh`
   const args = input?.promote ? ['--promote'] : []
   const timeoutMs = Math.min(Math.max(input?.timeout_s ?? 600, 60), 1800) * 1000

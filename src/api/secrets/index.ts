@@ -1,7 +1,7 @@
 /**
  * Pluggable LLM credential source.
  *
- * Three sources, picked by `RAK00N_SECRET_SOURCE`:
+ * Three sources, picked by `ORB2_SECRET_SOURCE`:
  *
  *   - `env`   — read directly from process.env. Used when running in
  *               the ART platform: the eya-operator clones
@@ -10,8 +10,8 @@
  *               `LLM_DEPLOYMENT_NAME`, `LLM_VERSION`, `LLM_MODEL`,
  *               `LLM_PROVIDER` all arrive pre-populated.
  *
- *   - `azure-kv` — legacy. Bootstrap SP fetches `RAK00N-TENANT-ID`,
- *                  `RAK00N-CLIENT-ID`, `RAK00N-CLIENT-SECRET` from a Key
+ *   - `azure-kv` — legacy. Bootstrap SP fetches `ORB2-TENANT-ID`,
+ *                  `ORB2-CLIENT-ID`, `ORB2-CLIENT-SECRET` from a Key
  *                  Vault and Foundry tokens are minted via
  *                  client_credentials. Kept for back-compat with the
  *                  openwopr deployment and for emergency rollback.
@@ -51,7 +51,7 @@ export type CredentialSource = {
 }
 
 export async function pickCredentialSource(): Promise<CredentialSource> {
-  const choice = (process.env.RAK00N_SECRET_SOURCE ?? 'auto').toLowerCase()
+  const choice = (process.env.ORB2_SECRET_SOURCE ?? 'auto').toLowerCase()
   if (choice === 'env') return loadEnvSource()
   if (choice === 'azure-kv' || choice === 'azurekv') return loadAzureKvSource()
   // auto
@@ -100,19 +100,19 @@ function loadAzureKvSource(): CredentialSource {
       // `@azure/identity` and `@azure/keyvault-secrets` into the
       // hot start path when they're not used.
       const { startFoundryTokenRefresher } = await import('../foundry/foundryAuth.js')
-      const tenantId = process.env.RAK00N_TENANT_ID
-      const clientId = process.env.RAK00N_CLIENT_ID
+      const tenantId = process.env.ORB2_TENANT_ID
+      const clientId = process.env.ORB2_CLIENT_ID
       if (!tenantId || !clientId) {
         throw new Error(
-          'azure-kv source: RAK00N_TENANT_ID + RAK00N_CLIENT_ID required (load via keyvault bootstrap before calling pickCredentialSource)',
+          'azure-kv source: ORB2_TENANT_ID + ORB2_CLIENT_ID required (load via keyvault bootstrap before calling pickCredentialSource)',
         )
       }
       const token = await startFoundryTokenRefresher(
         {
           tenantId,
           clientId,
-          clientSecret: process.env.RAK00N_CLIENT_SECRET,
-          clientAssertion: process.env.RAK00N_CLIENT_ASSERTION,
+          clientSecret: process.env.ORB2_CLIENT_SECRET,
+          clientAssertion: process.env.ORB2_CLIENT_ASSERTION,
         },
         () => {
           /* token refresher writes to OPENAI_API_KEY directly */

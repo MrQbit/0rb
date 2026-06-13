@@ -7,16 +7,16 @@
  *
  * Two identities exist:
  *
- *   1. `apikey` — `Authorization: Bearer rak00n_<hex>`. Hash → store
+ *   1. `apikey` — `Authorization: Bearer orb2_<hex>`. Hash → store
  *      `apikey:<hash>` → record. The plaintext key is never stored.
  *      Keys are minted by holders of an `admin: true` key (bootstrap)
  *      or via the dedicated SPA's "API Keys" tab.
  *
  *   2. `service` — anonymous internal trust. Returned for unsigned
- *      requests when `RAK00N_API_AUTH_REQUIRED=0`. Used by
+ *      requests when `ORB2_API_AUTH_REQUIRED=0`. Used by
  *      health/readiness/metrics, by the dedicated SPA serving its
  *      static UI, and (in dev) by the SPA's calls. In prod
- *      (`RAK00N_API_AUTH_REQUIRED=1`) every /v1/* call must carry a key.
+ *      (`ORB2_API_AUTH_REQUIRED=1`) every /v1/* call must carry a key.
  */
 import type { Store, ApiKeyRecord } from '../store/store.js'
 import { hashApiKey, isApiKeyShape, touchApiKey } from './apiKey.js'
@@ -76,12 +76,12 @@ export async function resolveIdentity(
 }
 
 /**
- * Ambient "service" identity used when `RAK00N_API_AUTH_REQUIRED=0`.
+ * Ambient "service" identity used when `ORB2_API_AUTH_REQUIRED=0`.
  * Returns null when auth is required so the caller is forced to send
  * a Bearer.
  */
 export function resolveServiceIdentity(agentId: string): CallerIdentity | null {
-  if ((process.env.RAK00N_API_AUTH_REQUIRED ?? '0') === '1') return null
+  if ((process.env.ORB2_API_AUTH_REQUIRED ?? '0') === '1') return null
   return { type: 'service', agentId }
 }
 
@@ -99,7 +99,7 @@ export function attributionFor(identity: CallerIdentity | null): {
   email?: string
   tenantId?: string
 } {
-  const tenantId = process.env.RAK00N_TENANT_ID || undefined
+  const tenantId = process.env.ORB2_TENANT_ID || undefined
   if (!identity) return { tenantId }
   if (identity.type === 'apikey') {
     return {

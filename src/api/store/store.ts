@@ -4,8 +4,8 @@
  * Two implementations:
  *   - RedisStore: production. Uses Bun's built-in `Bun.RedisClient`
  *     when available, falling back to a thin RESP client when running
- *     in Node. Keys are namespaced with `RAK00N_REDIS_PREFIX` (default
- *     "rak00n:") so multiple deployments can share one instance.
+ *     in Node. Keys are namespaced with `ORB2_REDIS_PREFIX` (default
+ *     "orb2:") so multiple deployments can share one instance.
  *   - MemoryStore: dev-only. Single-process Map; data evaporates on
  *     pod restart. Picked when `REDIS_URL` is unset.
  *
@@ -107,7 +107,7 @@ export type AuditEvent = {
   data?: Record<string, unknown>
 }
 
-const PREFIX = process.env.RAK00N_REDIS_PREFIX ?? 'rak00n:'
+const PREFIX = process.env.ORB2_REDIS_PREFIX ?? 'orb2:'
 
 class MemoryStore implements Store {
   private kv = new Map<string, { v: string; expiresAt?: number }>()

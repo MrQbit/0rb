@@ -19,12 +19,12 @@ export class WhatsAppChannel implements Channel {
   private bridge: WhatsAppBridge | null = null
 
   isConfigured(): boolean {
-    return !!process.env.RAK00N_OWNER_PHONE
+    return !!process.env.ORB2_OWNER_PHONE
   }
 
   async start(store: Store): Promise<void> {
     if (this.bridge) return
-    const ownerPhone = (process.env.RAK00N_OWNER_PHONE || '').replace(/^\+/, '').replace(/\D/g, '')
+    const ownerPhone = (process.env.ORB2_OWNER_PHONE || '').replace(/^\+/, '').replace(/\D/g, '')
     const bridge = new WhatsAppBridge(store)
     this.bridge = bridge
 

@@ -48,7 +48,7 @@ export async function executeSubmitJob(
     correlationId: job.id,
     messageVersion: '1.0',
     messageTimestamp: new Date().toISOString(),
-    source: 'rak00n-api',
+    source: 'orb2-api',
     body: {
       userId: context.ownerId,
       contextId: context.sessionId,
@@ -57,7 +57,7 @@ export async function executeSubmitJob(
       messageId: randomUUID(),
       agentResponseId: randomUUID(),
       state: input.requires_approval !== false ? 'input-required' : 'submitted',
-      agentId: 'rak00n',
+      agentId: 'orb2',
       timestamp: new Date().toISOString(),
       metadata: {
         jobType: job.type,

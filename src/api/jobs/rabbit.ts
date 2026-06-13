@@ -99,7 +99,7 @@ export async function publishToFabric(envelope: FabricMessageEnvelope): Promise<
       messageId: envelope.messageId,
       correlationId: envelope.correlationId,
       timestamp: Math.floor(Date.now() / 1000),
-      headers: { source: 'rak00n-api' },
+      headers: { source: 'orb2-api' },
     })
     console.log(`[rabbit] Published message ${envelope.messageId} (${envelope.messageType}) to ${queue}`)
     return true

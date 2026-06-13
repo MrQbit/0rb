@@ -1,20 +1,20 @@
 /**
- * rak00n WhatsApp bridge (OpenClaw-style).
+ * orb2 WhatsApp bridge (OpenClaw-style).
  *
  * Links the owner's own WhatsApp account via a QR scan (WhatsApp Web), then
- * relays messages from ALLOWED numbers to the rak00n agent and sends the
+ * relays messages from ALLOWED numbers to the orb2 agent and sends the
  * reply back over WhatsApp. Register only your own number and you can chat
  * with yourself — the agent answers.
  *
  * Why a separate service: Baileys is a heavy native-ish lib that doesn't
  * bundle into the agent's single-file Bun image, so it lives here (a normal
- * Node container with node_modules) and bridges to rak00n-api over HTTP —
+ * Node container with node_modules) and bridges to orb2-api over HTTP —
  * mirroring the tts/stt/vision/embed service pattern.
  *
  * Env:
- *   RAK00N_API_URL                 rak00n-api base (default http://rak00n-api:8080)
- *   RAK00N_WHATSAPP_ALLOWED        comma-separated E.164 numbers allowed to text
- *   RAK00N_WHATSAPP_BRIDGE_SECRET  shared secret for the inbound webhook
+ *   ORB2_API_URL                 orb2-api base (default http://orb2-api:8080)
+ *   ORB2_WHATSAPP_ALLOWED        comma-separated E.164 numbers allowed to text
+ *   ORB2_WHATSAPP_BRIDGE_SECRET  shared secret for the inbound webhook
  *   WA_AUTH_DIR                  auth-state dir (default /wa-auth)
  *   PORT                         http port (default 8995)
  *
@@ -33,14 +33,14 @@ import pino from 'pino'
 
 const log = pino({ level: process.env.LOG_LEVEL || 'info' })
 
-const API_URL = (process.env.RAK00N_API_URL || 'http://rak00n-api:8080').replace(/\/+$/, '')
-const BRIDGE_SECRET = process.env.RAK00N_WHATSAPP_BRIDGE_SECRET || ''
+const API_URL = (process.env.ORB2_API_URL || 'http://orb2-api:8080').replace(/\/+$/, '')
+const BRIDGE_SECRET = process.env.ORB2_WHATSAPP_BRIDGE_SECRET || ''
 const AUTH_DIR = process.env.WA_AUTH_DIR || '/wa-auth'
 const PORT = Number(process.env.PORT || 8995)
 
 function normNum(s) { return String(s || '').replace(/[^\d]/g, '') }
 const ALLOWED = new Set(
-  (process.env.RAK00N_WHATSAPP_ALLOWED || '')
+  (process.env.ORB2_WHATSAPP_ALLOWED || '')
     .split(',').map(normNum).filter(Boolean),
 )
 
@@ -66,7 +66,7 @@ async function start() {
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR)
   const { version } = await fetchLatestBaileysVersion().catch(() => ({ version: undefined }))
 
-  sock = makeWASocket({ version, auth: state, browser: ['rak00n', 'Chrome', '1.0'] })
+  sock = makeWASocket({ version, auth: state, browser: ['orb2', 'Chrome', '1.0'] })
 
   sock.ev.on('creds.update', saveCreds)
 

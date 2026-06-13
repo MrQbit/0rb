@@ -1,6 +1,6 @@
 /**
  * Worker bridge auth — short-lived HMAC tokens for the
- * RAK00N_INTERNAL_TOKEN that workers carry when they call back into
+ * ORB2_INTERNAL_TOKEN that workers carry when they call back into
  * router-side APIs.
  *
  * Token shape (urlsafe base64): "<sessionId>.<turnId>.<expSeconds>.<sigHex>"
@@ -18,12 +18,12 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 const DEFAULT_TTL_SECONDS = 30 * 60
 
 function getSecret(): string {
-  // RAK00N_INTERNAL_HMAC_SECRET is mounted from a Helm-managed Secret in
+  // ORB2_INTERNAL_HMAC_SECRET is mounted from a Helm-managed Secret in
   // production. In dev (no env), generate a per-process random one
   // -- workers always run in the same cluster pod so the router and
   // workers will agree only when the secret is shared. We never log
   // the secret.
-  const explicit = process.env.RAK00N_INTERNAL_HMAC_SECRET
+  const explicit = process.env.ORB2_INTERNAL_HMAC_SECRET
   if (explicit && explicit.length >= 16) return explicit
   // Fallback: derive from REDIS_URL so router + workers in the same
   // cluster share a stable secret for dev. Not for prod.

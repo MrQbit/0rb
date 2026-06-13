@@ -1,5 +1,5 @@
 [Unit]
-Description=rak00n PersonaPlex voice server
+Description=orb2 PersonaPlex voice server
 After=network.target
 
 [Service]

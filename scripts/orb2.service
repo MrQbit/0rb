@@ -1,0 +1,32 @@
+# orb2 stack — systemd boot unit.
+#
+# Docker is already enabled on boot and every service uses
+# `restart: unless-stopped`, so the stack recovers from a reboot on its
+# own. This unit is the belt-and-suspenders layer: on boot it runs
+# `docker compose up -d`, which also (re)creates anything that was removed
+# or is missing — guaranteeing the FULL stack is present after any outage.
+#
+# Install (run once, needs sudo):
+#   sudo cp scripts/orb2.service /etc/systemd/system/orb2.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now orb2.service
+#
+# Manage:  sudo systemctl status orb2   |   journalctl -u orb2 -f
+[Unit]
+Description=orb2 single-user stack (docker compose)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=mrqbit
+Group=docker
+WorkingDirectory=/home/mrqbit/Downloads/orb2
+ExecStart=/usr/bin/docker compose -f docker-compose.spark.yml up -d --remove-orphans
+ExecStop=/usr/bin/docker compose -f docker-compose.spark.yml stop
+TimeoutStartSec=600
+
+[Install]
+WantedBy=multi-user.target

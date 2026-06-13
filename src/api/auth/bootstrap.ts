@@ -1,7 +1,7 @@
 /**
  * Bootstrap the first admin API key.
  *
- * When the operator sets `RAK00N_BOOTSTRAP_ADMIN_KEY=rak00n_<hex>` on a
+ * When the operator sets `ORB2_BOOTSTRAP_ADMIN_KEY=orb2_<hex>` on a
  * fresh deployment (the configured value lives in a K8s Secret, not
  * a ConfigMap), this function runs once on startup, hashes the seed,
  * and persists it as the first admin record. Subsequent startups
@@ -16,11 +16,11 @@ import { hashApiKey, isApiKeyShape } from './apiKey.js'
 import type { Store } from '../store/store.js'
 
 export async function bootstrapAdminKey(store: Store): Promise<void> {
-  const seed = process.env.RAK00N_BOOTSTRAP_ADMIN_KEY?.trim()
+  const seed = process.env.ORB2_BOOTSTRAP_ADMIN_KEY?.trim()
   if (!seed) return
   if (!isApiKeyShape(seed)) {
     log.warn('bootstrap_admin_skipped', {
-      reason: 'RAK00N_BOOTSTRAP_ADMIN_KEY is not a valid rak00n_<64hex> shape',
+      reason: 'ORB2_BOOTSTRAP_ADMIN_KEY is not a valid orb2_<64hex> shape',
     })
     return
   }
@@ -40,7 +40,7 @@ export async function bootstrapAdminKey(store: Store): Promise<void> {
   await store.putApiKey(hash, {
     id,
     ownerOid: 'app:bootstrap-admin',
-    ownerEmail: 'bootstrap@rak00n.local',
+    ownerEmail: 'bootstrap@orb2.local',
     name: 'bootstrap-admin',
     admin: true,
     createdAt: new Date().toISOString(),

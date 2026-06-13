@@ -7,24 +7,24 @@
  * so Orb gets every device the homeowner has paired without writing drivers.
  *
  * Config (set in the install / Settings):
- *   RAK00N_HA_URL    e.g. http://homeassistant:8123  (or http://localhost:8123)
- *   RAK00N_HA_TOKEN  a Home Assistant long-lived access token
+ *   ORB2_HA_URL    e.g. http://homeassistant:8123  (or http://localhost:8123)
+ *   ORB2_HA_TOKEN  a Home Assistant long-lived access token
  *
  * REST: GET /api/states, POST /api/services/<domain>/<service> with a JSON
  * body that targets an entity_id. Auth is a Bearer token.
  */
 
 export function haEnabled(): boolean {
-  return !!(haBaseUrl() && process.env.RAK00N_HA_TOKEN)
+  return !!(haBaseUrl() && process.env.ORB2_HA_TOKEN)
 }
 
 function haBaseUrl(): string {
-  return (process.env.RAK00N_HA_URL || '').trim().replace(/\/+$/, '')
+  return (process.env.ORB2_HA_URL || '').trim().replace(/\/+$/, '')
 }
 
 function haHeaders(): Record<string, string> {
   return {
-    Authorization: `Bearer ${process.env.RAK00N_HA_TOKEN || ''}`,
+    Authorization: `Bearer ${process.env.ORB2_HA_TOKEN || ''}`,
     'Content-Type': 'application/json',
   }
 }

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>rak00n — AI Coding Agent</title>
+<title>orb2 — AI Coding Agent</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#F6F6FA;color:#2E2E38;line-height:1.6}
@@ -45,7 +45,7 @@
 
 <div class="header">
   <div class="header-inner">
-    <h1><span>rak00n</span></h1>
+    <h1><span>orb2</span></h1>
     <p>AI coding agent for any LLM — OpenAI, Gemini, DeepSeek, Ollama, and 200+ models</p>
   </div>
 </div>
@@ -67,20 +67,20 @@
     <div id="platform-macos" class="platform-content active">
       <div class="install-block">
         <button class="copy-btn" onclick="copyCommand(this, 'cmd-macos')">Copy</button>
-        <code id="cmd-macos">gh release download -R MrQbit/rak00n -p "rak00n-installer-macos" -D /tmp --clobber && chmod +x /tmp/rak00n-installer-macos && /tmp/rak00n-installer-macos && rm /tmp/rak00n-installer-macos && source ~/.zshrc</code>
+        <code id="cmd-macos">gh release download -R MrQbit/0rb -p "orb2-installer-macos" -D /tmp --clobber && chmod +x /tmp/orb2-installer-macos && /tmp/orb2-installer-macos && rm /tmp/orb2-installer-macos && source ~/.zshrc</code>
       </div>
     </div>
 
     <div id="platform-windows" class="platform-content">
       <div class="install-block">
         <button class="copy-btn" onclick="copyCommand(this, 'cmd-windows')">Copy</button>
-        <code id="cmd-windows">gh release download -R MrQbit/rak00n -p "rak00n-installer-windows.exe" -D $env:TEMP --clobber; & "$env:TEMP\rak00n-installer-windows.exe"</code>
+        <code id="cmd-windows">gh release download -R MrQbit/0rb -p "orb2-installer-windows.exe" -D $env:TEMP --clobber; & "$env:TEMP\orb2-installer-windows.exe"</code>
       </div>
     </div>
 
     <p style="margin-top:1rem;font-size:0.9rem;color:#6B6B7B;">
-      The installer downloads the latest rak00n binary, installs it to <code>~/.rak00n</code>, and adds it to your PATH.
-      If no API key is configured, rak00n will automatically set up a local Ollama instance.
+      The installer downloads the latest orb2 binary, installs it to <code>~/.orb2</code>, and adds it to your PATH.
+      If no API key is configured, orb2 will automatically set up a local Ollama instance.
     </p>
   </div>
 
@@ -88,10 +88,10 @@
     <h2>Manual Download</h2>
     <p style="font-size:0.9rem;color:#6B6B7B;margin-bottom:0.5rem;">Or download the installer binary directly from the latest release:</p>
     <div class="dl-links">
-      <a class="dl-link" href="https://github.com/MrQbit/rak00n/releases/latest/download/rak00n-installer-macos">
+      <a class="dl-link" href="https://github.com/MrQbit/0rb/releases/latest/download/orb2-installer-macos">
         <span class="icon">&#63743;</span> macOS Installer
       </a>
-      <a class="dl-link" href="https://github.com/MrQbit/rak00n/releases/latest/download/rak00n-installer-windows.exe">
+      <a class="dl-link" href="https://github.com/MrQbit/0rb/releases/latest/download/orb2-installer-windows.exe">
         <span class="icon">&#8862;</span> Windows Installer
       </a>
     </div>
@@ -123,10 +123,10 @@
     <h2>After Install</h2>
     <div class="install-block">
       <code><span class="comment"># Open a new terminal, then:</span>
-rak00n</code>
+orb2</code>
     </div>
     <p style="margin-top:1rem;font-size:0.9rem;color:#6B6B7B;">
-      rak00n will detect your environment and guide you through provider selection.
+      orb2 will detect your environment and guide you through provider selection.
       To use your own API key, set <code>OPENAI_API_KEY</code> or <code>ANTHROPIC_API_KEY</code> before running.
     </p>
   </div>
@@ -134,7 +134,7 @@ rak00n</code>
 </div>
 
 <div class="footer">
-  &copy; 2026 rak00n.
+  &copy; 2026 orb2.
 </div>
 
 <script>

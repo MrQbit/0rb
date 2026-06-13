@@ -17,7 +17,7 @@ const INDEX_KEY = 'vault:index'
 const INDEX_TTL = 0 // no expiry
 
 function getVaultDir(): string {
-  return process.env.RAK00N_VAULT_DIR || '/workspace/.vault'
+  return process.env.ORB2_VAULT_DIR || '/workspace/.vault'
 }
 
 function ensureVaultDir(): string {

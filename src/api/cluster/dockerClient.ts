@@ -1,7 +1,7 @@
 /**
  * Docker host control via the `docker` CLI.
  *
- * Gated behind RAK00N_DOCKER_OPS_ENABLED=1 because it requires the host
+ * Gated behind ORB2_DOCKER_OPS_ENABLED=1 because it requires the host
  * docker socket (/var/run/docker.sock) to be mounted into the pod —
  * that grants effective root on the Spark host, so it's opt-in.
  *
@@ -10,7 +10,7 @@
  */
 
 export function isDockerOpsEnabled(): boolean {
-  return process.env.RAK00N_DOCKER_OPS_ENABLED === '1'
+  return process.env.ORB2_DOCKER_OPS_ENABLED === '1'
 }
 
 async function docker(args: string[], timeoutMs = 15_000): Promise<{ stdout: string; stderr: string; code: number }> {

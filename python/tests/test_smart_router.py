@@ -128,7 +128,7 @@ def test_get_model_large_request():
     assert model == "openai-big"
 
 
-def test_get_model_large_message_overrides_rak00n_label():
+def test_get_model_large_message_overrides_orb2_label():
     p = make_provider("openai")
     r = make_router()
     model = r.get_model_for_provider(p, "claude-haiku", is_large_request=True)

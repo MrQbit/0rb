@@ -1,10 +1,10 @@
-# Reuse the rak00n-api base (bun:slim) — already in registry, no network pull needed
-FROM rak00n-api:dev
+# Reuse the orb2-api base (bun:slim) — already in registry, no network pull needed
+FROM orb2-api:dev
 USER root
 WORKDIR /app
 COPY canvas-pod/server.js /app/server.js
-RUN mkdir -p /workspace && chown -R rak00n:rak00n /workspace /app
-USER rak00n
+RUN mkdir -p /workspace && chown -R orb2:orb2 /workspace /app
+USER orb2
 WORKDIR /workspace
 ENV CANVAS_WORKSPACE=/workspace \
     RPC_PORT=9090 \

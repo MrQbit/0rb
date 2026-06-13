@@ -1,7 +1,7 @@
 /**
  * Intent hint — advisory-only classifier.
  *
- * The goal is to nudge RAK00N toward calling SubmitJob for clearly
+ * The goal is to nudge ORB2 toward calling SubmitJob for clearly
  * long-running asks, so the user isn't blocked while the agent grinds
  * through a multi-minute task. The classifier is HEURISTIC ONLY and
  * intentionally conservative: false negatives (missing a long-running
@@ -86,7 +86,7 @@ export function classifyIntent(message: string): IntentHint | null {
 /**
  * Compose a one-paragraph hint to prepend to the user message. The
  * agent reads it as a system note. Phrasing avoids commanding the
- * agent — it suggests, so RAK00N stays in charge of its own plan.
+ * agent — it suggests, so ORB2 stays in charge of its own plan.
  */
 export function renderHint(hint: IntentHint): string {
   const tagList = hint.triggers.join(', ')

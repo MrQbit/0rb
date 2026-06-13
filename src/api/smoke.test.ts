@@ -1,11 +1,11 @@
 /**
- * HTTP-layer smoke tests for the rak00n API.
- * Requires a running server at RAK00N_SMOKE_URL (default: http://localhost:9080).
+ * HTTP-layer smoke tests for the orb2 API.
+ * Requires a running server at ORB2_SMOKE_URL (default: http://localhost:9080).
  * No LLM calls — only static/catalog endpoints.
  */
 import { describe, it, expect } from 'bun:test'
 
-const BASE = process.env.RAK00N_SMOKE_URL || 'http://localhost:9080'
+const BASE = process.env.ORB2_SMOKE_URL || 'http://localhost:9080'
 
 async function get(path: string) {
   return fetch(`${BASE}${path}`)

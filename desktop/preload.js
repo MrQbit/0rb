@@ -1,7 +1,7 @@
-// rak00n desktop shell — preload (the ONLY bridge between the web console and
-// the host). Exposes a small, fixed `window.rak00n` capability API. Privileged
-// widgets feature-detect these (e.g. `if (window.rak00n?.terminal)`); in a plain
-// browser `window.rak00n` is undefined, so those widgets hide/degrade and every
+// orb2 desktop shell — preload (the ONLY bridge between the web console and
+// the host). Exposes a small, fixed `window.orb2` capability API. Privileged
+// widgets feature-detect these (e.g. `if (window.orb2?.terminal)`); in a plain
+// browser `window.orb2` is undefined, so those widgets hide/degrade and every
 // other (web-only) widget works identically. Adding a new visual/data widget
 // never touches this file.
 
@@ -11,7 +11,7 @@ const termListeners = new Map() // id → { onData, onExit }
 ipcRenderer.on('term:data', (_e, { id, data }) => termListeners.get(id)?.onData?.(data))
 ipcRenderer.on('term:exit', (_e, { id }) => termListeners.get(id)?.onExit?.())
 
-contextBridge.exposeInMainWorld('rak00n', {
+contextBridge.exposeInMainWorld('orb2', {
   // marker so the web UI can detect the desktop shell
   isDesktop: true,
   system: () => ipcRenderer.invoke('system:info'),
@@ -34,7 +34,7 @@ contextBridge.exposeInMainWorld('rak00n', {
   // Docker widget backend (CLI shell-out → { ok, stdout, stderr }).
   docker: args => ipcRenderer.invoke('docker:run', args),
 
-  // Restricted filesystem (under RAK00N_FS_ROOTS, default $HOME).
+  // Restricted filesystem (under ORB2_FS_ROOTS, default $HOME).
   files: {
     read: p => ipcRenderer.invoke('fs:read', p),
     list: p => ipcRenderer.invoke('fs:list', p),

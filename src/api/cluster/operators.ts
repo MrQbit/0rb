@@ -70,7 +70,7 @@ export type DockerOpsInput = {
 
 export async function executeDockerOps(input: DockerOpsInput): Promise<string> {
   if (!docker.isDockerOpsEnabled()) {
-    return 'DockerOps disabled. Set RAK00N_DOCKER_OPS_ENABLED=1 and mount /var/run/docker.sock to enable host docker control.'
+    return 'DockerOps disabled. Set ORB2_DOCKER_OPS_ENABLED=1 and mount /var/run/docker.sock to enable host docker control.'
   }
   switch (input.op) {
     case 'list':
@@ -116,8 +116,8 @@ export async function executeSelfUpdate(input: SelfUpdateInput): Promise<string>
   if (!k8s.isInCluster()) {
     return 'SelfUpdate unavailable: not running inside a Kubernetes cluster.'
   }
-  const deployment = input.deployment || process.env.RAK00N_SELF_DEPLOYMENT || 'rak00n-api'
-  const container = input.container || 'rak00n-api'
+  const deployment = input.deployment || process.env.ORB2_SELF_DEPLOYMENT || 'orb2-api'
+  const container = input.container || 'orb2-api'
   const timeoutMs = (input.timeout_s ?? 180) * 1000
 
   await k8s.patchDeploymentImage(deployment, input.image, container)
@@ -152,7 +152,7 @@ export type SelfBuildInput = {
  * the Deployment to it and watch the blue-green rollout.
  *
  * The build runs on the host via scripts/self-build.sh, which needs host
- * docker (RAK00N_DOCKER_OPS_ENABLED=1 + mounted socket) and the k3d CLI.
+ * docker (ORB2_DOCKER_OPS_ENABLED=1 + mounted socket) and the k3d CLI.
  * The agent is expected to have edited + tested its source (via Bash/
  * sandbox) BEFORE calling this.
  */
@@ -161,15 +161,15 @@ export async function executeSelfBuild(input: SelfBuildInput): Promise<string> {
     return 'SelfBuild unavailable: not running inside a Kubernetes cluster.'
   }
   if (!docker.isDockerOpsEnabled()) {
-    return 'SelfBuild requires host docker. Set RAK00N_DOCKER_OPS_ENABLED=1 and mount /var/run/docker.sock.'
+    return 'SelfBuild requires host docker. Set ORB2_DOCKER_OPS_ENABLED=1 and mount /var/run/docker.sock.'
   }
   const tag = input.tag || `selfupdate-${Date.now()}`
-  const script = process.env.RAK00N_SELF_BUILD_SCRIPT || 'scripts/self-build.sh'
+  const script = process.env.ORB2_SELF_BUILD_SCRIPT || 'scripts/self-build.sh'
 
   const proc = Bun.spawn(['bash', script, tag], {
     stdout: 'pipe',
     stderr: 'pipe',
-    cwd: process.env.RAK00N_SELF_BUILD_CONTEXT || process.cwd(),
+    cwd: process.env.ORB2_SELF_BUILD_CONTEXT || process.cwd(),
   })
   const [stdout, stderr] = await Promise.all([
     new Response(proc.stdout).text(),
@@ -182,7 +182,7 @@ export async function executeSelfBuild(input: SelfBuildInput): Promise<string> {
 
   // The script prints `IMAGE=<repo>:<tag>` on success.
   const m = /IMAGE=(\S+)/.exec(stdout)
-  const image = m?.[1] || `${process.env.RAK00N_SELF_IMAGE_REPO || 'rak00n-api'}:${tag}`
+  const image = m?.[1] || `${process.env.ORB2_SELF_IMAGE_REPO || 'orb2-api'}:${tag}`
 
   if (input.build_only) {
     return `SelfBuild complete: built + imported ${image}. Call SelfUpdate with this image to roll it out.`

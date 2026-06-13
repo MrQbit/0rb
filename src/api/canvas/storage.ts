@@ -7,7 +7,7 @@
  * downloaded and extracted over the template's overlayfs lower layer.
  *
  * Provider abstraction supports Azure Blob Storage and S3-compatible
- * backends. Configured via RAK00N_CANVAS_STORAGE_URL:
+ * backends. Configured via ORB2_CANVAS_STORAGE_URL:
  *   - az://container/prefix  → Azure Blob
  *   - s3://bucket/prefix     → S3-compatible
  *   - file:///path           → Local filesystem (dev/testing)
@@ -66,7 +66,7 @@ export class LocalSnapshotStore implements CanvasSnapshotStore {
 }
 
 export function createSnapshotStore(): CanvasSnapshotStore {
-  const url = process.env.RAK00N_CANVAS_STORAGE_URL || 'file:///var/rak00n/canvas-snapshots'
+  const url = process.env.ORB2_CANVAS_STORAGE_URL || 'file:///var/orb2/canvas-snapshots'
 
   if (url.startsWith('file://')) {
     return new LocalSnapshotStore(url.replace('file://', ''))
@@ -75,5 +75,5 @@ export function createSnapshotStore(): CanvasSnapshotStore {
   // Azure Blob and S3 implementations would go here. For now, fall back
   // to local storage with a warning.
   console.warn(`[canvas] unsupported storage URL scheme: ${url}; falling back to local`)
-  return new LocalSnapshotStore('/var/rak00n/canvas-snapshots')
+  return new LocalSnapshotStore('/var/orb2/canvas-snapshots')
 }

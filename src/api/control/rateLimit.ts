@@ -24,7 +24,7 @@ export type RateLimitBucket = {
   capacity: number
 }
 
-const ENV_PREFIX = 'RAK00N_RATELIMIT_'
+const ENV_PREFIX = 'ORB2_RATELIMIT_'
 
 function envInt(name: string, fallback: number): number {
   const raw = process.env[ENV_PREFIX + name]
@@ -45,7 +45,7 @@ export const RATE_LIMIT_BUCKETS = {
 } as const
 
 export function isRateLimitEnabled(): boolean {
-  return process.env.RAK00N_RATELIMIT_ENABLED === '1'
+  return process.env.ORB2_RATELIMIT_ENABLED === '1'
 }
 
 export function bucketForRoute(method: string, pathname: string): RateLimitBucket | null {

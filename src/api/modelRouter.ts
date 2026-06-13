@@ -18,10 +18,10 @@ export interface RouteInput { text: string; hasImage?: boolean; channel?: string
 const OPENROUTER = 'https://openrouter.ai/api/v1'
 
 function routerEnabled(): boolean {
-  return process.env.RAK00N_ROUTER_ENABLED === '1' && !!(process.env.RAK00N_OPENROUTER_KEY || '').trim()
+  return process.env.ORB2_ROUTER_ENABLED === '1' && !!(process.env.ORB2_OPENROUTER_KEY || '').trim()
 }
 function strongModel(): string {
-  return (process.env.RAK00N_ROUTER_STRONG_MODEL || 'openai/gpt-4o').trim()
+  return (process.env.ORB2_ROUTER_STRONG_MODEL || 'openai/gpt-4o').trim()
 }
 /** Whether the configured strong model can see images (so vision turns are safe to route). */
 function strongIsVision(): boolean {
@@ -49,14 +49,14 @@ export function routeTurn(input: RouteInput): RouteDecision | null {
   const wantsStrong = t.length > 600 || CODING.test(t) || REASONING.test(t)
   if (!wantsStrong) return null            // simple/quick → local (free)
 
-  return { model: strongModel(), baseURL: OPENROUTER, apiKey: (process.env.RAK00N_OPENROUTER_KEY as string).trim() }
+  return { model: strongModel(), baseURL: OPENROUTER, apiKey: (process.env.ORB2_OPENROUTER_KEY as string).trim() }
 }
 
 /** For diagnostics / the settings UI. */
 export function routerStatus() {
   return {
     enabled: routerEnabled(),
-    keyed: !!(process.env.RAK00N_OPENROUTER_KEY || '').trim(),
+    keyed: !!(process.env.ORB2_OPENROUTER_KEY || '').trim(),
     strongModel: strongModel(),
   }
 }

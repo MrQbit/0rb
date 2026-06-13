@@ -1,5 +1,5 @@
 /**
- * Foundry token minter for the unattended (server) RAK00N API.
+ * Foundry token minter for the unattended (server) ORB2 API.
  *
  * The CLI's `src/standalone/entraAuth.ts` uses az CLI → device-code
  * flow because it has a human at the keyboard. The API doesn't, so we

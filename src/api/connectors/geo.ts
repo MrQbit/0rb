@@ -6,7 +6,7 @@
 
 export interface GeoPoint { lat: number; lng: number; name?: string }
 
-const UA = 'rak00n/1.0 (self-hosted personal assistant)'
+const UA = 'orb2/1.0 (self-hosted personal assistant)'
 
 /** Place/address → coordinates. null if not found. */
 export async function geocode(query: string): Promise<GeoPoint | null> {

@@ -6,7 +6,7 @@ import { join } from 'path'
 import { existsSync, statSync, readFileSync } from 'fs'
 
 const UI_PORT = parseInt(process.env.UI_PORT ?? '9081', 10)
-const API_ORIGIN = process.env.RAK00N_API_URL ?? 'http://localhost:9080'
+const API_ORIGIN = process.env.ORB2_API_URL ?? 'http://localhost:9080'
 const WEB_DIR = join(import.meta.dir, '../web/public')
 
 const API_PREFIXES = ['/v1/', '/a2a/', '/healthz', '/readyz', '/metrics', '/docs', '/openapi.json', '/.well-known/']

@@ -7,7 +7,7 @@
  *
  * Secrets are stored at `<mount>/data/<path>` (KV v2 engine).
  * Default mount: "secret", configurable via VAULT_SECRET_MOUNT.
- * Default path prefix: "rak00n/", configurable via VAULT_SECRET_PREFIX.
+ * Default path prefix: "orb2/", configurable via VAULT_SECRET_PREFIX.
  */
 import { readFileSync } from 'node:fs'
 
@@ -48,10 +48,10 @@ export class VaultClient {
   constructor(config: VaultConfig) {
     this.addr = config.addr.replace(/\/+$/, '')
     this.mount = config.mount || 'secret'
-    this.prefix = config.prefix || 'rak00n'
+    this.prefix = config.prefix || 'orb2'
     this.namespace = config.namespace || ''
     this.authMethod = config.authMethod
-    this.role = config.role || 'rak00n'
+    this.role = config.role || 'orb2'
     this.clientToken = config.token || ''
     this.tokenExpiresAt = config.token ? Infinity : 0
     this.cacheTtlMs = 300_000 // 5 min cache
@@ -198,9 +198,9 @@ export function getVaultClient(): VaultClient | null {
     addr,
     authMethod,
     token: process.env.VAULT_TOKEN,
-    role: process.env.VAULT_ROLE || 'rak00n',
+    role: process.env.VAULT_ROLE || 'orb2',
     mount: process.env.VAULT_SECRET_MOUNT || 'secret',
-    prefix: process.env.VAULT_SECRET_PREFIX || 'rak00n',
+    prefix: process.env.VAULT_SECRET_PREFIX || 'orb2',
     namespace: process.env.VAULT_NAMESPACE || undefined,
   })
   return _client

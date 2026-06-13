@@ -48,7 +48,7 @@ function estimateTokens(messages: unknown[]): number {
 }
 
 function getContextWindow(model?: string): number {
-  const override = process.env.RAK00N_MAX_CONTEXT_TOKENS
+  const override = process.env.ORB2_MAX_CONTEXT_TOKENS
   if (override) {
     const n = parseInt(override, 10)
     if (!isNaN(n) && n > 0) return n

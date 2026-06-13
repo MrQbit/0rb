@@ -1,13 +1,13 @@
 /**
  * Docker control — the api container already has the docker CLI + the host
- * socket mounted (RAK00N_DOCKER_OPS_ENABLED), so this just shells out. Powers the
+ * socket mounted (ORB2_DOCKER_OPS_ENABLED), so this just shells out. Powers the
  * Docker widget: both the user (widget buttons) and the agent (Docker tool) can
  * list containers and stop/start/restart them or pull images.
  */
 import { execFile } from 'node:child_process'
 
 export function dockerEnabled(): boolean {
-  return process.env.RAK00N_DOCKER_OPS_ENABLED === '1' || process.env.RAK00N_DOCKER_OPS_ENABLED === 'true'
+  return process.env.ORB2_DOCKER_OPS_ENABLED === '1' || process.env.ORB2_DOCKER_OPS_ENABLED === 'true'
 }
 
 function run(args: string[], timeoutMs = 30000): Promise<{ ok: boolean; out: string; err: string }> {

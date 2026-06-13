@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-rak00n is currently maintained on the latest `main` branch and the latest
+orb2 is currently maintained on the latest `main` branch and the latest
 npm release only.
 
 | Version | Supported |
@@ -16,7 +16,7 @@ landed directly on `main` before a package release is published.
 
 ## Reporting a Vulnerability
 
-If you believe you have found a security vulnerability in rak00n, please
+If you believe you have found a security vulnerability in orb2, please
 report it privately.
 
 Preferred reporting channel:
@@ -58,9 +58,9 @@ report.
 
 This policy applies to:
 
-- the rak00n source code in this repository
-- official rak00n release artifacts published from this repository
-- the `rak00n` npm package
+- the orb2 source code in this repository
+- official orb2 release artifacts published from this repository
+- the `orb2` npm package
 
 This policy does not cover:
 

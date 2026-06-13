@@ -8,8 +8,8 @@ docs
 !dist/ARCHITECTURE.md
 .DS_Store
 .env
-.rak00n
-.rak00n-profile.json
+.orb2
+.orb2-profile.json
 calc.py
 calculate.py
 bun.lock

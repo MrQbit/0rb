@@ -1,28 +1,28 @@
 /**
  * Username/password login + signed session tokens for the single-user
- * rak00n console, channels, and iOS app.
+ * orb2 console, channels, and iOS app.
  *
  * Design (no new dependencies — all from node:crypto):
  *   - Passwords are hashed with scrypt: `scrypt$N$salt$hash` (hex). We
  *     never store plaintext; verification is constant-time.
  *   - A session is a stateless signed token:
- *         raksess_<base64url(payload)>.<base64url(hmac)>
+ *         orb2sess_<base64url(payload)>.<base64url(hmac)>
  *     payload = { u: username, iat, exp }. HMAC-SHA256 over the payload
- *     with RAK00N_AUTH_SECRET. Stateless = no server store needed; the same
+ *     with ORB2_AUTH_SECRET. Stateless = no server store needed; the same
  *     token works as an HttpOnly cookie (browser) AND a Bearer header
- *     (iOS app / channels). Revoke-all = rotate RAK00N_AUTH_SECRET.
+ *     (iOS app / channels). Revoke-all = rotate ORB2_AUTH_SECRET.
  *
  * Credentials resolve from the store (so they're changeable via the
  * console) and fall back to env for first-boot bootstrap:
- *   RAK00N_AUTH_USER         bootstrap username
- *   RAK00N_AUTH_PASS_HASH    bootstrap scrypt hash (use scripts/set-password)
- *   RAK00N_AUTH_SECRET       HMAC signing secret (required when auth is on)
+ *   ORB2_AUTH_USER         bootstrap username
+ *   ORB2_AUTH_PASS_HASH    bootstrap scrypt hash (use scripts/set-password)
+ *   ORB2_AUTH_SECRET       HMAC signing secret (required when auth is on)
  */
 import { scryptSync, randomBytes, createHmac, timingSafeEqual } from 'node:crypto'
 import type { Store } from '../store/store.js'
 
-export const SESSION_COOKIE = 'rak00n_session'
-const SESSION_PREFIX = 'raksess_'
+export const SESSION_COOKIE = 'orb2_session'
+const SESSION_PREFIX = 'orb2sess_'
 const SCRYPT_N = 16384
 const SCRYPT_KEYLEN = 32
 const DEFAULT_TTL_S = 60 * 60 * 24 * 30 // 30 days
@@ -66,29 +66,29 @@ function b64url(buf: Buffer | string): string {
 }
 
 function secret(): string {
-  return process.env.RAK00N_AUTH_SECRET || ''
+  return process.env.ORB2_AUTH_SECRET || ''
 }
 
 /**
- * Guarantee a session-signing secret exists. Without RAK00N_AUTH_SECRET,
+ * Guarantee a session-signing secret exists. Without ORB2_AUTH_SECRET,
  * verifySession() rejects every token — so on first boot we load a persisted
  * secret or generate + persist one. Must run before any login/claim.
  */
 export async function ensureSessionSecret(store: Store): Promise<void> {
-  if (process.env.RAK00N_AUTH_SECRET) return
+  if (process.env.ORB2_AUTH_SECRET) return
   const KEY = 'auth:session_secret'
   try {
     const existing = await store.getKv(KEY)
-    if (existing) { process.env.RAK00N_AUTH_SECRET = existing; return }
+    if (existing) { process.env.ORB2_AUTH_SECRET = existing; return }
   } catch { /* fall through to generate */ }
   const generated = randomBytes(32).toString('hex')
-  process.env.RAK00N_AUTH_SECRET = generated
+  process.env.ORB2_AUTH_SECRET = generated
   try { await store.putKv(KEY, generated, 60 * 60 * 24 * 3650) } catch { /* best effort */ }
 }
 
 /** Whether username/password auth is switched on. */
 export function authEnabled(): boolean {
-  return (process.env.RAK00N_API_AUTH_REQUIRED ?? '0') === '1'
+  return (process.env.ORB2_API_AUTH_REQUIRED ?? '0') === '1'
 }
 
 /** Mint a signed session token for `username`. */
@@ -145,7 +145,7 @@ export function sessionCookie(token: string, ttlSeconds = DEFAULT_TTL_S): string
     'SameSite=Lax',
     `Max-Age=${ttlSeconds}`,
   ]
-  if ((process.env.RAK00N_AUTH_COOKIE_SECURE ?? '0') === '1') attrs.push('Secure')
+  if ((process.env.ORB2_AUTH_COOKIE_SECURE ?? '0') === '1') attrs.push('Secure')
   return attrs.join('; ')
 }
 
@@ -164,8 +164,8 @@ export async function getCredentials(store: Store): Promise<Credentials | null> 
     const raw = await store.getKv(CRED_KEY)
     if (raw) return JSON.parse(raw) as Credentials
   } catch { /* fall through to env bootstrap */ }
-  const username = process.env.RAK00N_AUTH_USER
-  const passHash = process.env.RAK00N_AUTH_PASS_HASH
+  const username = process.env.ORB2_AUTH_USER
+  const passHash = process.env.ORB2_AUTH_PASS_HASH
   if (username && passHash) return { username, passHash }
   return null
 }

@@ -2,8 +2,8 @@
  * Telegram channel via the Bot API (long-polling, no SDK dependency).
  *
  * Configure with:
- *   RAK00N_TELEGRAM_BOT_TOKEN   bot token from @BotFather
- *   RAK00N_TELEGRAM_OWNER_ID    numeric chat id of the owner (only this
+ *   ORB2_TELEGRAM_BOT_TOKEN   bot token from @BotFather
+ *   ORB2_TELEGRAM_OWNER_ID    numeric chat id of the owner (only this
  *                             chat is processed; others are ignored)
  *
  * Find your owner id by messaging the bot once and reading the log line
@@ -28,15 +28,15 @@ export class TelegramChannel implements Channel {
   private lastMessageAt: string | null = null
 
   isConfigured(): boolean {
-    return !!process.env.RAK00N_TELEGRAM_BOT_TOKEN && !!process.env.RAK00N_TELEGRAM_OWNER_ID
+    return !!process.env.ORB2_TELEGRAM_BOT_TOKEN && !!process.env.ORB2_TELEGRAM_OWNER_ID
   }
 
   private token(): string {
-    return process.env.RAK00N_TELEGRAM_BOT_TOKEN || ''
+    return process.env.ORB2_TELEGRAM_BOT_TOKEN || ''
   }
 
   private ownerId(): string {
-    return String(process.env.RAK00N_TELEGRAM_OWNER_ID || '')
+    return String(process.env.ORB2_TELEGRAM_OWNER_ID || '')
   }
 
   async start(store: Store): Promise<void> {
@@ -48,7 +48,7 @@ export class TelegramChannel implements Channel {
     const me = await this.call('getMe').catch(() => null)
     if (!me?.ok) {
       this.running = false
-      throw new Error('Telegram getMe failed — check RAK00N_TELEGRAM_BOT_TOKEN')
+      throw new Error('Telegram getMe failed — check ORB2_TELEGRAM_BOT_TOKEN')
     }
     this.connected = true
     log.info('telegram_connected', { bot: me.result?.username })

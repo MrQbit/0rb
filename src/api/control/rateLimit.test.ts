@@ -40,20 +40,20 @@ const FAKE_IDENTITY = {
   },
 } as any
 
-const ORIG = process.env.RAK00N_RATELIMIT_ENABLED
+const ORIG = process.env.ORB2_RATELIMIT_ENABLED
 
 describe('rate limiter', () => {
   beforeEach(() => {
-    process.env.RAK00N_RATELIMIT_ENABLED = '1'
+    process.env.ORB2_RATELIMIT_ENABLED = '1'
   })
   afterEach(() => {
-    if (ORIG === undefined) delete process.env.RAK00N_RATELIMIT_ENABLED
-    else process.env.RAK00N_RATELIMIT_ENABLED = ORIG
+    if (ORIG === undefined) delete process.env.ORB2_RATELIMIT_ENABLED
+    else process.env.ORB2_RATELIMIT_ENABLED = ORIG
   })
 
   test('isRateLimitEnabled gated on env', () => {
     expect(isRateLimitEnabled()).toBe(true)
-    delete process.env.RAK00N_RATELIMIT_ENABLED
+    delete process.env.ORB2_RATELIMIT_ENABLED
     expect(isRateLimitEnabled()).toBe(false)
   })
 
@@ -94,7 +94,7 @@ describe('rate limiter', () => {
   })
 
   test('bypasses when env disabled', async () => {
-    delete process.env.RAK00N_RATELIMIT_ENABLED
+    delete process.env.ORB2_RATELIMIT_ENABLED
     const store = memStore()
     for (let i = 0; i < 999; i++) {
       const r = await checkRateLimit(store, FAKE_IDENTITY, 'POST', '/v1/keys', 1000)

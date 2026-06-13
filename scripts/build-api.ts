@@ -1,5 +1,5 @@
 /**
- * RAK00N build script — bundles the TypeScript source into a single
+ * ORB2 build script — bundles the TypeScript source into a single
  * distributable JS file using Bun's bundler.
  *
  * Handles:
@@ -62,13 +62,13 @@ const result = await Bun.build({
     // MACRO.* build-time constants
     // Keep the internal compatibility version high enough to pass
     // first-party minimum-version guards, but expose the real package
-    // version separately in RAK00N branding.
+    // version separately in ORB2 branding.
     'MACRO.VERSION': JSON.stringify('99.0.0'),
     'MACRO.DISPLAY_VERSION': JSON.stringify(version),
     'MACRO.BUILD_TIME': JSON.stringify(new Date().toISOString()),
     'MACRO.ISSUES_EXPLAINER':
-      JSON.stringify('report the issue at https://github.com/[owner]/rak00n/issues'),
-    'MACRO.PACKAGE_URL': JSON.stringify('rak00n'),
+      JSON.stringify('report the issue at https://github.com/[owner]/orb2/issues'),
+    'MACRO.PACKAGE_URL': JSON.stringify('orb2'),
     'MACRO.NATIVE_PACKAGE_URL': 'undefined',
   },
   plugins: [
@@ -169,7 +169,7 @@ export const ColorDiff = null;
 export const ColorFile = null;
 export const getSyntaxTheme = noop;
 export const plot = noop;
-export const createRak00nForChromeMcpServer = noop;
+export const createOrb2ForChromeMcpServer = noop;
 // OpenTelemetry exports
 export const ExportResultCode = { SUCCESS: 0, FAILED: 1 };
 export const resourceFromAttributes = noop;
@@ -335,12 +335,12 @@ if (!result.success) {
 // transitively imports gRPC types from the same source tree.
 import { mkdirSync, copyFileSync, cpSync, readdirSync, rmSync } from 'fs'
 mkdirSync('./proto', { recursive: true })
-if (existsSync('./src/proto/rak00n.proto')) {
+if (existsSync('./src/proto/orb2.proto')) {
   mkdirSync('./proto', { recursive: true })
-  copyFileSync('./src/proto/rak00n.proto', './proto/rak00n.proto')
+  copyFileSync('./src/proto/orb2.proto', './proto/orb2.proto')
 }
 
-// SPA was extracted into the rak00n-ui repo in v0.3.0. When src/web/ is
+// SPA was extracted into the orb2-ui repo in v0.3.0. When src/web/ is
 // still present (during the split transition, or for local single-pod
 // dev) we keep copying it; otherwise the bundle ships without one.
 if (existsSyncPre('./src/web')) {
@@ -374,11 +374,11 @@ for (const docFile of ['README.md', 'ARCHITECTURE.md']) {
   }
 }
 
-console.log(`✓ Built rak00n API v${version} → dist/api.mjs`)
+console.log(`✓ Built orb2 API v${version} → dist/api.mjs`)
 if (existsSyncPre('./dist/canvas-worker.mjs')) {
   console.log(`✓ Built canvas-worker → dist/canvas-worker.mjs`)
 }
 if (existsSyncPre('./dist/web')) {
   console.log(`✓ Copied SPA → dist/web/ (legacy single-pod mode)`)
 }
-console.log(`✓ Copied proto descriptor → proto/rak00n.proto`)
+console.log(`✓ Copied proto descriptor → proto/orb2.proto`)

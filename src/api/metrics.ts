@@ -2,17 +2,17 @@
  * Tiny Prometheus exposition format emitter.
  *
  * Counters / gauges:
- *   rak00n_chat_requests_total{model,outcome}
- *   rak00n_active_streams
- *   rak00n_tool_invocations_total{tool}
- *   rak00n_token_usage_total{kind,model}
- *   rak00n_http_requests_total{route,status}
- *   rak00n_http_request_duration_seconds_sum{route}
- *   rak00n_http_request_duration_seconds_count{route}
+ *   orb2_chat_requests_total{model,outcome}
+ *   orb2_active_streams
+ *   orb2_tool_invocations_total{tool}
+ *   orb2_token_usage_total{kind,model}
+ *   orb2_http_requests_total{route,status}
+ *   orb2_http_request_duration_seconds_sum{route}
+ *   orb2_http_request_duration_seconds_count{route}
  *
  * Latency reservoirs (bounded sliding window, p50/p95/p99 derived):
- *   rak00n_tool_duration_seconds{tool,quantile}
- *   rak00n_turn_duration_seconds{model,quantile}
+ *   orb2_tool_duration_seconds{tool,quantile}
+ *   orb2_turn_duration_seconds{model,quantile}
  *
  * No prom-client dep — rendering a flat text/plain document by hand
  * keeps deps (and the compiled binary) small.
@@ -20,12 +20,12 @@
 type Counter = Map<string, number>
 
 const counters: Record<string, Counter> = {
-  rak00n_chat_requests_total: new Map(),
-  rak00n_tool_invocations_total: new Map(),
-  rak00n_token_usage_total: new Map(),
-  rak00n_http_requests_total: new Map(),
-  rak00n_http_request_duration_seconds_sum: new Map(),
-  rak00n_http_request_duration_seconds_count: new Map(),
+  orb2_chat_requests_total: new Map(),
+  orb2_tool_invocations_total: new Map(),
+  orb2_token_usage_total: new Map(),
+  orb2_http_requests_total: new Map(),
+  orb2_http_request_duration_seconds_sum: new Map(),
+  orb2_http_request_duration_seconds_count: new Map(),
 }
 
 let activeStreams = 0
@@ -128,10 +128,10 @@ export type MetricsSnapshot = {
 
 export const metrics = {
   recordChat(model: string, outcome: 'success' | 'error' | 'cancelled') {
-    inc('rak00n_chat_requests_total', { model: model || 'default', outcome })
+    inc('orb2_chat_requests_total', { model: model || 'default', outcome })
   },
   recordTool(tool: string) {
-    inc('rak00n_tool_invocations_total', { tool })
+    inc('orb2_tool_invocations_total', { tool })
   },
   recordToolDuration(tool: string, durationMs: number) {
     pushReservoir(toolDurations, tool || 'unknown', durationMs)
@@ -141,15 +141,15 @@ export const metrics = {
   },
   recordTokens(kind: 'input' | 'output', model: string, count: number) {
     if (count <= 0) return
-    add('rak00n_token_usage_total', { kind, model: model || 'default' }, count)
+    add('orb2_token_usage_total', { kind, model: model || 'default' }, count)
   },
   recordHttp(route: string, status: number, durationSeconds: number) {
-    inc('rak00n_http_requests_total', {
+    inc('orb2_http_requests_total', {
       route,
       status: String(status),
     })
-    add('rak00n_http_request_duration_seconds_sum', { route }, durationSeconds)
-    inc('rak00n_http_request_duration_seconds_count', { route })
+    add('orb2_http_request_duration_seconds_sum', { route }, durationSeconds)
+    inc('orb2_http_request_duration_seconds_count', { route })
   },
   streamOpened() {
     activeStreams++
@@ -163,14 +163,14 @@ export const metrics = {
   snapshot(): MetricsSnapshot {
     const out: MetricsSnapshot = {
       active_streams: activeStreams,
-      chat: Object.fromEntries(counters.rak00n_chat_requests_total!.entries()),
+      chat: Object.fromEntries(counters.orb2_chat_requests_total!.entries()),
       tools: {},
-      tokens: Object.fromEntries(counters.rak00n_token_usage_total!.entries()),
-      http: Object.fromEntries(counters.rak00n_http_requests_total!.entries()),
+      tokens: Object.fromEntries(counters.orb2_token_usage_total!.entries()),
+      http: Object.fromEntries(counters.orb2_http_requests_total!.entries()),
       tool_latency_ms: reservoirSnapshot(toolDurations),
       turn_latency_ms: reservoirSnapshot(turnDurations),
     }
-    for (const [k, v] of counters.rak00n_tool_invocations_total!.entries()) {
+    for (const [k, v] of counters.orb2_tool_invocations_total!.entries()) {
       // k looks like  tool="FileRead"
       const m = /tool="([^"]+)"/.exec(k)
       if (m) out.tools[m[1]!] = v
@@ -180,27 +180,27 @@ export const metrics = {
   render(): string {
     const lines: string[] = []
     const HELP: Record<string, [string, string]> = {
-      rak00n_chat_requests_total: [
+      orb2_chat_requests_total: [
         'Number of chat requests handled, partitioned by model and outcome.',
         'counter',
       ],
-      rak00n_tool_invocations_total: [
+      orb2_tool_invocations_total: [
         'Number of agent tool invocations, partitioned by tool name.',
         'counter',
       ],
-      rak00n_token_usage_total: [
+      orb2_token_usage_total: [
         'Cumulative token usage, partitioned by kind (input/output) and model.',
         'counter',
       ],
-      rak00n_http_requests_total: [
+      orb2_http_requests_total: [
         'Number of HTTP requests served, partitioned by route and status code.',
         'counter',
       ],
-      rak00n_http_request_duration_seconds_sum: [
+      orb2_http_request_duration_seconds_sum: [
         'Cumulative HTTP request duration in seconds, partitioned by route.',
         'counter',
       ],
-      rak00n_http_request_duration_seconds_count: [
+      orb2_http_request_duration_seconds_count: [
         'Number of HTTP request duration observations, partitioned by route.',
         'counter',
       ],
@@ -217,9 +217,9 @@ export const metrics = {
         }
       }
     }
-    lines.push('# HELP rak00n_active_streams Number of in-flight chat streams.')
-    lines.push('# TYPE rak00n_active_streams gauge')
-    lines.push(`rak00n_active_streams ${activeStreams}`)
+    lines.push('# HELP orb2_active_streams Number of in-flight chat streams.')
+    lines.push('# TYPE orb2_active_streams gauge')
+    lines.push(`orb2_active_streams ${activeStreams}`)
 
     // ─── Latency summaries ───
     const renderSummary = (
@@ -244,13 +244,13 @@ export const metrics = {
       }
     }
     renderSummary(
-      'rak00n_tool_duration_seconds',
+      'orb2_tool_duration_seconds',
       'Tool invocation duration in seconds, partitioned by tool.',
       'tool',
       toolDurations,
     )
     renderSummary(
-      'rak00n_turn_duration_seconds',
+      'orb2_turn_duration_seconds',
       'Chat turn duration in seconds, partitioned by model.',
       'model',
       turnDurations,

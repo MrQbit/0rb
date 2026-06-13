@@ -26,7 +26,7 @@ export class VoiceChannel implements Channel {
   readonly name = 'Voice'
 
   isConfigured(): boolean {
-    return process.env.RAK00N_VOICE_ENABLED === '1'
+    return process.env.ORB2_VOICE_ENABLED === '1'
   }
 
   async start(_store: Store): Promise<void> {
@@ -39,7 +39,7 @@ export class VoiceChannel implements Channel {
     const configured = this.isConfigured()
     const connected = configured && backendReady
     const detail: Record<string, unknown> | undefined = configured
-      ? { backend: process.env.RAK00N_VOICE_BACKEND || 'whisper' }
+      ? { backend: process.env.ORB2_VOICE_BACKEND || 'whisper' }
       : undefined
     return { id: this.id, name: this.name, configured, connected, detail }
   }

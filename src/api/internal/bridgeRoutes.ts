@@ -6,7 +6,7 @@
  * API surface (jobs, sub-worker spawn, vault, memory, sandbox)
  * without re-implementing those services in every worker.
  *
- * Every route requires an `X-Rak00n-Bridge-Token` header containing the
+ * Every route requires an `X-Orb2-Bridge-Token` header containing the
  * HMAC-bound token issued by `bridgeAuth.issueBridgeToken()`. The
  * token's claim must match the URL's :turnId so a leaked token can
  * only act on the work it was issued for.
@@ -68,7 +68,7 @@ export async function tryHandleBridgeRoute(
   const [, urlTurnId, suffix] = m
 
   // Verify token + scope.
-  const token = req.headers.get('x-rak00n-bridge-token') ?? ''
+  const token = req.headers.get('x-orb2-bridge-token') ?? ''
   const claim = verifyBridgeToken(token)
   if (!claim) {
     return jsonResponse(401, {
@@ -241,7 +241,7 @@ export async function tryHandleBridgeRoute(
     try {
       // Stash a per-session memory digest fragment so the relay
       // collector picks it up on the next periodic sync.
-      const key = `rak00n:memory:digest:${sessionId}`
+      const key = `orb2:memory:digest:${sessionId}`
       await ctx.store.putKv(key, JSON.stringify({
         ...body,
         recorded_at: new Date().toISOString(),

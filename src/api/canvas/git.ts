@@ -10,12 +10,12 @@
  *     holds the SPA files. We init the repo at cwd (NOT at .canvas/)
  *     so other workspace-level artifacts stay tracked too.
  *   - Commit identity preference:
- *       1. Signed-in GitHub user's name/email (RAK00N_GIT_AUTHOR_NAME / EMAIL)
- *       2. Service fallback "Rak00n Canvas <rak00n@noreply.local>"
+ *       1. Signed-in GitHub user's name/email (ORB2_GIT_AUTHOR_NAME / EMAIL)
+ *       2. Service fallback "Orb2 Canvas <orb2@noreply.local>"
  *   - All commits are made with the `--allow-empty-message` flag
  *     disabled so empty diffs simply produce a no-op rather than an
  *     error.
- *   - Toggle the whole feature off with RAK00N_CANVAS_GIT_AUTOCOMMIT=0.
+ *   - Toggle the whole feature off with ORB2_CANVAS_GIT_AUTOCOMMIT=0.
  */
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
@@ -24,7 +24,7 @@ import { join } from 'node:path'
 export type GitResult = { ok: boolean; stdout: string; stderr: string; code: number }
 
 function isEnabled(): boolean {
-  const v = process.env.RAK00N_CANVAS_GIT_AUTOCOMMIT
+  const v = process.env.ORB2_CANVAS_GIT_AUTOCOMMIT
   return v !== '0' && v !== 'false'
 }
 
@@ -50,17 +50,17 @@ export async function runGit(cwd: string, args: string[]): Promise<GitResult> {
 
 function authorName(): string {
   return (
-    process.env.RAK00N_GIT_AUTHOR_NAME?.trim() ||
+    process.env.ORB2_GIT_AUTHOR_NAME?.trim() ||
     process.env.GIT_AUTHOR_NAME?.trim() ||
-    'Rak00n Canvas'
+    'Orb2 Canvas'
   )
 }
 
 function authorEmail(): string {
   return (
-    process.env.RAK00N_GIT_AUTHOR_EMAIL?.trim() ||
+    process.env.ORB2_GIT_AUTHOR_EMAIL?.trim() ||
     process.env.GIT_AUTHOR_EMAIL?.trim() ||
-    'rak00n-canvas@noreply.local'
+    'orb2-canvas@noreply.local'
   )
 }
 

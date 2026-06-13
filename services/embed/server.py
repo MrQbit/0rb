@@ -1,5 +1,5 @@
 """
-rak00n embedding service — local text embeddings on the GPU.
+orb2 embedding service — local text embeddings on the GPU.
 
 Powers semantic memory recall: turns memories and queries into vectors so
 the agent can retrieve by MEANING (paraphrase-aware), not just by an LLM
@@ -24,11 +24,11 @@ from pydantic import BaseModel
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("embed")
 
-MODEL_ID = os.environ.get("RAK00N_EMBED_MODEL", "BAAI/bge-base-en-v1.5")
-QUERY_PREFIX = os.environ.get("RAK00N_EMBED_QUERY_PREFIX",
+MODEL_ID = os.environ.get("ORB2_EMBED_MODEL", "BAAI/bge-base-en-v1.5")
+QUERY_PREFIX = os.environ.get("ORB2_EMBED_QUERY_PREFIX",
                               "Represent this sentence for searching relevant passages: ")
 
-app = FastAPI(title="rak00n-embed", version="1.0")
+app = FastAPI(title="orb2-embed", version="1.0")
 _model = None
 _device = "cpu"
 _dim = 0
@@ -70,8 +70,8 @@ def embed(req: EmbedRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("RAK00N_EMBED_PORT", "8994"))
-    if os.environ.get("RAK00N_EMBED_WARM", "1") == "1":
+    port = int(os.environ.get("ORB2_EMBED_PORT", "8994"))
+    if os.environ.get("ORB2_EMBED_WARM", "1") == "1":
         try:
             model().encode(["warm up"], normalize_embeddings=True)
         except Exception as e:

@@ -6,7 +6,7 @@
  *
  * Tokens are stored per box (single user) in the kv store and refreshed on
  * demand. The redirect URI must be registered in the Spotify app and equals
- * <RAK00N_PUBLIC_URL>/v1/oauth/spotify/callback.
+ * <ORB2_PUBLIC_URL>/v1/oauth/spotify/callback.
  */
 import type { Store } from '../store/store.js'
 
@@ -18,12 +18,12 @@ const SCOPES = [
   'playlist-read-private', 'user-library-read',
 ].join(' ')
 
-function clientId() { return (process.env.RAK00N_SPOTIFY_CLIENT_ID || '').trim() }
-function clientSecret() { return (process.env.RAK00N_SPOTIFY_CLIENT_SECRET || '').trim() }
-export function spotifyOAuthConfigured() { return !!(clientId() && clientSecret() && (process.env.RAK00N_PUBLIC_URL || '').trim()) }
+function clientId() { return (process.env.ORB2_SPOTIFY_CLIENT_ID || '').trim() }
+function clientSecret() { return (process.env.ORB2_SPOTIFY_CLIENT_SECRET || '').trim() }
+export function spotifyOAuthConfigured() { return !!(clientId() && clientSecret() && (process.env.ORB2_PUBLIC_URL || '').trim()) }
 
 export function redirectUri(): string {
-  const base = (process.env.RAK00N_PUBLIC_URL || '').replace(/\/+$/, '')
+  const base = (process.env.ORB2_PUBLIC_URL || '').replace(/\/+$/, '')
   return `${base}/v1/oauth/spotify/callback`
 }
 

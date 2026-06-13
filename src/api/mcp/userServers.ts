@@ -3,7 +3,7 @@
  *
  * Operators can register stand-alone MCPs (not bundled with a skill)
  * through POST /v1/mcps. Entries are persisted in Redis under
- * `rak00n:mcp:user:<name>` and an index `rak00n:mcp:user:index` keeps the
+ * `orb2:mcp:user:<name>` and an index `orb2:mcp:user:index` keeps the
  * list small without scanning Redis.
  *
  * User-registered MCPs are merged into every chat turn (after the
@@ -13,8 +13,8 @@
 import type { Store } from '../store/store.js'
 import type { SkillMcpServer } from '../skills/loader.js'
 
-const USER_MCP_PREFIX = 'rak00n:mcp:user:'
-const USER_MCP_INDEX = 'rak00n:mcp:user:index'
+const USER_MCP_PREFIX = 'orb2:mcp:user:'
+const USER_MCP_INDEX = 'orb2:mcp:user:index'
 const MCP_TTL_SECONDS = 86_400 * 365 // ~ a year
 
 export type UserMcpServer = SkillMcpServer & {

@@ -1,6 +1,6 @@
-// rak00n desktop shell — Electron main process.
+// orb2 desktop shell — Electron main process.
 //
-// Philosophy: this is a THIN HOST. It loads the existing rak00n web console
+// Philosophy: this is a THIN HOST. It loads the existing orb2 web console
 // (served by the `ui` service) unchanged, and adds a small, FIXED set of
 // privileged OS capabilities over IPC. New visual/data widgets live entirely in
 // the web UI and need zero changes here — only genuinely new OS powers (rare)
@@ -21,13 +21,13 @@ function loadConfig() { try { cfg = JSON.parse(fs.readFileSync(configPath(), 'ut
 function saveConfig(next) { cfg = { ...cfg, ...next }; try { fs.mkdirSync(path.dirname(configPath()), { recursive: true }) } catch {} fs.writeFileSync(configPath(), JSON.stringify(cfg, null, 2)) }
 // liveUrl is set once the local backend (or chosen server) is reachable.
 let liveUrl = null
-function rak00nUrl() { return process.env.RAK00N_URL || liveUrl || cfg.url || 'http://localhost:9080' }
-function isConfigured() { return !!(process.env.RAK00N_URL || cfg.url || cfg.mode) }
+function orb2Url() { return process.env.ORB2_URL || liveUrl || cfg.url || 'http://localhost:9080' }
+function isConfigured() { return !!(process.env.ORB2_URL || cfg.url || cfg.mode) }
 
 // Bring up whatever this config points at, then resolve the URL to load.
 //   server → just use the URL.  local/cloud → spin up the local backend.
 async function bringUp(onStatus) {
-  if (process.env.RAK00N_URL) { liveUrl = process.env.RAK00N_URL; return { ok: true } }
+  if (process.env.ORB2_URL) { liveUrl = process.env.ORB2_URL; return { ok: true } }
   if (cfg.mode === 'server') { liveUrl = cfg.url; return { ok: true } }
   const r = await startLocal(cfg, onStatus)        // local or cloud
   if (r.ok) liveUrl = r.url
@@ -42,11 +42,11 @@ async function bringUp(onStatus) {
 //              "in" the orb. (Open the website locally, full screen.)
 //   window   — a normal resizable window (dev / casual).
 function shellMode() {
-  let m = process.env.RAK00N_SHELL_MODE || cfg.shellMode || 'blended'
+  let m = process.env.ORB2_SHELL_MODE || cfg.shellMode || 'blended'
   if (m === 'desktop') m = 'blended'          // legacy alias
   return ['blended', 'web', 'window'].includes(m) ? m : 'blended'
 }
-const ALLOW_ROOTS = (process.env.RAK00N_FS_ROOTS || os.homedir()).split(path.delimiter)
+const ALLOW_ROOTS = (process.env.ORB2_FS_ROOTS || os.homedir()).split(path.delimiter)
 
 let mainWindow = null
 let setupWindow = null
@@ -67,7 +67,7 @@ function createWindow() {
     transparent: blended && !!cfg.blendedTransparent,
     backgroundColor: blended && cfg.blendedTransparent ? '#00000000' : '#0a0d0a',
     autoHideMenuBar: true,
-    title: 'rak00n',
+    title: 'orb2',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,   // bridge is the ONLY surface
@@ -91,7 +91,7 @@ function createWindow() {
     mainWindow.setSkipTaskbar(false)
   }
 
-  mainWindow.loadURL(rak00nUrl())
+  mainWindow.loadURL(orb2Url())
   mainWindow.once('ready-to-show', () => mainWindow.show())
   mainWindow.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' } })
   mainWindow.on('closed', () => { mainWindow = null })
@@ -109,7 +109,7 @@ function createTray() {
   if (!tray) {
     const icon = nativeImage.createFromPath(path.join(__dirname, 'assets', 'tray.png'))
     tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon)
-    tray.setToolTip('rak00n')
+    tray.setToolTip('orb2')
   }
   const m = shellMode()
   tray.setContextMenu(Menu.buildFromTemplate([
@@ -121,9 +121,9 @@ function createTray() {
       { label: 'Fullscreen (web)', type: 'radio', checked: m === 'web', click: () => setShellMode('web') },
       { label: 'Window', type: 'radio', checked: m === 'window', click: () => setShellMode('window') },
     ] },
-    { label: `Connected to ${rak00nUrl()}`, enabled: false },
+    { label: `Connected to ${orb2Url()}`, enabled: false },
     { type: 'separator' },
-    { label: 'Quit rak00n', click: () => { app.exit(0) } },
+    { label: 'Quit orb2', click: () => { app.exit(0) } },
   ]))
 }
 
@@ -131,7 +131,7 @@ function createTray() {
 function createSetupWindow(booting) {
   setupWindow = new BrowserWindow({
     width: 620, height: 720, resizable: false, autoHideMenuBar: true,
-    backgroundColor: '#06080a', title: 'rak00n — setup',
+    backgroundColor: '#06080a', title: 'orb2 — setup',
     webPreferences: { preload: path.join(__dirname, 'setup-preload.js'), contextIsolation: true, nodeIntegration: false },
   })
   setupWindow.loadFile(path.join(__dirname, 'setup.html'), booting ? { search: '?booting=1' } : undefined)
@@ -157,20 +157,20 @@ ipcMain.handle('setup:save', async (_e, next) => {
 async function boot() {
   loadConfig()
   if (!isConfigured()) { createSetupWindow(); return }
-  if (cfg.mode === 'server' || (process.env.RAK00N_URL && !cfg.mode)) {
+  if (cfg.mode === 'server' || (process.env.ORB2_URL && !cfg.mode)) {
     await bringUp(() => {}); createWindow(); createTray(); return
   }
   createSetupWindow(true)                    // boot splash
   const r = await bringUp(pushStatus)
   if (r.ok) { const w = setupWindow; createWindow(); createTray(); if (w) w.close() }
-  else pushStatus('⚠ ' + (r.message || 'Could not start rak00n.'))
+  else pushStatus('⚠ ' + (r.message || 'Could not start orb2.'))
 }
 
 // ── auto-launch at login (cross-platform) ────────────────────────────────────
 async function ensureAutoLaunch() {
   try {
     const AutoLaunch = require('auto-launch')
-    const launcher = new AutoLaunch({ name: 'rak00n', isHidden: false })
+    const launcher = new AutoLaunch({ name: 'orb2', isHidden: false })
     if (!(await launcher.isEnabled())) await launcher.enable()
   } catch {
     // Fallback to Electron's own login-item registration (win/mac).
@@ -180,7 +180,7 @@ async function ensureAutoLaunch() {
 
 // ── the privileged capability bridge (IPC) ───────────────────────────────────
 // A small, FIXED set of OS powers the browser sandbox can't provide. Privileged
-// widgets in the web UI feature-detect `window.rak00n.*`; everything else is
+// widgets in the web UI feature-detect `window.orb2.*`; everything else is
 // pure web and never reaches here.
 
 function underAllowedRoot(p) {
@@ -220,13 +220,13 @@ ipcMain.handle('docker:run', (e, args) => new Promise(resolve => {
     resolve({ ok: !err, stdout: stdout || '', stderr: stderr || (err ? String(err) : '') }))
 }))
 
-// Filesystem (restricted to RAK00N_FS_ROOTS, default $HOME).
+// Filesystem (restricted to ORB2_FS_ROOTS, default $HOME).
 ipcMain.handle('fs:read', (e, p) => { if (!underAllowedRoot(p)) throw new Error('path not allowed'); return fs.promises.readFile(p, 'utf8') })
 ipcMain.handle('fs:list', (e, p) => { if (!underAllowedRoot(p)) throw new Error('path not allowed'); return fs.promises.readdir(p, { withFileTypes: true }).then(es => es.map(d => ({ name: d.name, dir: d.isDirectory() }))) })
 ipcMain.handle('fs:write', (e, { path: p, data }) => { if (!underAllowedRoot(p)) throw new Error('path not allowed'); return fs.promises.writeFile(p, data) })
 
 ipcMain.handle('app:openExternal', (e, url) => shell.openExternal(url))
-ipcMain.handle('system:info', () => ({ platform: process.platform, arch: process.arch, home: os.homedir(), url: rak00nUrl(), owner: cfg.ownerEmail, brain: cfg.brain }))
+ipcMain.handle('system:info', () => ({ platform: process.platform, arch: process.arch, home: os.homedir(), url: orb2Url(), owner: cfg.ownerEmail, brain: cfg.brain }))
 
 // ── lifecycle ────────────────────────────────────────────────────────────────
 const single = app.requestSingleInstanceLock()

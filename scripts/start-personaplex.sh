@@ -2,8 +2,8 @@
 # Start the PersonaPlex (Moshi) voice server on port 8998.
 set -euo pipefail
 
-VOICE_PROMPT="${RAK00N_VOICE_VOICE_PROMPT:-NATM0.pt}"
-TEXT_PROMPT="${RAK00N_VOICE_PERSONA_PROMPT:-You are rak00n, an AI coding agent. Be concise, technical, and helpful.}"
+VOICE_PROMPT="${ORB2_VOICE_VOICE_PROMPT:-NATM0.pt}"
+TEXT_PROMPT="${ORB2_VOICE_PERSONA_PROMPT:-You are orb2, an AI coding agent. Be concise, technical, and helpful.}"
 PORT=8998
 SSL_DIR="/etc/rakoon/ssl"
 

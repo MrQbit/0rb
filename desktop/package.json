@@ -1,14 +1,14 @@
 {
-  "name": "rak00n-desktop",
-  "productName": "rak00n",
+  "name": "orb2-desktop",
+  "productName": "orb2",
   "version": "0.1.0",
   "private": true,
-  "description": "rak00n desktop shell — loads the orb console as a desktop-layer app with a small privileged capability bridge (terminal / docker / files / native browser).",
+  "description": "orb2 desktop shell — loads the orb console as a desktop-layer app with a small privileged capability bridge (terminal / docker / files / native browser).",
   "license": "SEE LICENSE IN ../LICENSE",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "RAK00N_URL=http://localhost:9080 electron .",
+    "dev": "ORB2_URL=http://localhost:9080 electron .",
     "dist": "electron-builder",
     "dist:win": "electron-builder --win",
     "dist:mac": "electron-builder --mac",
@@ -27,8 +27,8 @@
     "electron-builder": "^25.1.8"
   },
   "build": {
-    "appId": "ai.rak00n.desktop",
-    "productName": "rak00n",
+    "appId": "ai.orb2.desktop",
+    "productName": "orb2",
     "directories": { "output": "dist" },
     "files": ["main.js", "preload.js", "assets/**"],
     "win": { "target": ["nsis"], "icon": "assets/icon.ico" },

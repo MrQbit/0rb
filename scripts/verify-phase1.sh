@@ -3,7 +3,7 @@
 # Run this on the DGX Spark after: make spark
 set -euo pipefail
 
-NS=${NAMESPACE:-rak00n}
+NS=${NAMESPACE:-orb2}
 API_PORT=${API_PORT:-9080}
 PASS=0; FAIL=0
 
@@ -14,57 +14,57 @@ h()    { echo ""; echo "── $1 ───────────────�
 # Port-forward in background if not already forwarded
 if ! curl -sf "http://localhost:${API_PORT}/healthz" >/dev/null 2>&1; then
   echo "→ Starting port-forward on :${API_PORT}..."
-  kubectl -n "$NS" port-forward svc/rak00n-api "${API_PORT}:8080" &
+  kubectl -n "$NS" port-forward svc/orb2-api "${API_PORT}:8080" &
   PF_PID=$!
   trap 'kill $PF_PID 2>/dev/null || true' EXIT
   sleep 3
 fi
 
 h "RBAC resources"
-kubectl -n "$NS" get serviceaccount rak00n-api -o name 2>/dev/null \
-  && ok "ServiceAccount rak00n-api exists" || fail "ServiceAccount rak00n-api MISSING"
-kubectl -n "$NS" get role rak00n-api -o name 2>/dev/null \
-  && ok "Role rak00n-api exists" || fail "Role rak00n-api MISSING"
-kubectl -n "$NS" get rolebinding rak00n-api -o name 2>/dev/null \
-  && ok "RoleBinding rak00n-api exists" || fail "RoleBinding rak00n-api MISSING"
+kubectl -n "$NS" get serviceaccount orb2-api -o name 2>/dev/null \
+  && ok "ServiceAccount orb2-api exists" || fail "ServiceAccount orb2-api MISSING"
+kubectl -n "$NS" get role orb2-api -o name 2>/dev/null \
+  && ok "Role orb2-api exists" || fail "Role orb2-api MISSING"
+kubectl -n "$NS" get rolebinding orb2-api -o name 2>/dev/null \
+  && ok "RoleBinding orb2-api exists" || fail "RoleBinding orb2-api MISSING"
 
 h "Deployments + Replicas"
-REPLICAS=$(kubectl -n "$NS" get deploy rak00n-api -o jsonpath='{.spec.replicas}' 2>/dev/null || echo 0)
+REPLICAS=$(kubectl -n "$NS" get deploy orb2-api -o jsonpath='{.spec.replicas}' 2>/dev/null || echo 0)
 [ "$REPLICAS" -ge 2 ] \
-  && ok "rak00n-api has $REPLICAS replicas (≥2 for blue-green)" \
-  || fail "rak00n-api has only $REPLICAS replica(s) — needs ≥2 for rolling self-update"
+  && ok "orb2-api has $REPLICAS replicas (≥2 for blue-green)" \
+  || fail "orb2-api has only $REPLICAS replica(s) — needs ≥2 for rolling self-update"
 
-READY=$(kubectl -n "$NS" get deploy rak00n-api -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo 0)
+READY=$(kubectl -n "$NS" get deploy orb2-api -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo 0)
 [ "$READY" -ge 1 ] \
-  && ok "rak00n-api $READY/${REPLICAS} ready" \
-  || fail "rak00n-api not ready"
+  && ok "orb2-api $READY/${REPLICAS} ready" \
+  || fail "orb2-api not ready"
 
-STRATEGY=$(kubectl -n "$NS" get deploy rak00n-api -o jsonpath='{.spec.strategy.rollingUpdate.maxUnavailable}' 2>/dev/null || echo "?")
+STRATEGY=$(kubectl -n "$NS" get deploy orb2-api -o jsonpath='{.spec.strategy.rollingUpdate.maxUnavailable}' 2>/dev/null || echo "?")
 [ "$STRATEGY" = "0" ] \
   && ok "rollingUpdate.maxUnavailable=0 (blue-green safe)" \
   || fail "rollingUpdate.maxUnavailable=$STRATEGY (expected 0)"
 
 h "Worker env vars"
-WORKER_MODE=$(kubectl -n "$NS" exec deploy/rak00n-api -- sh -c 'echo $RAK00N_WORKER_MODE' 2>/dev/null | tr -d '\r' || echo "")
+WORKER_MODE=$(kubectl -n "$NS" exec deploy/orb2-api -- sh -c 'echo $ORB2_WORKER_MODE' 2>/dev/null | tr -d '\r' || echo "")
 [ "$WORKER_MODE" = "k8s-jobs" ] \
-  && ok "RAK00N_WORKER_MODE=k8s-jobs" \
-  || fail "RAK00N_WORKER_MODE='$WORKER_MODE' (expected k8s-jobs)"
+  && ok "ORB2_WORKER_MODE=k8s-jobs" \
+  || fail "ORB2_WORKER_MODE='$WORKER_MODE' (expected k8s-jobs)"
 
-WORKER_NS=$(kubectl -n "$NS" exec deploy/rak00n-api -- sh -c 'echo $RAK00N_WORKER_NAMESPACE' 2>/dev/null | tr -d '\r' || echo "")
+WORKER_NS=$(kubectl -n "$NS" exec deploy/orb2-api -- sh -c 'echo $ORB2_WORKER_NAMESPACE' 2>/dev/null | tr -d '\r' || echo "")
 [ -n "$WORKER_NS" ] \
-  && ok "RAK00N_WORKER_NAMESPACE=$WORKER_NS" \
-  || fail "RAK00N_WORKER_NAMESPACE not set"
+  && ok "ORB2_WORKER_NAMESPACE=$WORKER_NS" \
+  || fail "ORB2_WORKER_NAMESPACE not set"
 
-WORKER_IMAGE=$(kubectl -n "$NS" exec deploy/rak00n-api -- sh -c 'echo $RAK00N_WORKER_IMAGE' 2>/dev/null | tr -d '\r' || echo "")
+WORKER_IMAGE=$(kubectl -n "$NS" exec deploy/orb2-api -- sh -c 'echo $ORB2_WORKER_IMAGE' 2>/dev/null | tr -d '\r' || echo "")
 [ -n "$WORKER_IMAGE" ] \
-  && ok "RAK00N_WORKER_IMAGE=$WORKER_IMAGE" \
-  || fail "RAK00N_WORKER_IMAGE not set"
+  && ok "ORB2_WORKER_IMAGE=$WORKER_IMAGE" \
+  || fail "ORB2_WORKER_IMAGE not set"
 
 h "Canvas env vars"
-CANVAS_ENABLED=$(kubectl -n "$NS" exec deploy/rak00n-api -- sh -c 'echo $RAK00N_CANVAS_ENABLED' 2>/dev/null | tr -d '\r' || echo "")
+CANVAS_ENABLED=$(kubectl -n "$NS" exec deploy/orb2-api -- sh -c 'echo $ORB2_CANVAS_ENABLED' 2>/dev/null | tr -d '\r' || echo "")
 [ "$CANVAS_ENABLED" = "1" ] \
-  && ok "RAK00N_CANVAS_ENABLED=1" \
-  || fail "RAK00N_CANVAS_ENABLED='$CANVAS_ENABLED' (expected 1)"
+  && ok "ORB2_CANVAS_ENABLED=1" \
+  || fail "ORB2_CANVAS_ENABLED='$CANVAS_ENABLED' (expected 1)"
 
 h "API health"
 curl -sf "http://localhost:${API_PORT}/healthz" >/dev/null \
@@ -109,22 +109,22 @@ ok "  single_user in /v1/info: $SINGLE_USER"
 h "RBAC permissions test (from inside cluster)"
 # Verify the SA can actually list pods (the k8s API call that matters)
 CAN_LIST=$(kubectl -n "$NS" auth can-i list pods \
-  --as "system:serviceaccount:${NS}:rak00n-api" 2>/dev/null || echo "no")
+  --as "system:serviceaccount:${NS}:orb2-api" 2>/dev/null || echo "no")
 [ "$CAN_LIST" = "yes" ] \
-  && ok "SA rak00n-api can list pods" \
-  || fail "SA rak00n-api CANNOT list pods — RBAC misconfigured"
+  && ok "SA orb2-api can list pods" \
+  || fail "SA orb2-api CANNOT list pods — RBAC misconfigured"
 
 CAN_CREATE_JOBS=$(kubectl -n "$NS" auth can-i create jobs \
-  --as "system:serviceaccount:${NS}:rak00n-api" 2>/dev/null || echo "no")
+  --as "system:serviceaccount:${NS}:orb2-api" 2>/dev/null || echo "no")
 [ "$CAN_CREATE_JOBS" = "yes" ] \
-  && ok "SA rak00n-api can create jobs" \
-  || fail "SA rak00n-api CANNOT create jobs"
+  && ok "SA orb2-api can create jobs" \
+  || fail "SA orb2-api CANNOT create jobs"
 
 CAN_PATCH_DEPLOY=$(kubectl -n "$NS" auth can-i patch deployments \
-  --as "system:serviceaccount:${NS}:rak00n-api" 2>/dev/null || echo "no")
+  --as "system:serviceaccount:${NS}:orb2-api" 2>/dev/null || echo "no")
 [ "$CAN_PATCH_DEPLOY" = "yes" ] \
-  && ok "SA rak00n-api can patch deployments (self-update)" \
-  || fail "SA rak00n-api CANNOT patch deployments — self-update will fail"
+  && ok "SA orb2-api can patch deployments (self-update)" \
+  || fail "SA orb2-api CANNOT patch deployments — self-update will fail"
 
 echo ""
 echo "═══════════════════════════════════════════════════════"

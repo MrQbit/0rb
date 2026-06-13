@@ -6,9 +6,9 @@ keywords: security review, review pr, pr security, vulnerability review, stride 
 
 # PR Security Review
 
-Analyze code changes for security vulnerabilities using STRIDE-based threat modeling. Uses RAK00N's built-in tools (Read, Grep, Glob, Bash) to analyze code directly -- no external CLI required.
+Analyze code changes for security vulnerabilities using STRIDE-based threat modeling. Uses ORB2's built-in tools (Read, Grep, Glob, Bash) to analyze code directly -- no external CLI required.
 
-SECURITY_REFS_DIR is resolved from the RAK00N_SECURITY_REFS_DIR environment variable. Reference files are in that directory.
+SECURITY_REFS_DIR is resolved from the ORB2_SECURITY_REFS_DIR environment variable. Reference files are in that directory.
 
 ## When to Use
 

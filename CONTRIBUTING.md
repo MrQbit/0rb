@@ -1,17 +1,17 @@
-# Contributing to rak00n
+# Contributing to orb2
 
-Thanks for your interest. rak00n is a single-user, local-first AI assistant that
+Thanks for your interest. orb2 is a single-user, local-first AI assistant that
 runs as a Docker Compose stack. Contributions that keep it simple, well-tested,
 and easy to self-host are the most valuable.
 
-> License note: rak00n is released under the [PolyForm Noncommercial 1.0.0](LICENSE)
+> License note: orb2 is released under the [PolyForm Noncommercial 1.0.0](LICENSE)
 > license. By contributing you agree your contributions are licensed under the
 > same terms. Commercial use/redistribution requires written permission.
 
 ## Before you start
 
-- Search existing [issues](https://github.com/MrQbit/rak00n/issues) and
-  [discussions](https://github.com/MrQbit/rak00n/discussions) first.
+- Search existing [issues](https://github.com/MrQbit/0rb/issues) and
+  [discussions](https://github.com/MrQbit/0rb/discussions) first.
 - Use issues for confirmed bugs and actionable feature work; discussions for
   setup help and ideas.
 - For larger changes, open an issue first so the scope is clear.
@@ -19,7 +19,7 @@ and easy to self-host are the most valuable.
 
 ## Local setup
 
-rak00n's agent API is a Bun app bundled to a single file; the rest of the stack
+orb2's agent API is a Bun app bundled to a single file; the rest of the stack
 is Docker Compose. See [DEPLOYMENT.md](DEPLOYMENT.md) to bring it up.
 
 ```bash
@@ -30,8 +30,8 @@ bun run build:api        # bundle the agent API → dist/api.mjs
 To rebuild + redeploy a service after a change:
 
 ```bash
-docker build -t localhost:5001/rak00n-api:dev -f Dockerfile.api.dev .
-docker compose -f docker-compose.spark.yml up -d rak00n-api
+docker build -t localhost:5001/orb2-api:dev -f Dockerfile.api.dev .
+docker compose -f docker-compose.spark.yml up -d orb2-api
 ```
 
 The web console is static (`web/public/`); rebuild the `ui` image to ship UI

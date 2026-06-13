@@ -6,9 +6,9 @@ keywords: security scan, security audit, codebase scan, vulnerability scan, stri
 
 # Codebase Security Scan
 
-Comprehensive security audit of a project using STRIDE-based static analysis and dependency vulnerability scanning. Uses RAK00N's built-in tools (Read, Grep, Glob, Bash) -- no external CLI required.
+Comprehensive security audit of a project using STRIDE-based static analysis and dependency vulnerability scanning. Uses ORB2's built-in tools (Read, Grep, Glob, Bash) -- no external CLI required.
 
-SECURITY_REFS_DIR is resolved from the RAK00N_SECURITY_REFS_DIR environment variable.
+SECURITY_REFS_DIR is resolved from the ORB2_SECURITY_REFS_DIR environment variable.
 
 ## When to Use
 

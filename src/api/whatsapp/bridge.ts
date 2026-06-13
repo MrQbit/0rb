@@ -3,14 +3,14 @@
  * Connects to WhatsApp, persists credentials in the store, and emits
  * incoming messages from the owner phone.
  *
- * Only messages from RAK00N_OWNER_PHONE (E.164 format) are processed.
+ * Only messages from ORB2_OWNER_PHONE (E.164 format) are processed.
  * The QR code is available at getQR() until the connection is established.
  */
 import { EventEmitter } from 'node:events'
 import type { Store } from '../store/store.js'
 import { log } from '../log.js'
 
-const CREDS_KEY = 'rak00n:whatsapp:creds'
+const CREDS_KEY = 'orb2:whatsapp:creds'
 const QR_REFRESH_MS = 20_000
 
 export type WaBridgeStatus = {
@@ -35,9 +35,9 @@ export class WhatsAppBridge extends EventEmitter {
   }
 
   async connect(): Promise<void> {
-    const ownerPhone = process.env.RAK00N_OWNER_PHONE
+    const ownerPhone = process.env.ORB2_OWNER_PHONE
     if (!ownerPhone) {
-      log.warn('whatsapp_no_owner_phone', { msg: 'RAK00N_OWNER_PHONE not set; WhatsApp bridge disabled' })
+      log.warn('whatsapp_no_owner_phone', { msg: 'ORB2_OWNER_PHONE not set; WhatsApp bridge disabled' })
       return
     }
 
@@ -58,7 +58,7 @@ export class WhatsAppBridge extends EventEmitter {
     this.socket = makeWASocket({
       auth: state,
       printQRInTerminal: true,
-      browser: ['rak00n', 'Chrome', '1.0'],
+      browser: ['orb2', 'Chrome', '1.0'],
     })
 
     this.socket.ev.on('creds.update', async (creds: any) => {

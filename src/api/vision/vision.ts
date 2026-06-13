@@ -10,7 +10,7 @@
 import type { Store } from '../store/store.js'
 
 export function visionUrl(): string {
-  return (process.env.RAK00N_VISION_URL || '').replace(/\/+$/, '')
+  return (process.env.ORB2_VISION_URL || '').replace(/\/+$/, '')
 }
 export function visionEnabled(): boolean {
   return !!visionUrl()
@@ -18,10 +18,10 @@ export function visionEnabled(): boolean {
 
 // LLM-native vision: send the frame straight to the multimodal brain (the same
 // vLLM the agent talks to) as an image content block, instead of a separate
-// vision service (moondream2). Enabled with RAK00N_VISION_BACKEND=llm; falls back
+// vision service (moondream2). Enabled with ORB2_VISION_BACKEND=llm; falls back
 // to moondream when set to anything else. Either backend makes the tool show up.
 export function llmVisionEnabled(): boolean {
-  const backend = (process.env.RAK00N_VISION_BACKEND || '').toLowerCase()
+  const backend = (process.env.ORB2_VISION_BACKEND || '').toLowerCase()
   return backend === 'llm' && !!process.env.OPENAI_BASE_URL
 }
 export function visionToolAvailable(): boolean {
@@ -63,7 +63,7 @@ async function captionViaLLM(frame: Frame, question: string): Promise<string> {
 
 // ── in-memory latest frame per owner (NO disk) ──
 // Keyed by the user identity (single-user owner), not the chat session: the
-// user shares their camera once and rak00n can look at the latest frame in
+// user shares their camera once and orb2 can look at the latest frame in
 // any conversation. The server assigns its own session ids, so they can't be
 // aligned with a client-side stream anyway.
 type Frame = { jpeg: Uint8Array; ts: number }
@@ -112,7 +112,7 @@ export async function executeVision(
   ctx: { store: Store; ownerId: string },
 ): Promise<string> {
   const useLLM = llmVisionEnabled()
-  if (!useLLM && !visionEnabled()) return 'Vision is not configured (set RAK00N_VISION_BACKEND=llm or RAK00N_VISION_URL).'
+  if (!useLLM && !visionEnabled()) return 'Vision is not configured (set ORB2_VISION_BACKEND=llm or ORB2_VISION_URL).'
   // Try the turn's owner key, then the shared 'owner' key the camera also
   // writes to (voice turns are keyed by session id, not identity).
   const frame = getFrame(ctx.ownerId) || getFrame('owner')

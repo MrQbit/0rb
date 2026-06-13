@@ -1,21 +1,21 @@
-# rak00n — single-user "Spark" stack (DGX Spark / GB10).
+# orb2 — single-user "Spark" stack (DGX Spark / GB10).
 #
 # Replaces the k3d/k3s/Helm cluster with one self-contained, reboot-proof
 # Docker Compose stack. Every service has a restart policy + healthcheck;
 # services reach each other by name on the compose network (no k3d gateway
 # IPs). The UI (nginx) is the single front door and already proxies
-# /v1, /a2a, /docs, /healthz and the voice WebSocket to `rak00n-api:8080`.
+# /v1, /a2a, /docs, /healthz and the voice WebSocket to `orb2-api:8080`.
 #
 #   Brain:   vllm  (Qwen3.6-35B-A3B-NVFP4 MoE + MTP on the GPU, :8888)
 #   Voice:   tts (Kokoro, GPU) + stt (faster-whisper)
 #   State:   redis
-#   Agent:   rak00n-api (Bun)        ← rak00n is the brain
+#   Agent:   orb2-api (Bun)        ← orb2 is the brain
 #   Web:     ui (nginx)            ← published on the host
 #
 # Usage:
 #   docker compose -f docker-compose.spark.yml up -d
 #   docker compose -f docker-compose.spark.yml ps
-name: rak00n
+name: orb2
 
 x-gpu: &gpu
   runtime: nvidia
@@ -44,7 +44,7 @@ services:
     # Brain = Qwen3.6-35B-A3B-NVFP4 (MoE, multimodal/vision, NVFP4 on Blackwell)
     # with MTP speculative decoding. Benchmarked at ~62 tok/s vs ~46 for the old
     # Qwen3-Coder-Next-FP8 and ~29 for Gemma-4-26B-A4B-NVFP4 (2026-06-04).
-    # Served ALSO under the legacy alias `qwen3-coder-next` so rak00n-api
+    # Served ALSO under the legacy alias `qwen3-coder-next` so orb2-api
     # (OPENAI_MODEL=qwen3-coder-next) keeps working without any change.
     command:
       - vllm
@@ -82,17 +82,17 @@ services:
 
   # ── Voice: GPU neural TTS — Kokoro (default) or Orpheus (expressive) ─
   tts:
-    image: rak00n-tts:cuda
-    container_name: rak00n-tts
+    image: orb2-tts:cuda
+    container_name: orb2-tts
     <<: *gpu
     ports:
       - "8991:8991"
     environment:
       # kokoro (fast/stable) | orpheus (emotive, honours <laugh>/<sigh> cues).
-      RAK00N_TTS_ENGINE: "${RAK00N_TTS_ENGINE:-kokoro}"
+      ORB2_TTS_ENGINE: "${ORB2_TTS_ENGINE:-kokoro}"
       # Orpheus audio tokens come from the llama.cpp server; this service only
       # decodes them (SNAC) to PCM. SNAC weights pull from HF (small, public).
-      RAK00N_ORPHEUS_URL: http://orpheus-llama:8081
+      ORB2_ORPHEUS_URL: http://orpheus-llama:8081
       HF_TOKEN: "${HF_TOKEN:-}"
       HUGGING_FACE_HUB_TOKEN: "${HF_TOKEN:-}"
       HF_HUB_DISABLE_XET: "1"
@@ -110,13 +110,13 @@ services:
   # Generates the expressive-speech audio tokens that the tts service decodes
   # to PCM. Driven only by the brain's reply text — it authors no content.
   orpheus-llama:
-    image: rak00n-orpheus:cuda
-    container_name: rak00n-orpheus
+    image: orb2-orpheus:cuda
+    container_name: orb2-orpheus
     <<: *gpu
     ports:
       - "8081:8081"
     volumes:
-      - ${HOME}/.cache/rak00n-models:/models:ro
+      - ${HOME}/.cache/orb2-models:/models:ro
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8081/health',timeout=3).status==200 else 1)"]
       interval: 20s
@@ -127,18 +127,18 @@ services:
 
   # ── Voice: STT — SenseVoice (transcript + emotion + events) ───────
   stt:
-    image: rak00n-stt:cuda
-    container_name: rak00n-stt
+    image: orb2-stt:cuda
+    container_name: orb2-stt
     <<: *gpu
     ports:
       - "8990:8990"
     environment:
       # faster-whisper (English-accurate) restored as the transcriber — SenseVoice
-      # garbled conversational English. Set RAK00N_STT_ENGINE=sensevoice to revisit
+      # garbled conversational English. Set ORB2_STT_ENGINE=sensevoice to revisit
       # the emotion-tag path once its accuracy is tuned.
-      RAK00N_STT_ENGINE: whisper
+      ORB2_STT_ENGINE: whisper
       # Pull SenseVoice from the (fast) HuggingFace CDN; ms = ModelScope.
-      RAK00N_SENSEVOICE_HUB: hf
+      ORB2_SENSEVOICE_HUB: hf
       HF_HUB_DISABLE_XET: "1"
     volumes:
       - ${HOME}/.cache/huggingface:/root/.cache/huggingface
@@ -153,20 +153,20 @@ services:
     restart: unless-stopped
 
   # ── Vision: now handled natively by the multimodal brain (Qwen3.6) via
-  # RAK00N_VISION_BACKEND=llm. The old moondream2 `vision` service was retired
-  # 2026-06-04; its image (rak00n-vision:cuda) is kept locally so it can be
+  # ORB2_VISION_BACKEND=llm. The old moondream2 `vision` service was retired
+  # 2026-06-04; its image (orb2-vision:cuda) is kept locally so it can be
   # re-added here if ever needed (paste back a service on :8992 +
-  # RAK00N_VISION_URL + RAK00N_VISION_BACKEND=moondream).
+  # ORB2_VISION_URL + ORB2_VISION_BACKEND=moondream).
 
   # ── WebRTC A/V ingest (remote laptop camera/mic → frames) ────────
   av-webrtc:
-    image: rak00n-av-webrtc:latest
-    container_name: rak00n-av-webrtc
+    image: orb2-av-webrtc:latest
+    container_name: orb2-av-webrtc
     ports:
       - "8993:8993"
     environment:
-      RAK00N_API_URL: http://rak00n-api:8080
-      RAK00N_AV_FPS: "2"
+      ORB2_API_URL: http://orb2-api:8080
+      ORB2_AV_FPS: "2"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8993/health',timeout=3).status==200 else 1)"]
       interval: 20s
@@ -176,8 +176,8 @@ services:
 
   # ── Embeddings: bge (semantic memory recall) ──────────────────────
   embed:
-    image: rak00n-embed:cuda
-    container_name: rak00n-embed
+    image: orb2-embed:cuda
+    container_name: orb2-embed
     <<: *gpu
     ports:
       - "8994:8994"
@@ -196,16 +196,16 @@ services:
   whatsapp:
     build:
       context: ./services/whatsapp
-    image: localhost:5001/rak00n-whatsapp:dev
-    container_name: rak00n-whatsapp
+    image: localhost:5001/orb2-whatsapp:dev
+    container_name: orb2-whatsapp
     ports:
       - "8995:8995"
     environment:
-      RAK00N_API_URL: http://rak00n-api:8080
-      RAK00N_WHATSAPP_ALLOWED: "${RAK00N_WHATSAPP_ALLOWED:-}"
-      RAK00N_WHATSAPP_BRIDGE_SECRET: "${RAK00N_WHATSAPP_BRIDGE_SECRET:-}"
+      ORB2_API_URL: http://orb2-api:8080
+      ORB2_WHATSAPP_ALLOWED: "${ORB2_WHATSAPP_ALLOWED:-}"
+      ORB2_WHATSAPP_BRIDGE_SECRET: "${ORB2_WHATSAPP_BRIDGE_SECRET:-}"
     volumes:
-      - rak00n-wa:/wa-auth
+      - orb2-wa:/wa-auth
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:8995/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
       interval: 20s
@@ -218,9 +218,9 @@ services:
   #    Powers the agent's WebSearch tool (DuckDuckGo blocks server requests). ──
   searxng:
     image: searxng/searxng:latest
-    container_name: rak00n-searxng
+    container_name: orb2-searxng
     environment:
-      SEARXNG_SECRET: "${SEARXNG_SECRET:-rak00n-searxng-secret}"
+      SEARXNG_SECRET: "${SEARXNG_SECRET:-orb2-searxng-secret}"
       SEARXNG_BASE_URL: "http://localhost:8080/"
     volumes:
       - ./services/searxng/settings.yml:/etc/searxng/settings.yml:ro
@@ -234,24 +234,24 @@ services:
 
   # ── Blender (headless 3D) ─────────────────────────────────────────
   # Runs agent-authored bpy scripts and exports glTF into the shared
-  # workspace volume; rak00n-api serves the .glb and the UI renders it in a
-  # model widget. Runs as uid 10001 (same as rak00n-api) so files written into
+  # workspace volume; orb2-api serves the .glb and the UI renders it in a
+  # model widget. Runs as uid 10001 (same as orb2-api) so files written into
   # /workspace/<sid>/.widget stay owned consistently. HOME/TMPDIR=/tmp keeps
   # Blender happy without a real home dir under --factory-startup.
   blender:
-    image: localhost:5001/rak00n-blender:dev
-    container_name: rak00n-blender
-    # rak00n-api first so it populates the fresh /workspace volume with the right
+    image: localhost:5001/orb2-blender:dev
+    container_name: orb2-blender
+    # orb2-api first so it populates the fresh /workspace volume with the right
     # ownership (uid 10001) before Blender mounts it.
     depends_on:
-      - rak00n-api
+      - orb2-api
     user: "10001:10001"
     environment:
       HOME: /tmp
       TMPDIR: /tmp
-      RAK00N_API_WORKSPACE_ROOT: /workspace
+      ORB2_API_WORKSPACE_ROOT: /workspace
     volumes:
-      - rak00n-workspace:/workspace
+      - orb2-workspace:/workspace
     healthcheck:
       test: ["CMD-SHELL", "python3 -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8996/health').read() else 1)\""]
       interval: 30s
@@ -263,7 +263,7 @@ services:
   # ── State: Redis Stack (adds RediSearch vector index for memory) ──
   redis:
     image: redis/redis-stack-server:7.4.0-v0
-    container_name: rak00n-redis
+    container_name: orb2-redis
     command: redis-stack-server --appendonly yes
     volumes:
       - redis-data:/data
@@ -274,17 +274,17 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # ── Agent API (rak00n is the brain) ───────────────────────────────
-  rak00n-api:
-    image: localhost:5001/rak00n-api:dev
-    container_name: rak00n-api
+  # ── Agent API (orb2 is the brain) ───────────────────────────────
+  orb2-api:
+    image: localhost:5001/orb2-api:dev
+    container_name: orb2-api
     depends_on:
       redis:
         condition: service_healthy
     environment:
-      # Local vLLM (OpenAI-compatible) — rak00n's brain
-      RAK00N_USE_OPENAI: "1"
-      RAK00N_SECRET_SOURCE: env
+      # Local vLLM (OpenAI-compatible) — orb2's brain
+      ORB2_USE_OPENAI: "1"
+      ORB2_SECRET_SOURCE: env
       OPENAI_BASE_URL: http://vllm:8888/v1
       OPENAI_MODEL: qwen3-coder-next
       LLM_ENDPOINT: http://vllm:8888/v1
@@ -293,106 +293,106 @@ services:
       # Qwen3.6 is a thinking model; for the snappy conversational orb we turn
       # reasoning OFF (no <think> leakage, faster replies = parity with the old
       # coder model). Sends chat_template_kwargs.enable_thinking=false to vLLM.
-      RAK00N_DISABLE_THINKING: "1"
+      ORB2_DISABLE_THINKING: "1"
       # Generous output ceiling — with the 131072 window there's no truncation
       # tradeoff; this is just a sane upper bound (16384 ≈ a very long reply).
-      RAK00N_MAX_OUTPUT_TOKENS: "16384"
+      ORB2_MAX_OUTPUT_TOKENS: "16384"
       LLM_DEPLOYMENT_NAME: qwen3-coder-next
       LLM_PROVIDER: vllm
-      RAK00N_DEFAULT_MODEL: qwen3-coder-next
-      RAK00N_HELPER_MODEL: qwen3-coder-next
+      ORB2_DEFAULT_MODEL: qwen3-coder-next
+      ORB2_HELPER_MODEL: qwen3-coder-next
       # State
       REDIS_URL: redis://redis:6379
       # Voice (STT/TTS as compose services)
-      RAK00N_VOICE_ENABLED: "1"
-      RAK00N_VOICE_BACKEND: whisper
-      RAK00N_STT_URL: http://stt:8990
-      RAK00N_TTS_URL: http://tts:8991
-      RAK00N_TTS_VOICE: af_heart
+      ORB2_VOICE_ENABLED: "1"
+      ORB2_VOICE_BACKEND: whisper
+      ORB2_STT_URL: http://stt:8990
+      ORB2_TTS_URL: http://tts:8991
+      ORB2_TTS_VOICE: af_heart
       # Vision: routed to the multimodal brain (Qwen3.6) itself — the moondream2
-      # service was retired. RAK00N_VISION_URL is left unset; to fall back, re-add
-      # the vision service and set RAK00N_VISION_BACKEND=moondream + RAK00N_VISION_URL.
-      RAK00N_VISION_BACKEND: "${RAK00N_VISION_BACKEND:-llm}"
+      # service was retired. ORB2_VISION_URL is left unset; to fall back, re-add
+      # the vision service and set ORB2_VISION_BACKEND=moondream + ORB2_VISION_URL.
+      ORB2_VISION_BACKEND: "${ORB2_VISION_BACKEND:-llm}"
       # Semantic memory (embeddings)
-      RAK00N_EMBED_URL: http://embed:8994
+      ORB2_EMBED_URL: http://embed:8994
       # Web search backend for the WebSearch tool (DDG is blocked server-side)
-      RAK00N_SEARXNG_URL: "${RAK00N_SEARXNG_URL:-http://searxng:8080}"
-      RAK00N_BRAVE_API_KEY: "${RAK00N_BRAVE_API_KEY:-}"
+      ORB2_SEARXNG_URL: "${ORB2_SEARXNG_URL:-http://searxng:8080}"
+      ORB2_BRAVE_API_KEY: "${ORB2_BRAVE_API_KEY:-}"
       # Connected apps (also settable live from Settings → Apps)
-      RAK00N_YOUTUBE_API_KEY: "${RAK00N_YOUTUBE_API_KEY:-}"
-      RAK00N_SPOTIFY_CLIENT_ID: "${RAK00N_SPOTIFY_CLIENT_ID:-}"
-      RAK00N_SPOTIFY_CLIENT_SECRET: "${RAK00N_SPOTIFY_CLIENT_SECRET:-}"
-      RAK00N_NEWSAPI_KEY: "${RAK00N_NEWSAPI_KEY:-}"
-      RAK00N_VERCEL_TOKEN: "${RAK00N_VERCEL_TOKEN:-}"
-      RAK00N_VERCEL_TEAM_ID: "${RAK00N_VERCEL_TEAM_ID:-}"
+      ORB2_YOUTUBE_API_KEY: "${ORB2_YOUTUBE_API_KEY:-}"
+      ORB2_SPOTIFY_CLIENT_ID: "${ORB2_SPOTIFY_CLIENT_ID:-}"
+      ORB2_SPOTIFY_CLIENT_SECRET: "${ORB2_SPOTIFY_CLIENT_SECRET:-}"
+      ORB2_NEWSAPI_KEY: "${ORB2_NEWSAPI_KEY:-}"
+      ORB2_VERCEL_TOKEN: "${ORB2_VERCEL_TOKEN:-}"
+      ORB2_VERCEL_TEAM_ID: "${ORB2_VERCEL_TEAM_ID:-}"
       # Cloud Storage (Google Drive + Microsoft OneDrive) OAuth client creds —
       # also settable live from Settings → Apps → Cloud Storage.
-      RAK00N_GOOGLE_CLIENT_ID: "${RAK00N_GOOGLE_CLIENT_ID:-}"
-      RAK00N_GOOGLE_CLIENT_SECRET: "${RAK00N_GOOGLE_CLIENT_SECRET:-}"
-      RAK00N_MS_CLIENT_ID: "${RAK00N_MS_CLIENT_ID:-}"
-      RAK00N_MS_CLIENT_SECRET: "${RAK00N_MS_CLIENT_SECRET:-}"
+      ORB2_GOOGLE_CLIENT_ID: "${ORB2_GOOGLE_CLIENT_ID:-}"
+      ORB2_GOOGLE_CLIENT_SECRET: "${ORB2_GOOGLE_CLIENT_SECRET:-}"
+      ORB2_MS_CLIENT_ID: "${ORB2_MS_CLIENT_ID:-}"
+      ORB2_MS_CLIENT_SECRET: "${ORB2_MS_CLIENT_SECRET:-}"
       # Blender 3D service — agent writes bpy scripts, gets back glTF rendered
       # in a model widget. Shares the /workspace volume so the .glb is servable.
-      RAK00N_BLENDER_URL: "${RAK00N_BLENDER_URL:-http://blender:8996}"
+      ORB2_BLENDER_URL: "${ORB2_BLENDER_URL:-http://blender:8996}"
       # Telegram channel (long-polling; owner-restricted). Configured via
       # .env — empty values leave the channel cleanly skipped at startup.
-      RAK00N_TELEGRAM_BOT_TOKEN: "${RAK00N_TELEGRAM_BOT_TOKEN:-}"
-      RAK00N_TELEGRAM_OWNER_ID: "${RAK00N_TELEGRAM_OWNER_ID:-}"
+      ORB2_TELEGRAM_BOT_TOKEN: "${ORB2_TELEGRAM_BOT_TOKEN:-}"
+      ORB2_TELEGRAM_OWNER_ID: "${ORB2_TELEGRAM_OWNER_ID:-}"
       # WhatsApp bridge webhook secret (shared with the whatsapp service)
-      RAK00N_WHATSAPP_BRIDGE_SECRET: "${RAK00N_WHATSAPP_BRIDGE_SECRET:-}"
+      ORB2_WHATSAPP_BRIDGE_SECRET: "${ORB2_WHATSAPP_BRIDGE_SECRET:-}"
       # WhatsApp bridge service (for status/QR proxy in the console)
-      RAK00N_WHATSAPP_BRIDGE_URL: "${RAK00N_WHATSAPP_BRIDGE_URL:-http://whatsapp:8995}"
+      ORB2_WHATSAPP_BRIDGE_URL: "${ORB2_WHATSAPP_BRIDGE_URL:-http://whatsapp:8995}"
       # Sandbox: in-process (no k8s pods)
-      RAK00N_SANDBOX_MODE: inproc
+      ORB2_SANDBOX_MODE: inproc
       # Files
-      RAK00N_FILES_ENABLED: "1"
-      RAK00N_FILES_ROOT: /workspace/rak00n-files
-      RAK00N_FILES_MAX_BYTES: "104857600"
-      RAK00N_FILES_QUOTA_BYTES: "1073741824"
+      ORB2_FILES_ENABLED: "1"
+      ORB2_FILES_ROOT: /workspace/orb2-files
+      ORB2_FILES_MAX_BYTES: "104857600"
+      ORB2_FILES_QUOTA_BYTES: "1073741824"
       # Canvas: reworked for compose in a later phase
-      RAK00N_CANVAS_ENABLED: "0"
+      ORB2_CANVAS_ENABLED: "0"
       # Canvas TOOL: enabled, but scoped (via its description) to full custom
       # web APPS and PUBLISHING a shareable collection — single charts/tables/
       # videos go through the Widget tool. ("false" disables it.)
-      RAK00N_CANVAS: "true"
+      ORB2_CANVAS: "true"
       # Server
-      RAK00N_STANDALONE: "1"
+      ORB2_STANDALONE: "1"
       # Memory: persistent memory dir (durable home on a volume). The agent
       # writes/recalls MEMORY.md here via its file tools.
-      RAK00N_COWORK_MEMORY_PATH_OVERRIDE: /memory
-      RAK00N_API_PORT: "8080"
-      RAK00N_API_HOST: 0.0.0.0
-      RAK00N_API_WORKSPACE_ROOT: /workspace
+      ORB2_COWORK_MEMORY_PATH_OVERRIDE: /memory
+      ORB2_API_PORT: "8080"
+      ORB2_API_HOST: 0.0.0.0
+      ORB2_API_WORKSPACE_ROOT: /workspace
       # Auth (email + OTP). Allowlist + SMTP via .env. Defaults off so the
       # box still works before auth is configured.
-      RAK00N_API_AUTH_REQUIRED: "${RAK00N_API_AUTH_REQUIRED:-0}"
-      RAK00N_AUTH_SECRET: "${RAK00N_AUTH_SECRET:-}"
+      ORB2_API_AUTH_REQUIRED: "${ORB2_API_AUTH_REQUIRED:-0}"
+      ORB2_AUTH_SECRET: "${ORB2_AUTH_SECRET:-}"
       # HTTPS / Tailscale: mark the session cookie Secure + advertise the URL.
-      RAK00N_AUTH_COOKIE_SECURE: "${RAK00N_AUTH_COOKIE_SECURE:-0}"
-      RAK00N_PUBLIC_URL: "${RAK00N_PUBLIC_URL:-}"
-      RAK00N_AUTH_ALLOWED_EMAILS: "${RAK00N_AUTH_ALLOWED_EMAILS:-}"
-      RAK00N_SMTP_HOST: "${RAK00N_SMTP_HOST:-}"
-      RAK00N_SMTP_PORT: "${RAK00N_SMTP_PORT:-465}"
-      RAK00N_SMTP_USER: "${RAK00N_SMTP_USER:-}"
-      RAK00N_SMTP_PASS: "${RAK00N_SMTP_PASS:-}"
-      RAK00N_SMTP_FROM: "${RAK00N_SMTP_FROM:-}"
-      RAK00N_API_SESSION_TTL: "604800"
-      RAK00N_SKILLS_ENABLED: "1"
-      RAK00N_CORS_ORIGINS: "*"
-      AGENT_ID: rak00n-api
+      ORB2_AUTH_COOKIE_SECURE: "${ORB2_AUTH_COOKIE_SECURE:-0}"
+      ORB2_PUBLIC_URL: "${ORB2_PUBLIC_URL:-}"
+      ORB2_AUTH_ALLOWED_EMAILS: "${ORB2_AUTH_ALLOWED_EMAILS:-}"
+      ORB2_SMTP_HOST: "${ORB2_SMTP_HOST:-}"
+      ORB2_SMTP_PORT: "${ORB2_SMTP_PORT:-465}"
+      ORB2_SMTP_USER: "${ORB2_SMTP_USER:-}"
+      ORB2_SMTP_PASS: "${ORB2_SMTP_PASS:-}"
+      ORB2_SMTP_FROM: "${ORB2_SMTP_FROM:-}"
+      ORB2_API_SESSION_TTL: "604800"
+      ORB2_SKILLS_ENABLED: "1"
+      ORB2_CORS_ORIGINS: "*"
+      AGENT_ID: orb2-api
       NODE_ENV: production
       # Self-evolution: the agent can build + sandbox-test + promote new
       # versions of its own code. Requires the repo (/src) + docker socket
       # mounted below and membership in the docker group (group_add).
-      RAK00N_SELF_MODIFY_ENABLED: "${RAK00N_SELF_MODIFY_ENABLED:-1}"
+      ORB2_SELF_MODIFY_ENABLED: "${ORB2_SELF_MODIFY_ENABLED:-1}"
       # Repo is mounted at its HOST path (identical inside + out) so that
       # bind-mounts in docker-in-docker (the promoter) resolve correctly.
-      RAK00N_SELF_SRC: "${RAK00N_SELF_SRC_HOST:-/home/mrqbit/Downloads/rak00n}"
-      RAK00N_DOCKER_OPS_ENABLED: "1"
-      RAK00N_COMPOSE_FILE: docker-compose.spark.yml
-      RAK00N_COMPOSE_PROJECT: rak00n
-      RAK00N_COMPOSE_NETWORK: rak00n_default
-      RAK00N_SELF_REGISTRY: localhost:5001
+      ORB2_SELF_SRC: "${ORB2_SELF_SRC_HOST:-/home/mrqbit/Downloads/orb2}"
+      ORB2_DOCKER_OPS_ENABLED: "1"
+      ORB2_COMPOSE_FILE: docker-compose.spark.yml
+      ORB2_COMPOSE_PROJECT: orb2
+      ORB2_COMPOSE_NETWORK: orb2_default
+      ORB2_SELF_REGISTRY: localhost:5001
     # Supplementary groups so the non-root agent (uid 10001) can use the
     # mounted docker socket (gid 988) and write to the bind-mounted repo
     # owned by the host user (gid 1000, repo is group-writable).
@@ -401,13 +401,13 @@ services:
       - "1000"
     volumes:
       # Session workspaces (.canvas/.widget/.published) — a named volume so the
-      # Blender service can share it and write .glb files rak00n-api then serves.
-      - rak00n-workspace:/workspace
-      - rak00n-files:/workspace/rak00n-files
-      - rak00n-memory:/memory
+      # Blender service can share it and write .glb files orb2-api then serves.
+      - orb2-workspace:/workspace
+      - orb2-files:/workspace/orb2-files
+      - orb2-memory:/memory
       # Self-evolution: own source (read-write) mounted at its HOST path so
       # docker-in-docker bind-mounts line up, plus the host docker socket.
-      - ${RAK00N_SELF_SRC_HOST:-/home/mrqbit/Downloads/rak00n}:${RAK00N_SELF_SRC_HOST:-/home/mrqbit/Downloads/rak00n}
+      - ${ORB2_SELF_SRC_HOST:-/home/mrqbit/Downloads/orb2}:${ORB2_SELF_SRC_HOST:-/home/mrqbit/Downloads/orb2}
       - /var/run/docker.sock:/var/run/docker.sock
       # Tailscale control for the Access panel: the host tailscaled socket
       # (world-rw, so no root needed) + the static host CLI. Lets the orb show
@@ -422,16 +422,16 @@ services:
       start_period: 30s
     restart: unless-stopped
 
-  # ── Web console (nginx; proxies API + voice WS to rak00n-api) ───────
+  # ── Web console (nginx; proxies API + voice WS to orb2-api) ───────
   ui:
-    image: localhost:5001/rak00n-ui:dev
-    container_name: rak00n-ui
+    image: localhost:5001/orb2-ui:dev
+    container_name: orb2-ui
     depends_on:
-      - rak00n-api
+      - orb2-api
     ports:
-      - "${RAK00N_UI_PORT:-9080}:8080"
+      - "${ORB2_UI_PORT:-9080}:8080"
       # HTTPS (self-signed) so camera/mic work from other devices on the LAN.
-      - "${RAK00N_UI_HTTPS_PORT:-9443}:8443"
+      - "${ORB2_UI_HTTPS_PORT:-9443}:8443"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
       interval: 15s
@@ -445,18 +445,18 @@ services:
   # and troubleshooting logs. Sees the others via the mounted socket.
   watchdog:
     image: docker:cli
-    container_name: rak00n-watchdog
+    container_name: orb2-watchdog
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./scripts/rak00n-watchdog.sh:/rak00n-watchdog.sh:ro
-      - watchdog-logs:/var/log/rak00n
-    entrypoint: ["/bin/sh", "/rak00n-watchdog.sh"]
+      - ./scripts/orb2-watchdog.sh:/orb2-watchdog.sh:ro
+      - watchdog-logs:/var/log/orb2
+    entrypoint: ["/bin/sh", "/orb2-watchdog.sh"]
     restart: unless-stopped
 
 volumes:
   redis-data:
-  rak00n-files:
-  rak00n-workspace:
+  orb2-files:
+  orb2-workspace:
   watchdog-logs:
-  rak00n-memory:
-  rak00n-wa:
+  orb2-memory:
+  orb2-wa:

@@ -55,7 +55,7 @@ function buildResultEnvelope(
     correlationId: req.correlationId ?? req.body.messageId,
     messageVersion: '1.0',
     messageTimestamp: new Date().toISOString(),
-    source: 'rak00n-api',
+    source: 'orb2-api',
     body: {
       userId: req.body.userId,
       contextId: req.body.contextId,
@@ -64,7 +64,7 @@ function buildResultEnvelope(
       messageId: req.body.messageId,
       agentResponseId: req.body.agentResponseId,
       state: body.state,
-      agentId: req.body.agentId ?? 'rak00n-api',
+      agentId: req.body.agentId ?? 'orb2-api',
       timestamp: new Date().toISOString(),
       metadata: body.metadata,
     },
@@ -84,7 +84,7 @@ export function startRequestConsumer(ctx: { store: Store; sessionTtlSeconds: num
     }
 
     const sessionId = env.body.contextId ?? randomUUID()
-    const workspaceRoot = process.env.RAK00N_API_WORKSPACE_ROOT || '/workspace'
+    const workspaceRoot = process.env.ORB2_API_WORKSPACE_ROOT || '/workspace'
     const workingDirectory = path.join(workspaceRoot, sessionId)
     ensureDir(workingDirectory)
 
@@ -383,7 +383,7 @@ export function startRequestConsumer(ctx: { store: Store; sessionTtlSeconds: num
     }
 
     const abortController = new AbortController()
-    const turnTimeoutMs = Number(process.env.RAK00N_TURN_TIMEOUT_MS) || 180_000
+    const turnTimeoutMs = Number(process.env.ORB2_TURN_TIMEOUT_MS) || 180_000
     let turnTimedOut = false
     const turnTimeoutHandle = setTimeout(() => {
       turnTimedOut = true

@@ -66,7 +66,7 @@ export async function tryCloudOAuthRoute(req: Request, method: string, pathname:
   const start = /^\/v1\/oauth\/cloud\/(google|microsoft)\/start$/.exec(pathname)
   if (method === 'GET' && start && isProvider(start[1]!)) {
     const p = start[1] as CloudProvider
-    if (!providerConfigured(p)) return json(400, { error: `Set ${p} Client ID/Secret + RAK00N_PUBLIC_URL first.`, redirect_uri: redirectUri(p) })
+    if (!providerConfigured(p)) return json(400, { error: `Set ${p} Client ID/Secret + ORB2_PUBLIC_URL first.`, redirect_uri: redirectUri(p) })
     return json(200, { url: await authorizeUrl(store, p), redirect_uri: redirectUri(p) })
   }
   const disc = /^\/v1\/oauth\/cloud\/(google|microsoft)\/disconnect$/.exec(pathname)

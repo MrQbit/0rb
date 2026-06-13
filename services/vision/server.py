@@ -1,5 +1,5 @@
 """
-rak00n vision service — moondream2.
+orb2 vision service — moondream2.
 
 A small vision-language model (~1.8B) that captions images and answers
 questions about them ("what's in this frame?", "is the person holding
@@ -29,10 +29,10 @@ from PIL import Image
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("vision")
 
-MODEL_ID = os.environ.get("RAK00N_VISION_MODEL", "vikhyatk/moondream2")
-MODEL_REV = os.environ.get("RAK00N_VISION_REVISION", "2025-01-09")
+MODEL_ID = os.environ.get("ORB2_VISION_MODEL", "vikhyatk/moondream2")
+MODEL_REV = os.environ.get("ORB2_VISION_REVISION", "2025-01-09")
 
-app = FastAPI(title="rak00n-vision", version="1.0")
+app = FastAPI(title="orb2-vision", version="1.0")
 _model = None
 _tok = None
 _device = "cpu"
@@ -119,8 +119,8 @@ async def query(
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("RAK00N_VISION_PORT", "8992"))
-    if os.environ.get("RAK00N_VISION_WARM", "1") == "1":
+    port = int(os.environ.get("ORB2_VISION_PORT", "8992"))
+    if os.environ.get("ORB2_VISION_WARM", "1") == "1":
         try:
             model()  # load weights before serving
         except Exception as e:

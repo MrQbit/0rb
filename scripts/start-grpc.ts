@@ -8,12 +8,12 @@ Object.assign(globalThis, {
   MACRO: {
     VERSION: pkg.version,
     DISPLAY_VERSION: pkg.version,
-    PACKAGE_URL: 'rak00n',
+    PACKAGE_URL: 'orb2',
   }
 })
 
 async function main() {
-  console.log('Starting RAK00N gRPC Server...')
+  console.log('Starting ORB2 gRPC Server...')
   await init()
 
   // Mirror CLI bootstrap: hydrate secure tokens and resolve provider profile

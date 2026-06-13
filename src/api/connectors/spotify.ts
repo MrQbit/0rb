@@ -2,17 +2,17 @@
  * Spotify connector — search via the Client Credentials flow (app token, no
  * user login). Enough to search tracks and embed the player (open.spotify.com
  * /embed/...) which plays full tracks if the listener is signed into Spotify
- * in their browser, otherwise a 30s preview. Configure RAK00N_SPOTIFY_CLIENT_ID
- * + RAK00N_SPOTIFY_CLIENT_SECRET (developer.spotify.com → an app).
+ * in their browser, otherwise a 30s preview. Configure ORB2_SPOTIFY_CLIENT_ID
+ * + ORB2_SPOTIFY_CLIENT_SECRET (developer.spotify.com → an app).
  */
 export function spotifyEnabled(): boolean {
-  return !!((process.env.RAK00N_SPOTIFY_CLIENT_ID || '').trim() && (process.env.RAK00N_SPOTIFY_CLIENT_SECRET || '').trim())
+  return !!((process.env.ORB2_SPOTIFY_CLIENT_ID || '').trim() && (process.env.ORB2_SPOTIFY_CLIENT_SECRET || '').trim())
 }
 
 let tokenCache = { token: '', exp: 0 }
 async function spotifyToken(): Promise<string> {
-  const id = (process.env.RAK00N_SPOTIFY_CLIENT_ID || '').trim()
-  const sec = (process.env.RAK00N_SPOTIFY_CLIENT_SECRET || '').trim()
+  const id = (process.env.ORB2_SPOTIFY_CLIENT_ID || '').trim()
+  const sec = (process.env.ORB2_SPOTIFY_CLIENT_SECRET || '').trim()
   if (!id || !sec) throw new Error('Spotify is not connected (client id/secret unset)')
   if (tokenCache.token && Date.now() < tokenCache.exp) return tokenCache.token
   const r = await fetch('https://accounts.spotify.com/api/token', {

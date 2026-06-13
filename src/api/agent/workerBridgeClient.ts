@@ -3,8 +3,8 @@
  *
  * Tools running inside a K8s worker pod that need to invoke
  * router-managed services (jobs, sub-worker spawn, sandbox, vault,
- * memory) call into this module. It reads `RAK00N_INTERNAL_TOKEN` and
- * `RAK00N_INTERNAL_API_URL` from env (injected by `launchWorkerJob`)
+ * memory) call into this module. It reads `ORB2_INTERNAL_TOKEN` and
+ * `ORB2_INTERNAL_API_URL` from env (injected by `launchWorkerJob`)
  * and POSTs to `/v1/internal/turn/<turnId>/...`.
  *
  * Fail-safe by design: if the bridge is unreachable or the env isn't
@@ -20,9 +20,9 @@ export type BridgeResult<T> =
   | { ok: false; error: string; status?: number }
 
 function getEnv() {
-  const url = process.env.RAK00N_INTERNAL_API_URL
-  const token = process.env.RAK00N_INTERNAL_TOKEN
-  const turnId = process.env.RAK00N_INTERNAL_TURN_ID
+  const url = process.env.ORB2_INTERNAL_API_URL
+  const token = process.env.ORB2_INTERNAL_TOKEN
+  const turnId = process.env.ORB2_INTERNAL_TURN_ID
   if (!url || !token || !turnId) return null
   return { url: url.replace(/\/+$/, ''), token, turnId }
 }
@@ -49,7 +49,7 @@ async function bridgeFetch<T>(
       method,
       headers: {
         'content-type': 'application/json',
-        'x-rak00n-bridge-token': env.token,
+        'x-orb2-bridge-token': env.token,
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
       signal: ac.signal,

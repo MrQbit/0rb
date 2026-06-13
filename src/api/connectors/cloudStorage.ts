@@ -129,7 +129,7 @@ export async function downloadCloudFile(
   if (!res.ok) throw new Error(`Download failed (${res.status})`)
   const buf = Buffer.from(await res.arrayBuffer())
 
-  const wsRoot = process.env.RAK00N_API_WORKSPACE_ROOT || '/workspace'
+  const wsRoot = process.env.ORB2_API_WORKSPACE_ROOT || '/workspace'
   const dir = path.join(wsRoot, sessionId, 'cloud')
   mkdirSync(dir, { recursive: true })
   const dest = path.join(dir, name)

@@ -1,8 +1,8 @@
 /**
  * Walks a checked-out repo and parses the four config surfaces:
  *
- *   .rak00n/skills/*.md      -> SkillDefinition
- *   .rak00n/agents/*.md      -> AgentDefinition (frontmatter only)
+ *   .orb2/skills/*.md      -> SkillDefinition
+ *   .orb2/agents/*.md      -> AgentDefinition (frontmatter only)
  *   .mcp.json              -> { mcpServers: { name: McpConfig } }
  *   mcp_servers.json       -> same shape, alternate filename
  *
@@ -81,7 +81,7 @@ export function scanRepo(repoRoot: string, sourceLabel: string): ScanResult {
   }
 
   // Skills
-  const skillsDir = join(repoRoot, '.rak00n', 'skills')
+  const skillsDir = join(repoRoot, '.orb2', 'skills')
   for (const f of readDirSafe(skillsDir)) {
     if (!f.endsWith('.md')) continue
     const filePath = join(skillsDir, f)
@@ -104,7 +104,7 @@ export function scanRepo(repoRoot: string, sourceLabel: string): ScanResult {
   }
 
   // Agents
-  const agentsDir = join(repoRoot, '.rak00n', 'agents')
+  const agentsDir = join(repoRoot, '.orb2', 'agents')
   for (const f of readDirSafe(agentsDir)) {
     if (!f.endsWith('.md')) continue
     const filePath = join(agentsDir, f)

@@ -1,8 +1,0 @@
-apiVersion: v2
-name: rak00n
-description: "rak00n — personal AI coding agent (local-first, DGX Spark)"
-type: application
-version: 0.1.0
-appVersion: "0.1.25"
-maintainers:
-  - name: MrQbit

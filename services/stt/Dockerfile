@@ -13,7 +13,7 @@ RUN uv pip install --python /app/moshi/.venv/bin/python \
 WORKDIR /srv
 COPY server.py /srv/server.py
 
-ENV RAK00N_STT_PORT=8990 \
-    RAK00N_STT_ENGINE=sensevoice
+ENV ORB2_STT_PORT=8990 \
+    ORB2_STT_ENGINE=sensevoice
 EXPOSE 8990
 CMD ["/app/moshi/.venv/bin/python", "/srv/server.py"]

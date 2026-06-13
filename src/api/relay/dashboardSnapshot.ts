@@ -14,10 +14,10 @@ import { dollars, type CostRecord } from '../cost/routes.js'
 import { getDiscoveryState } from '../discovery/registry.js'
 import { getRelayReporter, type DashboardSnapshot } from './reporter.js'
 
-const COST_INDEX_KEY = 'rak00n:cost:index'
-const COST_KEY_PREFIX = 'rak00n:cost:session:'
-const COST_OWNER_PREFIX = 'rak00n:cost:owner:'
-const COST_OWNER_INDEX = 'rak00n:cost:owners'
+const COST_INDEX_KEY = 'orb2:cost:index'
+const COST_KEY_PREFIX = 'orb2:cost:session:'
+const COST_OWNER_PREFIX = 'orb2:cost:owner:'
+const COST_OWNER_INDEX = 'orb2:cost:owners'
 
 async function readJsonArray<T>(store: Store, key: string): Promise<T[]> {
   const raw = await store.getKv(key)

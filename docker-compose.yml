@@ -1,8 +1,8 @@
-# rak00n local stack — vLLM + Redis + API
+# orb2 local stack — vLLM + Redis + API
 #
 # Usage:
 #   docker compose up                  # full stack with local vLLM
-#   docker compose up redis rak00n-api # API only (vLLM running separately or on host)
+#   docker compose up redis orb2-api # API only (vLLM running separately or on host)
 #
 # Environment:
 #   VLLM_MODEL           — HuggingFace model ID (default: Qwen/Qwen3-Coder-Next)
@@ -57,7 +57,7 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - rak00n-redis-data:/data
+      - orb2-redis-data:/data
     command: redis-server --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -66,8 +66,8 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # ── rak00n API ────────────────────────────────────────────────────
-  rak00n-api:
+  # ── orb2 API ────────────────────────────────────────────────────
+  orb2-api:
     build:
       context: .
       dockerfile: Dockerfile.api.dev
@@ -79,25 +79,25 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       # Default: local vLLM (OpenAI-compatible)
-      - RAK00N_USE_OPENAI=1
+      - ORB2_USE_OPENAI=1
       - OPENAI_BASE_URL=http://vllm:8000/v1
       - OPENAI_MODEL=${VLLM_SERVED_NAME:-qwen3-coder-next}
-      - RAK00N_DEFAULT_MODEL=${VLLM_SERVED_NAME:-qwen3-coder-next}
-      - RAK00N_HELPER_MODEL=${VLLM_SERVED_NAME:-qwen3-coder-next}
+      - ORB2_DEFAULT_MODEL=${VLLM_SERVED_NAME:-qwen3-coder-next}
+      - ORB2_HELPER_MODEL=${VLLM_SERVED_NAME:-qwen3-coder-next}
       # Foundry fallback (optional — set via .env or export)
       - ANTHROPIC_FOUNDRY_BASE_URL=${FOUNDRY_BASE_URL:-}
       - ANTHROPIC_FOUNDRY_API_KEY=${FOUNDRY_API_KEY:-}
       - ANTHROPIC_FOUNDRY_RESOURCE=${FOUNDRY_RESOURCE:-}
       - ANTHROPIC_DEFAULT_SONNET_MODEL=${FOUNDRY_DEFAULT_MODEL:-claude-sonnet-4-6}
       # Single user, no auth
-      - RAK00N_SECRET_SOURCE=env
-      - RAK00N_API_AUTH_REQUIRED=0
-      - RAK00N_API_SESSION_TTL=604800
+      - ORB2_SECRET_SOURCE=env
+      - ORB2_API_AUTH_REQUIRED=0
+      - ORB2_API_SESSION_TTL=604800
       - NODE_ENV=production
     volumes:
-      - rak00n-files:/workspace/rak00n-files
+      - orb2-files:/workspace/orb2-files
     restart: unless-stopped
 
 volumes:
-  rak00n-redis-data:
-  rak00n-files:
+  orb2-redis-data:
+  orb2-files:

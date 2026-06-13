@@ -13,10 +13,10 @@
  *   snapshotAndDestroy → Tars upper layer, uploads, deletes pod
  *
  * Session stickiness is guaranteed by Redis:
- *   rak00n:canvas:<sessionId> → JSON(CanvasPodInfo)
+ *   orb2:canvas:<sessionId> → JSON(CanvasPodInfo)
  *
  * The pod's idle timeout is enforced by the canvas-worker entrypoint
- * which self-terminates after RAK00N_CANVAS_IDLE_TIMEOUT_MS of no
+ * which self-terminates after ORB2_CANVAS_IDLE_TIMEOUT_MS of no
  * incoming turns. The router also runs a periodic cleanup sweep.
  */
 import { randomUUID } from 'node:crypto'
@@ -25,11 +25,11 @@ import { log } from '../log.js'
 import type { CanvasPodInfo, CanvasSessionConfig, CanvasTemplate } from './types.js'
 import { DEFAULT_CANVAS_CONFIG } from './types.js'
 
-const CANVAS_KEY_PREFIX = 'rak00n:canvas:'
+const CANVAS_KEY_PREFIX = 'orb2:canvas:'
 const CANVAS_POD_TTL = 7200 // 2h Redis key TTL (pod self-terminates sooner)
 
 export function isCanvasModeEnabled(): boolean {
-  return process.env.RAK00N_CANVAS_ENABLED === '1'
+  return process.env.ORB2_CANVAS_ENABLED === '1'
 }
 
 export async function getCanvasPod(
@@ -64,17 +64,17 @@ export async function createCanvasPod(
   sessionId: string,
   config: CanvasSessionConfig = DEFAULT_CANVAS_CONFIG,
 ): Promise<CanvasPodInfo> {
-  const namespace = process.env.RAK00N_CANVAS_NAMESPACE || process.env.RAK00N_WORKER_NAMESPACE || 'rak00n'
-  const image = process.env.RAK00N_CANVAS_IMAGE || 'rak00n-canvas:dev'
+  const namespace = process.env.ORB2_CANVAS_NAMESPACE || process.env.ORB2_WORKER_NAMESPACE || 'orb2'
+  const image = process.env.ORB2_CANVAS_IMAGE || 'orb2-canvas:dev'
   const redisUrl = process.env.REDIS_URL || ''
   const foundryKey = process.env.ANTHROPIC_FOUNDRY_API_KEY || ''
   const foundryUrl = process.env.ANTHROPIC_FOUNDRY_BASE_URL || ''
   const internalApiUrl =
-    process.env.RAK00N_INTERNAL_API_URL ||
-    `http://rak00n-api.${namespace}.svc.cluster.local:8080`
+    process.env.ORB2_INTERNAL_API_URL ||
+    `http://orb2-api.${namespace}.svc.cluster.local:8080`
   const vitePort = 5173
   const rpcPort = 9090
-  const podName = `rak00n-canvas-${sessionId.slice(0, 8)}-${randomUUID().slice(0, 4)}`
+  const podName = `orb2-canvas-${sessionId.slice(0, 8)}-${randomUUID().slice(0, 4)}`
 
   const podSpec = {
     apiVersion: 'v1',
@@ -83,10 +83,10 @@ export async function createCanvasPod(
       name: podName,
       namespace,
       labels: {
-        'app.kubernetes.io/name': 'rak00n',
-        'app.kubernetes.io/instance': 'rak00n',
+        'app.kubernetes.io/name': 'orb2',
+        'app.kubernetes.io/instance': 'orb2',
         'app.kubernetes.io/component': 'canvas-worker',
-        'rak00n.ai/session-id': sessionId.slice(0, 8),
+        'orb2.ai/session-id': sessionId.slice(0, 8),
       },
     },
     spec: {
@@ -106,12 +106,12 @@ export async function createCanvasPod(
       // pod can read meta.path values from the SYSTEM note but the
       // path itself resolves to ENOENT, and Canvas-with-attachment
       // turns fail while plain chat-about-the-file works.
-      ...(process.env.RAK00N_WORKER_FILES_PVC?.trim() && {
+      ...(process.env.ORB2_WORKER_FILES_PVC?.trim() && {
         volumes: [
           {
-            name: 'rak00n-files',
+            name: 'orb2-files',
             persistentVolumeClaim: {
-              claimName: process.env.RAK00N_WORKER_FILES_PVC.trim(),
+              claimName: process.env.ORB2_WORKER_FILES_PVC.trim(),
             },
           },
         ],
@@ -119,39 +119,39 @@ export async function createCanvasPod(
       containers: [{
         name: 'canvas',
         image,
-        imagePullPolicy: process.env.RAK00N_CANVAS_IMAGE_PULL_POLICY || 'IfNotPresent',
+        imagePullPolicy: process.env.ORB2_CANVAS_IMAGE_PULL_POLICY || 'IfNotPresent',
         ports: [
           { containerPort: vitePort, name: 'vite' },
           { containerPort: rpcPort, name: 'rpc' },
         ],
-        ...(process.env.RAK00N_WORKER_FILES_PVC?.trim() && {
+        ...(process.env.ORB2_WORKER_FILES_PVC?.trim() && {
           volumeMounts: [
             {
-              name: 'rak00n-files',
+              name: 'orb2-files',
               mountPath:
-                process.env.RAK00N_WORKER_FILES_MOUNT_PATH?.trim() ||
-                process.env.RAK00N_FILES_ROOT?.trim() ||
-                '/var/rak00n/files',
+                process.env.ORB2_WORKER_FILES_MOUNT_PATH?.trim() ||
+                process.env.ORB2_FILES_ROOT?.trim() ||
+                '/var/orb2/files',
               readOnly: false,
             },
           ],
         }),
         env: [
-          { name: 'RAK00N_MODE', value: 'canvas' },
-          { name: 'RAK00N_CANVAS_SESSION_ID', value: sessionId },
-          { name: 'RAK00N_CANVAS_TEMPLATE', value: config.template },
-          { name: 'RAK00N_CANVAS_IDLE_TIMEOUT_MS', value: String(config.idleTimeoutMs) },
-          { name: 'RAK00N_CANVAS_VITE_PORT', value: String(vitePort) },
-          { name: 'RAK00N_CANVAS_RPC_PORT', value: String(rpcPort) },
+          { name: 'ORB2_MODE', value: 'canvas' },
+          { name: 'ORB2_CANVAS_SESSION_ID', value: sessionId },
+          { name: 'ORB2_CANVAS_TEMPLATE', value: config.template },
+          { name: 'ORB2_CANVAS_IDLE_TIMEOUT_MS', value: String(config.idleTimeoutMs) },
+          { name: 'ORB2_CANVAS_VITE_PORT', value: String(vitePort) },
+          { name: 'ORB2_CANVAS_RPC_PORT', value: String(rpcPort) },
           { name: 'REDIS_URL', value: redisUrl },
           { name: 'ANTHROPIC_FOUNDRY_API_KEY', value: foundryKey },
           { name: 'ANTHROPIC_FOUNDRY_BASE_URL', value: foundryUrl },
-          { name: 'RAK00N_INTERNAL_API_URL', value: internalApiUrl },
+          { name: 'ORB2_INTERNAL_API_URL', value: internalApiUrl },
           // Pass the files root through so any in-pod code that
-          // reads RAK00N_FILES_ROOT (e.g. file-meta lookups) resolves
+          // reads ORB2_FILES_ROOT (e.g. file-meta lookups) resolves
           // to the same path the worker uses.
-          ...(process.env.RAK00N_FILES_ROOT?.trim()
-            ? [{ name: 'RAK00N_FILES_ROOT', value: process.env.RAK00N_FILES_ROOT.trim() }]
+          ...(process.env.ORB2_FILES_ROOT?.trim()
+            ? [{ name: 'ORB2_FILES_ROOT', value: process.env.ORB2_FILES_ROOT.trim() }]
             : []),
         ],
         resources: {
@@ -252,7 +252,7 @@ export async function destroyCanvasPod(
   const info = await getCanvasPod(store, sessionId)
   if (!info) return
 
-  const namespace = process.env.RAK00N_CANVAS_NAMESPACE || process.env.RAK00N_WORKER_NAMESPACE || 'rak00n'
+  const namespace = process.env.ORB2_CANVAS_NAMESPACE || process.env.ORB2_WORKER_NAMESPACE || 'orb2'
   const { readFileSync } = await import('node:fs')
   const token = readFileSync('/var/run/secrets/kubernetes.io/serviceaccount/token', 'utf-8').trim()
   const caCert = readFileSync('/var/run/secrets/kubernetes.io/serviceaccount/ca.crt', 'utf-8')

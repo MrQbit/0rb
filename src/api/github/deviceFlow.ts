@@ -3,7 +3,7 @@
  * https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#device-flow
  *
  * Recovered into the API tree during the re-platform off the legacy core
- * (was rak00n-core/services/github/deviceFlow). Pure GitHub-protocol code with
+ * (was orb2-core/services/github/deviceFlow). Pure GitHub-protocol code with
  * no core dependencies.
  */
 

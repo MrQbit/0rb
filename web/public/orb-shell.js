@@ -1,5 +1,5 @@
 /* ============================================================================
-   rak00n orb shell — the orb is the agent; the page is its surface.
+   orb2 orb shell — the orb is the agent; the page is its surface.
    - The orb floats, breathes, and reacts to voice (audio-reactive canvas).
    - Click the orb → the chat panel grows from it. Drag the orb → move it.
    - Agent canvas renders full-screen behind the orb.
@@ -146,7 +146,7 @@
     if (firstMsg) { messages.innerHTML=''; firstMsg=false; }
     const div = document.createElement('div'); div.className = `msg ${role}`;
     const who = document.createElement('div'); who.className='who';
-    who.textContent = role==='user'?'you':role==='assistant'?'rak00n':role;
+    who.textContent = role==='user'?'you':role==='assistant'?'orb2':role;
     const span = document.createElement('span'); span.textContent = text;
     div.append(who, span); messages.appendChild(div); messages.scrollTop = messages.scrollHeight;
     return span;
@@ -321,7 +321,7 @@
       cam.stream = await navigator.mediaDevices.getUserMedia({ video:{ width:640, height:480, facingMode:'user' }, audio:false });
       selfView.srcObject = cam.stream; selfView.classList.add('show');
       cam.on = true; camToggle.classList.remove('cam-off'); camToggle.classList.add('cam-on');
-      toast('Camera on — rak00n can see');
+      toast('Camera on — orb2 can see');
       cam.timer = setInterval(pushFrame, 1500);
     } catch(err){ toast(err.message); stopCam(); }
   }
@@ -1031,15 +1031,15 @@
     let s = {};
     try{ s = (await (await fetch('/v1/settings',{credentials:'same-origin'})).json()).settings || {}; }catch{}
     const set = (dot, state, on, label) => { const d=$(dot), t=$(state); if(d) d.className='pill-dot '+(on?'ok':''); if(t) t.textContent = on?('connected'+(label?' · '+label:'')):'not connected'; };
-    set('#ytDot','#ytState', !!s.RAK00N_YOUTUBE_API_KEY);
-    set('#spDot','#spState', !!s.RAK00N_SPOTIFY_CLIENT_ID && !!s.RAK00N_SPOTIFY_CLIENT_SECRET);
-    set('#nwDot','#nwState', !!s.RAK00N_NEWSAPI_KEY);
-    set('#vcDot','#vcState', !!s.RAK00N_VERCEL_TOKEN, 'publishes to vercel.app');
+    set('#ytDot','#ytState', !!s.ORB2_YOUTUBE_API_KEY);
+    set('#spDot','#spState', !!s.ORB2_SPOTIFY_CLIENT_ID && !!s.ORB2_SPOTIFY_CLIENT_SECRET);
+    set('#nwDot','#nwState', !!s.ORB2_NEWSAPI_KEY);
+    set('#vcDot','#vcState', !!s.ORB2_VERCEL_TOKEN, 'publishes to vercel.app');
     const put = async (body, ok) => { try{ const r=await fetch('/v1/settings',{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify(body)}); toast(r.ok?ok:'Failed'); if(r.ok) setTimeout(loadApps,300); }catch{ toast('Failed'); } };
-    const yt=$('#ytSave'); if(yt && !yt.dataset.w){ yt.dataset.w='1'; yt.onclick=()=>{ const k=$('#ytKey').value.trim(); if(k){ put({RAK00N_YOUTUBE_API_KEY:k},'YouTube connected'); $('#ytKey').value=''; } }; }
-    const sp=$('#spSave'); if(sp && !sp.dataset.w){ sp.dataset.w='1'; sp.onclick=()=>{ const id=$('#spId').value.trim(), sec=$('#spSecret').value.trim(); if(id&&sec){ put({RAK00N_SPOTIFY_CLIENT_ID:id,RAK00N_SPOTIFY_CLIENT_SECRET:sec},'Spotify connected'); $('#spId').value=''; $('#spSecret').value=''; } }; }
-    const nw=$('#nwSave'); if(nw && !nw.dataset.w){ nw.dataset.w='1'; nw.onclick=()=>{ const k=$('#nwKey').value.trim(); if(k){ put({RAK00N_NEWSAPI_KEY:k},'News connected'); $('#nwKey').value=''; } }; }
-    const vc=$('#vcSave'); if(vc && !vc.dataset.w){ vc.dataset.w='1'; vc.onclick=()=>{ const t=$('#vcToken').value.trim(); if(t){ put(Object.assign({RAK00N_VERCEL_TOKEN:t}, $('#vcTeam').value.trim()?{RAK00N_VERCEL_TEAM_ID:$('#vcTeam').value.trim()}:{}),'Vercel connected'); $('#vcToken').value=''; } }; }
+    const yt=$('#ytSave'); if(yt && !yt.dataset.w){ yt.dataset.w='1'; yt.onclick=()=>{ const k=$('#ytKey').value.trim(); if(k){ put({ORB2_YOUTUBE_API_KEY:k},'YouTube connected'); $('#ytKey').value=''; } }; }
+    const sp=$('#spSave'); if(sp && !sp.dataset.w){ sp.dataset.w='1'; sp.onclick=()=>{ const id=$('#spId').value.trim(), sec=$('#spSecret').value.trim(); if(id&&sec){ put({ORB2_SPOTIFY_CLIENT_ID:id,ORB2_SPOTIFY_CLIENT_SECRET:sec},'Spotify connected'); $('#spId').value=''; $('#spSecret').value=''; } }; }
+    const nw=$('#nwSave'); if(nw && !nw.dataset.w){ nw.dataset.w='1'; nw.onclick=()=>{ const k=$('#nwKey').value.trim(); if(k){ put({ORB2_NEWSAPI_KEY:k},'News connected'); $('#nwKey').value=''; } }; }
+    const vc=$('#vcSave'); if(vc && !vc.dataset.w){ vc.dataset.w='1'; vc.onclick=()=>{ const t=$('#vcToken').value.trim(); if(t){ put(Object.assign({ORB2_VERCEL_TOKEN:t}, $('#vcTeam').value.trim()?{ORB2_VERCEL_TEAM_ID:$('#vcTeam').value.trim()}:{}),'Vercel connected'); $('#vcToken').value=''; } }; }
     // Spotify account OAuth status + connect/disconnect.
     try{
       const st = await (await fetch('/v1/oauth/spotify/status',{credentials:'same-origin'})).json();
@@ -1052,8 +1052,8 @@
       if(disc && !disc.dataset.w){ disc.dataset.w='1'; disc.onclick=async()=>{ await fetch('/v1/oauth/spotify/disconnect',{method:'POST',credentials:'same-origin'}); toast('Disconnected'); loadApps(); }; }
     }catch{}
     // Cloud Storage (Google Drive + OneDrive): save client creds + OAuth.
-    const gdSave=$('#gdSave'); if(gdSave && !gdSave.dataset.w){ gdSave.dataset.w='1'; gdSave.onclick=()=>{ const id=$('#gdId').value.trim(), sec=$('#gdSecret').value.trim(); if(id){ put(Object.assign({RAK00N_GOOGLE_CLIENT_ID:id}, sec?{RAK00N_GOOGLE_CLIENT_SECRET:sec}:{}),'Google saved'); $('#gdId').value=''; $('#gdSecret').value=''; } }; }
-    const odSave=$('#odSave'); if(odSave && !odSave.dataset.w){ odSave.dataset.w='1'; odSave.onclick=()=>{ const id=$('#odId').value.trim(), sec=$('#odSecret').value.trim(); if(id){ put(Object.assign({RAK00N_MS_CLIENT_ID:id}, sec?{RAK00N_MS_CLIENT_SECRET:sec}:{}),'Microsoft saved'); $('#odId').value=''; $('#odSecret').value=''; } }; }
+    const gdSave=$('#gdSave'); if(gdSave && !gdSave.dataset.w){ gdSave.dataset.w='1'; gdSave.onclick=()=>{ const id=$('#gdId').value.trim(), sec=$('#gdSecret').value.trim(); if(id){ put(Object.assign({ORB2_GOOGLE_CLIENT_ID:id}, sec?{ORB2_GOOGLE_CLIENT_SECRET:sec}:{}),'Google saved'); $('#gdId').value=''; $('#gdSecret').value=''; } }; }
+    const odSave=$('#odSave'); if(odSave && !odSave.dataset.w){ odSave.dataset.w='1'; odSave.onclick=()=>{ const id=$('#odId').value.trim(), sec=$('#odSecret').value.trim(); if(id){ put(Object.assign({ORB2_MS_CLIENT_ID:id}, sec?{ORB2_MS_CLIENT_SECRET:sec}:{}),'Microsoft saved'); $('#odId').value=''; $('#odSecret').value=''; } }; }
     try{
       const cs = await (await fetch('/v1/oauth/cloud/status',{credentials:'same-origin'})).json();
       const anyConn = !!(cs.google&&cs.google.connected) || !!(cs.microsoft&&cs.microsoft.connected);
@@ -1175,19 +1175,19 @@
       // ── Smart routing (cost optimizer) ──
       `<div style="border-top:1px solid var(--line);margin:16px 0 0;padding-top:12px;">`+
       `<div class="set-row"><div class="info-label" style="color:var(--ink);">Smart routing</div>`+
-      `<button id="rtToggle" class="set-switch${s.RAK00N_ROUTER_ENABLED==='1'?' on':''}" aria-label="Toggle routing"><span class="knob"></span></button></div>`+
+      `<button id="rtToggle" class="set-switch${s.ORB2_ROUTER_ENABLED==='1'?' on':''}" aria-label="Toggle routing"><span class="knob"></span></button></div>`+
       `<p class="set-muted small">Keep the default model (local Qwen) for everyday turns, and automatically send <strong>coding &amp; hard reasoning</strong> to a stronger cloud model — optimizing quality vs cost. Voice stays local. Uses <strong>OpenRouter</strong> (one key → GPT &amp; Claude).</p>`+
-      `<div class="set-form"><input id="rtKey" type="password" placeholder="OpenRouter API key (sk-or-…)" autocomplete="off" style="flex:2;" /><input id="rtModel" type="text" placeholder="strong model" value="${esc(s.RAK00N_ROUTER_STRONG_MODEL||'openai/gpt-4o')}" /></div>`+
-      `<div class="set-row" style="margin-top:8px;"><button id="rtSave" class="set-btn">Save routing</button><span class="set-muted small" id="rtState">${s.RAK00N_OPENROUTER_KEY?'key set':'no key yet'}</span></div></div>`;
+      `<div class="set-form"><input id="rtKey" type="password" placeholder="OpenRouter API key (sk-or-…)" autocomplete="off" style="flex:2;" /><input id="rtModel" type="text" placeholder="strong model" value="${esc(s.ORB2_ROUTER_STRONG_MODEL||'openai/gpt-4o')}" /></div>`+
+      `<div class="set-row" style="margin-top:8px;"><button id="rtSave" class="set-btn">Save routing</button><span class="set-muted small" id="rtState">${s.ORB2_OPENROUTER_KEY?'key set':'no key yet'}</span></div></div>`;
     $('#brSave').onclick=async()=>{ const body={}; const e=$('#brEndpoint').value.trim(),m=$('#brModel').value.trim(),k=$('#brKey').value.trim();
       if(e)body.OPENAI_BASE_URL=e; if(m)body.OPENAI_MODEL=m; if(k)body.OPENAI_API_KEY=k;
       if(!Object.keys(body).length){ toast('Enter an endpoint'); return; }
       try{ await fetch('/v1/settings',{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify(body)}); toast('Saved — restart to apply the endpoint'); }catch{ toast('Failed'); } };
     $('#brLocal').onclick=async()=>{ try{ await fetch('/v1/settings',{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({OPENAI_BASE_URL:'http://vllm:8888/v1'})}); toast('Reset to local — restart to apply'); renderBrainCfg({OPENAI_BASE_URL:'http://vllm:8888/v1',OPENAI_MODEL:s.OPENAI_MODEL}); }catch{ toast('Failed'); } };
     $('#rtToggle').onclick=async()=>{ const on=!$('#rtToggle').classList.contains('on'); $('#rtToggle').classList.toggle('on',on);
-      try{ await fetch('/v1/settings',{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({RAK00N_ROUTER_ENABLED:on?'1':'0'})}); toast(on?'Smart routing on':'Smart routing off'); }catch{ toast('Failed'); } };
+      try{ await fetch('/v1/settings',{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({ORB2_ROUTER_ENABLED:on?'1':'0'})}); toast(on?'Smart routing on':'Smart routing off'); }catch{ toast('Failed'); } };
     $('#rtSave').onclick=async()=>{ const body={}; const k=$('#rtKey').value.trim(),m=$('#rtModel').value.trim();
-      if(k)body.RAK00N_OPENROUTER_KEY=k; if(m)body.RAK00N_ROUTER_STRONG_MODEL=m;
+      if(k)body.ORB2_OPENROUTER_KEY=k; if(m)body.ORB2_ROUTER_STRONG_MODEL=m;
       if(!Object.keys(body).length){ toast('Enter your OpenRouter key'); return; }
       try{ await fetch('/v1/settings',{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify(body)}); $('#rtKey').value=''; $('#rtState').textContent='key set'; toast('Routing saved'); }catch{ toast('Failed'); } };
   }
@@ -1225,14 +1225,14 @@
     let s={}; try{ s=(await (await fetch('/v1/settings',{credentials:'same-origin'})).json()).settings||{}; }catch{}
 
     // ── Telegram — configurable in the UI ──
-    const tgOn=!!s.RAK00N_TELEGRAM_BOT_TOKEN;
+    const tgOn=!!s.ORB2_TELEGRAM_BOT_TOKEN;
     const tg=document.createElement('div'); tg.className='set-card';
     tg.innerHTML=`<div class="set-row"><span class="pill-dot ${tgOn?'ok':''}"></span><div class="info-label" style="color:var(--ink);">Telegram</div><span class="set-muted small">${tgOn?'configured':'not configured'}</span></div>`+
       `<p class="set-muted small">Make a bot with <strong>@BotFather</strong> and paste its token. Owner chat id (optional) restricts who it answers.</p>`+
       `<div class="set-form"><input id="tgToken" type="password" placeholder="Bot token" autocomplete="off" style="flex:2;" /><input id="tgOwner" type="text" inputmode="numeric" placeholder="Owner chat id (optional)" /><button id="tgSave" class="set-btn">Save</button></div>`;
     list.appendChild(tg);
     $('#tgSave').onclick=async()=>{ const body={}; const t=$('#tgToken').value.trim(), o=$('#tgOwner').value.trim();
-      if(t)body.RAK00N_TELEGRAM_BOT_TOKEN=t; if(o)body.RAK00N_TELEGRAM_OWNER_ID=o;
+      if(t)body.ORB2_TELEGRAM_BOT_TOKEN=t; if(o)body.ORB2_TELEGRAM_OWNER_ID=o;
       if(!Object.keys(body).length){ toast('Enter a bot token'); return; }
       try{ await fetch('/v1/settings',{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify(body)}); toast('Telegram saved'); loadChannels(); }catch{ toast('Failed'); } };
 
@@ -1262,15 +1262,15 @@
     const list=$('#setVoice'); list.innerHTML='';
     let s={};
     try{ const r=await (await fetch('/v1/settings',{credentials:'same-origin'})).json(); s=r.settings||{}; }catch{}
-    const enabled=s.RAK00N_VOICE_ENABLED||'1';
-    const curVoice=s.RAK00N_TTS_VOICE||'tara';
+    const enabled=s.ORB2_VOICE_ENABLED||'1';
+    const curVoice=s.ORB2_TTS_VOICE||'tara';
 
     // Voice enabled toggle
     const row=document.createElement('div'); row.className='set-item';
     row.innerHTML=`<div class="grow"><div class="t">Voice enabled</div><div class="s">the orb can listen &amp; speak</div></div>`;
     const sw=document.createElement('button'); sw.className='set-switch'+(enabled==='1'?' on':''); sw.setAttribute('aria-label','Toggle voice'); sw.innerHTML='<span class="knob"></span>';
     sw.onclick=async()=>{ const on=!sw.classList.contains('on'); sw.classList.toggle('on',on);
-      try{ await fetch('/v1/settings',{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({RAK00N_VOICE_ENABLED:on?'1':'0'})}); toast(on?'Voice enabled':'Voice disabled'); }catch{ toast('Failed'); } };
+      try{ await fetch('/v1/settings',{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({ORB2_VOICE_ENABLED:on?'1':'0'})}); toast(on?'Voice enabled':'Voice disabled'); }catch{ toast('Failed'); } };
     row.appendChild(sw); list.appendChild(row);
 
     // Voice selection (Orpheus expressive voices)
@@ -1279,7 +1279,7 @@
     vrow.innerHTML=`<div class="grow"><div class="t">Voice</div><div class="s">how the orb sounds</div></div>`;
     const sel=document.createElement('select'); sel.className='set-select';
     for(const [v,label] of VOICES){ const o=document.createElement('option'); o.value=v; o.textContent=label; if(v===curVoice)o.selected=true; sel.appendChild(o); }
-    sel.onchange=async()=>{ try{ await fetch('/v1/settings',{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({RAK00N_TTS_VOICE:sel.value})}); toast('Voice set to '+sel.value); }catch{ toast('Failed'); } };
+    sel.onchange=async()=>{ try{ await fetch('/v1/settings',{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({ORB2_TTS_VOICE:sel.value})}); toast('Voice set to '+sel.value); }catch{ toast('Failed'); } };
     vrow.appendChild(sel); list.appendChild(vrow);
 
     try{ const v=await (await fetch('/v1/voice/status')).json();
@@ -1325,7 +1325,7 @@
     fetch('/v1/oauth/spotify/token', { credentials:'same-origin' }).then(r=>r.ok?r.json():null).then(d=>{
       if (!d || !d.token || typeof Spotify === 'undefined') return;
       const player = new Spotify.Player({
-        name: 'rak00n',
+        name: 'orb2',
         getOAuthToken: cb => { fetch('/v1/oauth/spotify/token',{credentials:'same-origin'}).then(r=>r.json()).then(x=>cb(x.token)).catch(()=>{}); },
         volume: 0.6,
       });

@@ -5,7 +5,7 @@
  * to drive one agent turn and feed the reply text back for synthesis.
  *
  * Optional alternative to the default local whisper.cpp backend; select
- * with RAK00N_VOICE_BACKEND=personaplex.
+ * with ORB2_VOICE_BACKEND=personaplex.
  */
 import type { Store } from '../store/store.js'
 import type { VoiceBackend, VoiceBackendStatus, VoiceSend, VoiceSession } from './backend.js'
@@ -13,7 +13,7 @@ import { isPersonaplexReady, getPersonaplexStatus } from './personaplex.js'
 import { runChannelTurn } from '../channels/runtime.js'
 import { log } from '../log.js'
 
-const PERSONAPLEX_WS_URL = (process.env.RAK00N_PERSONAPLEX_URL || 'https://localhost:8998')
+const PERSONAPLEX_WS_URL = (process.env.ORB2_PERSONAPLEX_URL || 'https://localhost:8998')
   .replace(/^https?:\/\//, 'wss://')
 
 export class PersonaplexBackend implements VoiceBackend {

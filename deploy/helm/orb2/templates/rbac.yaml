@@ -1,0 +1,89 @@
+{{- if .Values.rbac.create }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.rbac.serviceAccountName }}
+  namespace: {{ include "orb2.namespace" . }}
+  labels:
+    {{- include "orb2.labels" . | nindent 4 }}
+---
+# Namespace-scoped permissions: the agent manages worker Jobs, canvas/
+# sandbox Pods, their Services/ConfigMaps, and (for self-update) patches
+# its own Deployment + watches rollout status. Scoped to the orb2
+# namespace via a RoleBinding — no cluster-wide blast radius by default.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Values.rbac.serviceAccountName }}
+  namespace: {{ include "orb2.namespace" . }}
+  labels:
+    {{- include "orb2.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "watch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["create", "get", "list", "watch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/log", "pods/status"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["services", "configmaps"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+  # Self-update: patch the Deployment image and watch the rollout.
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "patch", "update"]
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Values.rbac.serviceAccountName }}
+  namespace: {{ include "orb2.namespace" . }}
+  labels:
+    {{- include "orb2.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .Values.rbac.serviceAccountName }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.rbac.serviceAccountName }}
+    namespace: {{ include "orb2.namespace" . }}
+{{- if .Values.rbac.clusterWide }}
+---
+# Optional cluster-wide read for operator/diagnostics use (off by default).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "orb2.namespace" . }}-{{ .Values.rbac.serviceAccountName }}-read
+  labels:
+    {{- include "orb2.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["nodes", "namespaces", "pods", "services", "events"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "orb2.namespace" . }}-{{ .Values.rbac.serviceAccountName }}-read
+  labels:
+    {{- include "orb2.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "orb2.namespace" . }}-{{ .Values.rbac.serviceAccountName }}-read
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.rbac.serviceAccountName }}
+    namespace: {{ include "orb2.namespace" . }}
+{{- end }}
+{{- end }}

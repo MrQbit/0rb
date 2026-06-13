@@ -4,12 +4,12 @@
  *
  *   1. Relay desired state, delivered to us in the heartbeat ACK
  *      payload ('relay-controlled'). When the relay returns
- *      `{ control: { state: 'disabled' } }` rak00n-art flips state
+ *      `{ control: { state: 'disabled' } }` orb2-art flips state
  *      within ~30s. This is what an operator clicks 'Kill all
  *      instances' on the relay dashboard to drive.
  *
  *   2. Local admin override, set via POST /v1/control/{drain,disable,
- *      resume}. Persisted in Redis at `rak00n:control:local_state` so
+ *      resume}. Persisted in Redis at `orb2:control:local_state` so
  *      it survives a router restart and is shared across replicas.
  *      Useful when the relay is unreachable and the operator needs
  *      to take this single instance offline immediately.
@@ -19,7 +19,7 @@
  *
  * Surfaces consult `getControlState()` on the request hot path. When
  * the effective state is 'disabled' all non-readonly v1 calls return
- * 503 RAK00N_DISABLED. Health/readiness/metrics/info stay open so the
+ * 503 ORB2_DISABLED. Health/readiness/metrics/info stay open so the
  * pod still passes its probes.
  */
 import { log } from '../log.js'
@@ -35,8 +35,8 @@ export type ControlSnapshot = {
   changedAt: string
 }
 
-const KEY_LOCAL = 'rak00n:control:local_state'
-const KEY_RELAY = 'rak00n:control:relay_state'
+const KEY_LOCAL = 'orb2:control:local_state'
+const KEY_RELAY = 'orb2:control:relay_state'
 
 let _store: Store | null = null
 let _local: ControlSnapshot = {

@@ -3,15 +3,15 @@
  * sub-agent definitions.
  *
  * Repos are configured via:
- *   - RAK00N_DISCOVERY_PATHS env (comma-separated absolute paths or
+ *   - ORB2_DISCOVERY_PATHS env (comma-separated absolute paths or
  *     git URLs). Each entry is either a local filesystem path or a
  *     git URL pointing into the private EMU GitHub org.
  *
  * Git URLs are restricted by an allowlist regex -- only repositories
  * inside the configured EMU GitHub Enterprise org may be cloned. The
- * default allowlist accepts `https://github.com/rak00n-core/*` and
- * `git@github.com:rak00n-core/*`. Override the org name via
- * RAK00N_DISCOVERY_GIT_ALLOWED_ORG.
+ * default allowlist accepts `https://github.com/orb2-core/*` and
+ * `git@github.com:orb2-core/*`. Override the org name via
+ * ORB2_DISCOVERY_GIT_ALLOWED_ORG.
  *
  * Public GitHub repos are NEVER cloned through this surface, by
  * design -- discovery feeds the agent palette and the trust boundary
@@ -28,17 +28,17 @@ export type DiscoveryConfig = {
   sources: DiscoverySource[]
   /** Where to clone git URLs. Persistent across pod restarts when mounted. */
   cacheRoot: string
-  /** EMU org name. Default 'rak00n-core'. */
+  /** EMU org name. Default 'orb2-core'. */
   emuOrg: string
   /** Periodic refresh interval in ms. */
   refreshIntervalMs: number
 }
 
-const DEFAULT_CACHE_ROOT = '/var/rak00n/discovery'
+const DEFAULT_CACHE_ROOT = '/var/orb2/discovery'
 const DEFAULT_REFRESH_INTERVAL_MS = 15 * 60 * 1000
 
 export function getEmuOrg(): string {
-  return (process.env.RAK00N_DISCOVERY_GIT_ALLOWED_ORG || 'rak00n-core').trim()
+  return (process.env.ORB2_DISCOVERY_GIT_ALLOWED_ORG || 'orb2-core').trim()
 }
 
 /**
@@ -84,14 +84,14 @@ function parseSource(raw: string): DiscoverySource | null {
 }
 
 export function getDiscoveryConfig(): DiscoveryConfig {
-  const raw = process.env.RAK00N_DISCOVERY_PATHS || ''
+  const raw = process.env.ORB2_DISCOVERY_PATHS || ''
   const sources = raw
     .split(',')
     .map(parseSource)
     .filter((s): s is DiscoverySource => s !== null)
-  const cacheRoot = process.env.RAK00N_DISCOVERY_CACHE_DIR || DEFAULT_CACHE_ROOT
+  const cacheRoot = process.env.ORB2_DISCOVERY_CACHE_DIR || DEFAULT_CACHE_ROOT
   const refreshSec = parseInt(
-    process.env.RAK00N_DISCOVERY_REFRESH_SECONDS || '900',
+    process.env.ORB2_DISCOVERY_REFRESH_SECONDS || '900',
     10,
   )
   return {

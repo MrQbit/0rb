@@ -29,16 +29,16 @@ function makeMemStore() {
   } as any
 }
 
-const VALID = 'rak00n_' + 'a'.repeat(64)
-const ORIG = process.env.RAK00N_BOOTSTRAP_ADMIN_KEY
+const VALID = 'orb2_' + 'a'.repeat(64)
+const ORIG = process.env.ORB2_BOOTSTRAP_ADMIN_KEY
 
 describe('bootstrapAdminKey', () => {
   beforeEach(() => {
-    delete process.env.RAK00N_BOOTSTRAP_ADMIN_KEY
+    delete process.env.ORB2_BOOTSTRAP_ADMIN_KEY
   })
   afterEach(() => {
-    if (ORIG === undefined) delete process.env.RAK00N_BOOTSTRAP_ADMIN_KEY
-    else process.env.RAK00N_BOOTSTRAP_ADMIN_KEY = ORIG
+    if (ORIG === undefined) delete process.env.ORB2_BOOTSTRAP_ADMIN_KEY
+    else process.env.ORB2_BOOTSTRAP_ADMIN_KEY = ORIG
   })
 
   test('no-op when env var is unset', async () => {
@@ -48,7 +48,7 @@ describe('bootstrapAdminKey', () => {
   })
 
   test('mints the first admin when env var is set and store has no admin', async () => {
-    process.env.RAK00N_BOOTSTRAP_ADMIN_KEY = VALID
+    process.env.ORB2_BOOTSTRAP_ADMIN_KEY = VALID
     const store = makeMemStore()
     await bootstrapAdminKey(store)
     const all = await store.listAllApiKeys()
@@ -58,7 +58,7 @@ describe('bootstrapAdminKey', () => {
   })
 
   test('no-op when an admin already exists', async () => {
-    process.env.RAK00N_BOOTSTRAP_ADMIN_KEY = VALID
+    process.env.ORB2_BOOTSTRAP_ADMIN_KEY = VALID
     const store = makeMemStore()
     await store.putApiKey('preexisting', {
       id: 'pre',
@@ -75,7 +75,7 @@ describe('bootstrapAdminKey', () => {
   })
 
   test('no-op when env var is malformed', async () => {
-    process.env.RAK00N_BOOTSTRAP_ADMIN_KEY = 'not-a-rak00n-key'
+    process.env.ORB2_BOOTSTRAP_ADMIN_KEY = 'not-a-orb2-key'
     const store = makeMemStore()
     await bootstrapAdminKey(store)
     expect((await store.listAllApiKeys()).length).toBe(0)

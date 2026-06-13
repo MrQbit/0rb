@@ -2,7 +2,7 @@
  * File-upload storage for /v1/files/*.
  *
  * Files are written to <FILES_ROOT>/<sessionId>/<subdir>/<safeName>
- * and indexed in Redis under rak00n:file:<id> + rak00n:file:idx:<sessionId>
+ * and indexed in Redis under orb2:file:<id> + orb2:file:idx:<sessionId>
  * (a JSON list of ids). The stored absolute path is what the worker
  * pod reads when the agent reads it with the Read tool -- the
  * upload root is mounted into the worker at the same path via the
@@ -17,8 +17,8 @@
  *   - Deleting requires the same.
  *
  * Constraints:
- *   - Per-file size cap RAK00N_FILES_MAX_BYTES (default 50 MB)
- *   - Per-session quota RAK00N_FILES_QUOTA_BYTES (default 500 MB)
+ *   - Per-file size cap ORB2_FILES_MAX_BYTES (default 50 MB)
+ *   - Per-session quota ORB2_FILES_QUOTA_BYTES (default 500 MB)
  *   - Filename sanitised (no '..', no path separators, no NUL)
  *   - SHA-256 of contents stored alongside metadata
  */
@@ -34,16 +34,16 @@ import {
 import { dirname, join, resolve } from 'node:path'
 import type { Store } from '../store/store.js'
 
-export const DEFAULT_FILES_ROOT = '/var/rak00n/files'
+export const DEFAULT_FILES_ROOT = '/var/orb2/files'
 export const DEFAULT_MAX_BYTES = 50 * 1024 * 1024
 export const DEFAULT_QUOTA_BYTES = 500 * 1024 * 1024
 
-const FILE_KEY_PREFIX = 'rak00n:file:'
-const SESSION_INDEX_PREFIX = 'rak00n:file:idx:'
+const FILE_KEY_PREFIX = 'orb2:file:'
+const SESSION_INDEX_PREFIX = 'orb2:file:idx:'
 // Global list of every session that has ever had a file uploaded.
 // We append-only here and dedupe on read; the count stays bounded by
 // the number of distinct sessions, not files.
-const GLOBAL_SESSIONS_KEY = 'rak00n:file:sessions'
+const GLOBAL_SESSIONS_KEY = 'orb2:file:sessions'
 
 export type StoredFileMeta = {
   id: string
@@ -66,10 +66,10 @@ export type FilesConfig = {
 }
 
 export function getFilesConfig(): FilesConfig {
-  const enabled = process.env.RAK00N_FILES_ENABLED !== '0'
-  const root = process.env.RAK00N_FILES_ROOT?.trim() || DEFAULT_FILES_ROOT
-  const max = parseInt(process.env.RAK00N_FILES_MAX_BYTES || '', 10)
-  const quota = parseInt(process.env.RAK00N_FILES_QUOTA_BYTES || '', 10)
+  const enabled = process.env.ORB2_FILES_ENABLED !== '0'
+  const root = process.env.ORB2_FILES_ROOT?.trim() || DEFAULT_FILES_ROOT
+  const max = parseInt(process.env.ORB2_FILES_MAX_BYTES || '', 10)
+  const quota = parseInt(process.env.ORB2_FILES_QUOTA_BYTES || '', 10)
   return {
     enabled,
     root,

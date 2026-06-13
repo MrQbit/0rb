@@ -5,8 +5,8 @@
  * (single user) in the kv store and refreshed on demand.
  *
  * Redirect URIs (register these in the Google / Microsoft app):
- *   <RAK00N_PUBLIC_URL>/v1/oauth/cloud/google/callback
- *   <RAK00N_PUBLIC_URL>/v1/oauth/cloud/microsoft/callback
+ *   <ORB2_PUBLIC_URL>/v1/oauth/cloud/google/callback
+ *   <ORB2_PUBLIC_URL>/v1/oauth/cloud/microsoft/callback
  */
 import type { Store } from '../store/store.js'
 
@@ -32,8 +32,8 @@ const DEVICE_KEY = (p: CloudProvider) => `cloud:device:${p}`
 function providerCfg(p: CloudProvider): ProviderCfg {
   if (p === 'google') {
     return {
-      clientId: (process.env.RAK00N_GOOGLE_CLIENT_ID || '').trim(),
-      clientSecret: (process.env.RAK00N_GOOGLE_CLIENT_SECRET || '').trim(),
+      clientId: (process.env.ORB2_GOOGLE_CLIENT_ID || '').trim(),
+      clientSecret: (process.env.ORB2_GOOGLE_CLIENT_SECRET || '').trim(),
       authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
       tokenUrl: 'https://oauth2.googleapis.com/token',
       // Device-code endpoint (RFC 8628) — "TV & limited input" client, no secret.
@@ -44,8 +44,8 @@ function providerCfg(p: CloudProvider): ProviderCfg {
     }
   }
   return {
-    clientId: (process.env.RAK00N_MS_CLIENT_ID || '').trim(),
-    clientSecret: (process.env.RAK00N_MS_CLIENT_SECRET || '').trim(),
+    clientId: (process.env.ORB2_MS_CLIENT_ID || '').trim(),
+    clientSecret: (process.env.ORB2_MS_CLIENT_SECRET || '').trim(),
     authUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
     tokenUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
     deviceCodeUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/devicecode',
@@ -57,7 +57,7 @@ function providerCfg(p: CloudProvider): ProviderCfg {
 
 export function providerConfigured(p: CloudProvider): boolean {
   const c = providerCfg(p)
-  return !!(c.clientId && c.clientSecret && (process.env.RAK00N_PUBLIC_URL || '').trim())
+  return !!(c.clientId && c.clientSecret && (process.env.ORB2_PUBLIC_URL || '').trim())
 }
 export function anyCloudConfigured(): boolean {
   // Either the full redirect flow (client+secret+public URL) OR just a device
@@ -66,7 +66,7 @@ export function anyCloudConfigured(): boolean {
 }
 
 export function redirectUri(p: CloudProvider): string {
-  const base = (process.env.RAK00N_PUBLIC_URL || '').replace(/\/+$/, '')
+  const base = (process.env.ORB2_PUBLIC_URL || '').replace(/\/+$/, '')
   return `${base}/v1/oauth/cloud/${p}/callback`
 }
 
@@ -157,7 +157,7 @@ export async function getToken(store: Store, p: CloudProvider): Promise<string |
 }
 
 // ── Device Authorization Flow (RFC 8628) — the "TV login" path ───────────────
-// Far simpler for end users than the redirect dance: rak00n shows a code + URL,
+// Far simpler for end users than the redirect dance: orb2 shows a code + URL,
 // the user approves on their phone, we poll for the token. Needs only a public
 // client_id (no secret, no redirect URI). One connection grants all the scopes
 // above → lights up files + mail + calendar widgets at once.

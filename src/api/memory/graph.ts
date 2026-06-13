@@ -20,7 +20,7 @@ const EDGES_PREFIX = 'graph:edges:'  // graph:edges:<key> -> Edge[] JSON
 const TTL_S = 60 * 60 * 24 * 365
 
 export function graphMemoryEnabled(): boolean {
-  return process.env.RAK00N_MEMORY_GRAPH !== '0'
+  return process.env.ORB2_MEMORY_GRAPH !== '0'
 }
 
 export type Triple = { subject: string; relation: string; object: string }

@@ -12,6 +12,6 @@ RUN pip install --no-cache-dir \
 WORKDIR /srv
 COPY server.py /srv/server.py
 
-ENV RAK00N_AV_PORT=8993
+ENV ORB2_AV_PORT=8993
 EXPOSE 8993
 CMD ["python", "/srv/server.py"]

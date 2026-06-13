@@ -38,7 +38,7 @@ export async function trySpotifyOAuthRoute(req: Request, method: string, pathnam
   if (!authed(req)) return json(401, { error: 'authentication required' })
 
   if (method === 'GET' && pathname === '/v1/oauth/spotify/start') {
-    if (!spotifyOAuthConfigured()) return json(400, { error: 'Set Spotify Client ID/Secret + RAK00N_PUBLIC_URL first.', redirect_uri: redirectUri() })
+    if (!spotifyOAuthConfigured()) return json(400, { error: 'Set Spotify Client ID/Secret + ORB2_PUBLIC_URL first.', redirect_uri: redirectUri() })
     return json(200, { url: await authorizeUrl(store), redirect_uri: redirectUri() })
   }
   if (method === 'GET' && pathname === '/v1/oauth/spotify/status') {

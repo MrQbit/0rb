@@ -26,8 +26,8 @@ function creds(): { token: string; caCert: string; apiServer: string; namespace:
   const caCert = readFileSync(`${SA_DIR}/ca.crt`, 'utf-8')
   const apiServer = `https://${process.env.KUBERNETES_SERVICE_HOST}:${process.env.KUBERNETES_SERVICE_PORT}`
   const namespace =
-    process.env.RAK00N_WORKER_NAMESPACE ||
-    (existsSync(`${SA_DIR}/namespace`) ? readFileSync(`${SA_DIR}/namespace`, 'utf-8').trim() : 'rak00n')
+    process.env.ORB2_WORKER_NAMESPACE ||
+    (existsSync(`${SA_DIR}/namespace`) ? readFileSync(`${SA_DIR}/namespace`, 'utf-8').trim() : 'orb2')
   return { token, caCert, apiServer, namespace }
 }
 

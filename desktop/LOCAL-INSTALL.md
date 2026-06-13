@@ -13,7 +13,7 @@ questions, and has a **fully functional orb running entirely on their machine**
 │                                                                              │
 │  Local mode orchestrates, on this machine:                                   │
 │                                                                              │
-│   ┌── Ollama ──────────────┐   ┌── rak00n-api (compiled Bun binary) ──────┐  │
+│   ┌── Ollama ──────────────┐   ┌── orb2-api (compiled Bun binary) ──────┐  │
 │   │ localhost:11434/v1     │◄──┤ OPENAI_BASE_URL=…:11434/v1               │  │
 │   │ model: qwen3-vl:8b     │   │ MemoryStore (no REDIS_URL)               │  │
 │   │ (vision + tools)       │   │ settings/owner/keys passed as env        │  │
@@ -35,7 +35,7 @@ questions, and has a **fully functional orb running entirely on their machine**
   brain endpoint) lives in the Electron `config.json` and is passed to the api
   as **env on every launch**, so it survives restarts even though the store is
   in-memory. Login sessions reset on restart (acceptable; user re-signs-in).
-- **Compiled api**: ship `rak00n-api` as a standalone binary
+- **Compiled api**: ship `orb2-api` as a standalone binary
   (`bun build --compile`), so the user needs neither Bun nor Node.
 - **Voice**: whisper.cpp + Piper are cross-platform and need no GPU — the
   consumer voice path. (Orpheus/SenseVoice are the Spark/CUDA path and are not
@@ -52,7 +52,7 @@ Settings → Apps.
 
 ## Build pipeline (maintainer)
 1. `bun run build:api` → `dist/api.mjs`
-2. `bun build --compile dist/api.mjs --outfile desktop/bin/rak00n-api[-mac|.exe]`
+2. `bun build --compile dist/api.mjs --outfile desktop/bin/orb2-api[-mac|.exe]`
 3. Copy the web UI (`web/public`) into the app resources (served by the api).
 4. Drop real keys into `desktop/keys.json`.
 5. `cd desktop && npm run dist:mac` / `dist:win` → signed installer.

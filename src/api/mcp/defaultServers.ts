@@ -1,17 +1,17 @@
 import type { SkillMcpServer } from '../skills/loader.js'
 
 /** All default MCP servers configured for this environment.
- *  Operators can supply a custom list via RAK00N_DEFAULT_MCPS_JSON (JSON array of SkillMcpServer). */
+ *  Operators can supply a custom list via ORB2_DEFAULT_MCPS_JSON (JSON array of SkillMcpServer). */
 export function getDefaultMcpServers(): SkillMcpServer[] {
-  if (process.env.RAK00N_DEFAULT_MCPS_DISABLED === '1') return []
+  if (process.env.ORB2_DEFAULT_MCPS_DISABLED === '1') return []
 
-  if (process.env.RAK00N_DEFAULT_MCPS_JSON) {
+  if (process.env.ORB2_DEFAULT_MCPS_JSON) {
     try {
-      const parsed = JSON.parse(process.env.RAK00N_DEFAULT_MCPS_JSON)
+      const parsed = JSON.parse(process.env.ORB2_DEFAULT_MCPS_JSON)
       if (Array.isArray(parsed)) return parsed.filter(isValidServer)
     } catch (err) {
       console.warn(
-        `[mcp-defaults] RAK00N_DEFAULT_MCPS_JSON parse failed, falling back to empty: ${(err as Error).message}`,
+        `[mcp-defaults] ORB2_DEFAULT_MCPS_JSON parse failed, falling back to empty: ${(err as Error).message}`,
       )
     }
   }

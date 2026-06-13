@@ -1,7 +1,7 @@
 """
 smart_router.py
 ---------------
-Intelligent auto-router for RAK00N.
+Intelligent auto-router for ORB2.
 
 Instead of always using one fixed provider, the smart router:
 - Pings all configured providers on startup
@@ -21,7 +21,7 @@ Usage in server.py:
     ROUTER_STRATEGY=latency    # or: cost, balanced
     ROUTER_FALLBACK=true       # auto-retry on failure
 
-Contribution target: https://github.com/MrQbit/rak00n
+Contribution target: https://github.com/MrQbit/0rb
 """
 
 import asyncio
@@ -135,7 +135,7 @@ def build_default_providers() -> list[Provider]:
 
 class SmartRouter:
     """
-    Intelligently routes Rak00n API requests to the best
+    Intelligently routes Orb2 API requests to the best
     available LLM provider based on latency, cost, and health.
     """
 
@@ -230,14 +230,14 @@ class SmartRouter:
     def get_model_for_provider(
         self,
         provider: Provider,
-        rak00n_model: str,
+        orb2_model: str,
         is_large_request: bool = False,
     ) -> str:
-        """Map a RAK00N model name to the provider's actual model."""
+        """Map a ORB2 model name to the provider's actual model."""
         if is_large_request:
             return provider.big_model
         is_large = any(
-            keyword in rak00n_model.lower()
+            keyword in orb2_model.lower()
             for keyword in ["opus", "sonnet", "large", "big"]
         )
         return provider.big_model if is_large else provider.small_model
@@ -261,7 +261,7 @@ class SmartRouter:
     async def route(
         self,
         messages: list[dict],
-        rak00n_model: str = "claude-sonnet",
+        orb2_model: str = "claude-sonnet",
         attempt: int = 0,
         exclude_providers: Optional[list[str]] = None,
     ) -> dict:
@@ -296,7 +296,7 @@ class SmartRouter:
         provider = min(available, key=lambda p: p.score(self.strategy))
         model = self.get_model_for_provider(
             provider,
-            rak00n_model,
+            orb2_model,
             is_large_request=large,
         )
 

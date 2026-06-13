@@ -1,0 +1,169 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: orb2-config
+  namespace: {{ include "orb2.namespace" . }}
+  labels:
+    {{- include "orb2.labels" . | nindent 4 }}
+data:
+  ORB2_API_PORT: "8080"
+  ORB2_API_HOST: "0.0.0.0"
+  ORB2_API_WORKSPACE_ROOT: "/workspace"
+  ORB2_API_AUTH_REQUIRED: {{ .Values.auth.required | ternary "1" "0" | quote }}
+  ORB2_API_MAX_STREAMS: {{ .Values.router.maxConcurrentStreams | quote }}
+  ORB2_API_SESSION_TTL: {{ .Values.router.sessionTtlSeconds | quote }}
+  ORB2_STANDALONE: "1"
+  ORB2_ENVIRONMENT: {{ .Values.global.environment | default "dev" | quote }}
+  {{- if and .Values.mcps .Values.mcps.defaults (not (default true .Values.mcps.defaults.enabled)) }}
+  ORB2_DEFAULT_MCPS_DISABLED: "1"
+  {{- end }}
+  {{- if and .Values.llm (eq .Values.llm.defaultProvider "local") }}
+  # Local vLLM (OpenAI-compatible) — default provider
+  ORB2_USE_OPENAI: "1"
+  ORB2_SECRET_SOURCE: "env"
+  LLM_ENDPOINT: {{ .Values.llm.local.baseUrl | quote }}
+  LLM_KEY: {{ .Values.llm.local.apiKey | default "local" | quote }}
+  LLM_DEPLOYMENT_NAME: {{ .Values.llm.local.model | quote }}
+  LLM_MODEL: {{ .Values.llm.local.model | quote }}
+  LLM_PROVIDER: {{ .Values.llm.local.provider | default "vllm" | quote }}
+  OPENAI_BASE_URL: {{ .Values.llm.local.baseUrl | quote }}
+  OPENAI_MODEL: {{ .Values.llm.local.model | quote }}
+  ORB2_DEFAULT_MODEL: {{ .Values.llm.local.model | quote }}
+  ORB2_HELPER_MODEL: {{ .Values.llm.local.helperModel | default .Values.llm.local.model | quote }}
+  {{- else }}
+  ORB2_USE_FOUNDRY: "1"
+  {{- end }}
+  {{- if and .Values.llm .Values.llm.foundry .Values.llm.foundry.enabled }}
+  # Foundry is available as fallback
+  ORB2_FOUNDRY_AVAILABLE: "1"
+  {{- end }}
+  NODE_ENV: "production"
+  AGENT_ID: "orb2-api"
+  {{- if .Values.router.maxBodyMb }}
+  ORB2_API_MAX_BODY_MB: {{ .Values.router.maxBodyMb | quote }}
+  {{- end }}
+  {{- if .Values.router.rateLimit.enabled }}
+  ORB2_RATELIMIT_ENABLED: "1"
+  {{- range $k, $v := .Values.router.rateLimit.limits }}
+  ORB2_RATELIMIT_{{ $k }}: {{ $v | quote }}
+  {{- end }}
+  {{- end }}
+  {{- if .Values.sandbox.enabled }}
+  ORB2_SANDBOX_MODE: "pod"
+  ORB2_SANDBOX_URL: "http://orb2-sandbox:9091"
+  {{- end }}
+  {{/*
+    Foundry endpoint: baseUrl and resource are mutually exclusive in
+    the Anthropic SDK ("API Error: baseURL and resource are mutually
+    exclusive"). Prefer baseUrl when both are set so explicit
+    overrides win; otherwise fall back to the resource shorthand.
+  */}}
+  {{- if and .Values.llm .Values.llm.foundry .Values.llm.foundry.enabled }}
+  {{- if .Values.llm.foundry.baseUrl }}
+  ANTHROPIC_FOUNDRY_BASE_URL: {{ .Values.llm.foundry.baseUrl | quote }}
+  {{- else if .Values.llm.foundry.resource }}
+  ANTHROPIC_FOUNDRY_RESOURCE: {{ .Values.llm.foundry.resource | quote }}
+  {{- end }}
+  {{- if .Values.llm.foundry.defaultModel }}
+  ANTHROPIC_DEFAULT_SONNET_MODEL: {{ .Values.llm.foundry.defaultModel | quote }}
+  {{- end }}
+  {{- if .Values.llm.foundry.defaultChatModel }}
+  ANTHROPIC_FOUNDRY_CHAT_MODEL: {{ .Values.llm.foundry.defaultChatModel | quote }}
+  {{- end }}
+  {{- end }}
+  {{- if .Values.redis.enabled }}
+  REDIS_URL: {{ include "orb2.redisUrl" . | quote }}
+  {{- end }}
+  {{- if .Values.auth.corsOrigins }}
+  ORB2_CORS_ORIGINS: {{ .Values.auth.corsOrigins | quote }}
+  {{- end }}
+  {{- if .Values.logUserContent }}
+  ORB2_LOG_USER_CONTENT: "true"
+  {{- end }}
+  {{- if .Values.rabbitmq.enabled }}
+  RABBITMQ_URL: {{ .Values.rabbitmq.url | quote }}
+  RABBITMQ_INPUT_QUEUE: {{ .Values.rabbitmq.inputQueue | quote }}
+  RABBITMQ_OUTPUT_QUEUE: {{ .Values.rabbitmq.outputQueue | quote }}
+  {{- end }}
+  {{- if .Values.relay.enabled }}
+  ORB2_RELAY_URL: {{ .Values.relay.url | quote }}
+  {{- if .Values.relay.instanceId }}
+  ORB2_INSTANCE_ID: {{ .Values.relay.instanceId | quote }}
+  {{- end }}
+  {{- if .Values.relay.memorySync }}
+  ORB2_RELAY_MEMORY_SYNC: "true"
+  {{- end }}
+  {{- end }}
+  {{- if .Values.tenant.id }}
+  ORB2_TENANT_ID: {{ .Values.tenant.id | quote }}
+  {{- end }}
+  ORB2_SKILLS_ENABLED: {{ .Values.features.skills.enabled | ternary "1" "0" | quote }}
+  {{- if .Values.discovery.enabled }}
+  ORB2_DISCOVERY_PATHS: {{ .Values.discovery.paths | quote }}
+  ORB2_DISCOVERY_GIT_ALLOWED_ORG: {{ .Values.discovery.emuOrg | quote }}
+  {{- if .Values.discovery.cacheDir }}
+  ORB2_DISCOVERY_CACHE_DIR: {{ .Values.discovery.cacheDir | quote }}
+  {{- end }}
+  ORB2_DISCOVERY_REFRESH_SECONDS: {{ .Values.discovery.refreshSeconds | quote }}
+  {{- end }}
+  {{- if .Values.agents.fsRoot }}
+  ORB2_AGENT_FS_ROOT: {{ .Values.agents.fsRoot | quote }}
+  {{- end }}
+  {{- if .Values.files }}
+  ORB2_FILES_ENABLED: {{ ternary "1" "0" (default true .Values.files.enabled) | quote }}
+  {{- if .Values.files.root }}
+  ORB2_FILES_ROOT: {{ .Values.files.root | quote }}
+  {{- end }}
+  {{- if .Values.files.maxBytesPerFile }}
+  ORB2_FILES_MAX_BYTES: {{ .Values.files.maxBytesPerFile | int64 | quote }}
+  {{- end }}
+  {{- if .Values.files.quotaBytesPerSession }}
+  ORB2_FILES_QUOTA_BYTES: {{ .Values.files.quotaBytesPerSession | int64 | quote }}
+  {{- end }}
+  {{- if .Values.files.persistence.enabled }}
+  ORB2_WORKER_FILES_PVC: {{ .Values.files.persistence.existingClaim | default .Values.files.persistence.claimName | default "orb2-files" | quote }}
+  ORB2_WORKER_FILES_MOUNT_PATH: {{ .Values.files.root | quote }}
+  {{- end }}
+  {{- end }}
+  {{- if and .Values.github .Values.github.app .Values.github.app.enabled }}
+  GITHUB_APP_ID: {{ .Values.github.app.appId | quote }}
+  GITHUB_APP_INSTALLATION_ID: {{ .Values.github.app.installationId | quote }}
+  {{- if .Values.github.app.apiBase }}
+  GITHUB_APP_API_BASE: {{ .Values.github.app.apiBase | quote }}
+  {{- end }}
+  {{- end }}
+  {{- if and .Values.github .Values.github.oauth .Values.github.oauth.clientId }}
+  GITHUB_DEVICE_FLOW_CLIENT_ID: {{ .Values.github.oauth.clientId | quote }}
+  {{- end }}
+  {{- if .Values.vault.enabled }}
+  VAULT_ADDR: {{ .Values.vault.addr | quote }}
+  VAULT_AUTH_METHOD: {{ .Values.vault.authMethod | quote }}
+  VAULT_ROLE: {{ .Values.vault.role | quote }}
+  VAULT_SECRET_MOUNT: {{ .Values.vault.secretMount | quote }}
+  VAULT_SECRET_PREFIX: {{ .Values.vault.secretPrefix | quote }}
+  {{- if .Values.vault.namespace }}
+  VAULT_NAMESPACE: {{ .Values.vault.namespace | quote }}
+  {{- end }}
+  {{- end }}
+  {{- if and .Values.voice .Values.voice.enabled }}
+  # Voice: continuous STT→orb2(Qwen)→TTS with barge-in. STT/TTS are GPU
+  # host services; the whisper backend keeps orb2 as the answering brain.
+  ORB2_VOICE_ENABLED: "1"
+  ORB2_VOICE_BACKEND: {{ .Values.voice.backend | default "whisper" | quote }}
+  {{- if .Values.voice.sttUrl }}
+  ORB2_STT_URL: {{ .Values.voice.sttUrl | quote }}
+  {{- end }}
+  {{- if .Values.voice.ttsUrl }}
+  ORB2_TTS_URL: {{ .Values.voice.ttsUrl | quote }}
+  {{- end }}
+  {{- if .Values.voice.ttsVoice }}
+  ORB2_TTS_VOICE: {{ .Values.voice.ttsVoice | quote }}
+  {{- end }}
+  {{- end }}
+  {{- if .Values.canvas.enabled }}
+  ORB2_CANVAS_ENABLED: "1"
+  {{- if .Values.canvas.image }}
+  ORB2_CANVAS_IMAGE: {{ .Values.canvas.image | quote }}
+  ORB2_CANVAS_IMAGE_PULL_POLICY: {{ .Values.canvas.imagePullPolicy | default .Values.global.imagePullPolicy | quote }}
+  {{- end }}
+  {{- end }}

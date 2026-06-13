@@ -9,7 +9,7 @@ Writes the last sample to /tmp/orpheus_bench.wav.
 import os, time, wave
 import numpy as np
 
-os.environ.setdefault("RAK00N_TTS_ENGINE", "orpheus")
+os.environ.setdefault("ORB2_TTS_ENGINE", "orpheus")
 import server  # noqa: E402
 
 SR = server.SAMPLE_RATE

@@ -3,7 +3,7 @@
  * server is running and ready on port 8998.
  */
 
-const PERSONAPLEX_URL = process.env.RAK00N_PERSONAPLEX_URL || 'https://localhost:8998'
+const PERSONAPLEX_URL = process.env.ORB2_PERSONAPLEX_URL || 'https://localhost:8998'
 
 export type PersonaplexStatus = {
   running: boolean
@@ -27,6 +27,6 @@ export async function getPersonaplexStatus(): Promise<PersonaplexStatus> {
   return {
     running,
     url: PERSONAPLEX_URL,
-    voice_prompt: process.env.RAK00N_VOICE_VOICE_PROMPT || 'NATM0.pt',
+    voice_prompt: process.env.ORB2_VOICE_VOICE_PROMPT || 'NATM0.pt',
   }
 }

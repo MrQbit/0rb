@@ -55,11 +55,11 @@ export const WIDGET_CATALOG: WidgetDef[] = [
   { id: 'map', name: 'Maps & directions', desc: 'Places, pins and driving routes (OpenStreetMap).', category: 'Info', setup: 'none', icon: '🗺️' },
   { id: 'calendar', name: 'Calendar', desc: 'A month calendar with events and an agenda.', category: 'Info', setup: 'none', icon: '📅' },
   { id: 'todo', name: 'Tasks', desc: 'A live task list the orb opens and ticks along during long/multi-step work.', category: 'Productivity', setup: 'none', icon: '☑️' },
-  { id: 'websearch', name: 'Web search & news', desc: 'Headlines and search via your self-hosted SearXNG.', category: 'Info', setup: 'none', icon: '🔎', envKeys: ['RAK00N_SEARXNG_URL'] },
+  { id: 'websearch', name: 'Web search & news', desc: 'Headlines and search via your self-hosted SearXNG.', category: 'Info', setup: 'none', icon: '🔎', envKeys: ['ORB2_SEARXNG_URL'] },
 
   // ── Media (one shared owner key — safe to share, public data only) ──
-  { id: 'youtube', name: 'YouTube', desc: 'Search and play videos.', category: 'Media', setup: 'owner-key', icon: '▶️', envKeys: ['RAK00N_YOUTUBE_API_KEY'], ownerAction: true },
-  { id: 'spotify', name: 'Spotify', desc: 'Search music and play embeds.', category: 'Media', setup: 'owner-key', icon: '🎵', envKeys: ['RAK00N_SPOTIFY_CLIENT_ID', 'RAK00N_SPOTIFY_CLIENT_SECRET'], provider: 'spotify', ownerAction: true },
+  { id: 'youtube', name: 'YouTube', desc: 'Search and play videos.', category: 'Media', setup: 'owner-key', icon: '▶️', envKeys: ['ORB2_YOUTUBE_API_KEY'], ownerAction: true },
+  { id: 'spotify', name: 'Spotify', desc: 'Search music and play embeds.', category: 'Media', setup: 'owner-key', icon: '🎵', envKeys: ['ORB2_SPOTIFY_CLIENT_ID', 'ORB2_SPOTIFY_CLIENT_SECRET'], provider: 'spotify', ownerAction: true },
 
   // ── Account (per-user OAuth / token) ──
   { id: 'gmail', name: 'Gmail / mail', desc: 'Inbox preview from your connected account.', category: 'Account', setup: 'oauth', icon: '✉️', provider: 'google' },
@@ -68,12 +68,12 @@ export const WIDGET_CATALOG: WidgetDef[] = [
   { id: 'outlook', name: 'Outlook mail', desc: 'Inbox preview from Microsoft 365.', category: 'Account', setup: 'oauth', icon: '📧', provider: 'microsoft' },
   { id: 'mscal', name: 'Microsoft Calendar', desc: 'Your Outlook calendar.', category: 'Account', setup: 'oauth', icon: '🗓️', provider: 'microsoft' },
   { id: 'onedrive', name: 'OneDrive', desc: 'Search and pull your OneDrive files.', category: 'Account', setup: 'oauth', icon: '☁️', provider: 'microsoft' },
-  { id: 'vercel', name: 'Vercel', desc: 'Deployment status; publish public pages.', category: 'Dev', setup: 'token', icon: '▲', envKeys: ['RAK00N_VERCEL_TOKEN'], provider: 'vercel' },
+  { id: 'vercel', name: 'Vercel', desc: 'Deployment status; publish public pages.', category: 'Dev', setup: 'token', icon: '▲', envKeys: ['ORB2_VERCEL_TOKEN'], provider: 'vercel' },
   { id: 'github', name: 'GitHub', desc: 'Repos, issues and PRs.', category: 'Dev', setup: 'token', icon: '⌥', provider: 'github' },
 
   // ── Dev / local ──
-  { id: 'docker', name: 'Docker', desc: 'Live containers — start/stop/logs.', category: 'Dev', setup: 'local', icon: '🐳', envKeys: ['RAK00N_DOCKER_OPS_ENABLED'] },
-  { id: 'blender', name: '3D model', desc: 'Generate and orbit a 3D model (Blender).', category: 'Dev', setup: 'local', icon: '🧊', envKeys: ['RAK00N_BLENDER_URL'] },
+  { id: 'docker', name: 'Docker', desc: 'Live containers — start/stop/logs.', category: 'Dev', setup: 'local', icon: '🐳', envKeys: ['ORB2_DOCKER_OPS_ENABLED'] },
+  { id: 'blender', name: '3D model', desc: 'Generate and orbit a 3D model (Blender).', category: 'Dev', setup: 'local', icon: '🧊', envKeys: ['ORB2_BLENDER_URL'] },
 ]
 
 function envSet(keys?: string[]): boolean {
@@ -81,7 +81,7 @@ function envSet(keys?: string[]): boolean {
   return keys.every(k => !!(process.env[k] && String(process.env[k]).trim()))
 }
 
-const DISABLED_SETTING = 'RAK00N_WIDGETS_DISABLED'
+const DISABLED_SETTING = 'ORB2_WIDGETS_DISABLED'
 
 function disabledSet(): Set<string> {
   return new Set((process.env[DISABLED_SETTING] || '').split(',').map(s => s.trim()).filter(Boolean))

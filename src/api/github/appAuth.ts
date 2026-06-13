@@ -139,7 +139,7 @@ export async function mintInstallationToken(): Promise<InstallationToken | null>
       Authorization: `Bearer ${jwt}`,
       Accept: 'application/vnd.github+json',
       'X-GitHub-Api-Version': '2022-11-28',
-      'User-Agent': 'rak00n-art',
+      'User-Agent': 'orb2-art',
     },
   })
   if (!res.ok) {

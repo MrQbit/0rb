@@ -2,7 +2,7 @@
  * Structured logger + audit emitter.
  *
  * - log.info/.warn/.error → JSON to stdout (one line per event), level
- *   gated by RAK00N_API_LOG_LEVEL (default "info").
+ *   gated by ORB2_API_LOG_LEVEL (default "info").
  * - audit.emit → writes the event to the Store's audit list AND to
  *   stdout (level "audit") so log aggregators capture it even when
  *   Redis is unreachable.
@@ -15,7 +15,7 @@ import type { Store, AuditEvent } from './store/store.js'
 const LEVELS = ['debug', 'info', 'warn', 'error', 'audit'] as const
 type Level = (typeof LEVELS)[number]
 const minLevel: Level =
-  (process.env.RAK00N_API_LOG_LEVEL as Level) || 'info'
+  (process.env.ORB2_API_LOG_LEVEL as Level) || 'info'
 const minIndex = LEVELS.indexOf(minLevel)
 
 function emit(level: Level, msg: string, data?: Record<string, unknown>) {

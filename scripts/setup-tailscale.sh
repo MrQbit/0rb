@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Publish the rak00n console for secure remote access via Tailscale.
+# Publish the orb2 console for secure remote access via Tailscale.
 #
 # Tailscale gives the box a stable private address on your tailnet AND
 # automatic HTTPS (via `tailscale serve`) — which remote VOICE needs, since
-# the browser mic (getUserMedia) only works in a secure context. rak00n's
+# the browser mic (getUserMedia) only works in a secure context. orb2's
 # own username/password still gates everything behind it.
 #
 # Usage:
@@ -14,7 +14,7 @@
 # Run on the Spark host (needs sudo). Re-runnable.
 set -euo pipefail
 
-UI_PORT="${RAK00N_UI_PORT:-9080}"
+UI_PORT="${ORB2_UI_PORT:-9080}"
 AUTH_KEY=""
 FUNNEL=false
 for arg in "$@"; do
@@ -24,7 +24,7 @@ for arg in "$@"; do
   esac
 done
 
-echo "=== rak00n Tailscale publish (UI port ${UI_PORT}) ==="
+echo "=== orb2 Tailscale publish (UI port ${UI_PORT}) ==="
 
 if ! command -v tailscale &>/dev/null; then
   echo "→ Installing Tailscale..."
@@ -59,11 +59,11 @@ HOST_FQDN="$(tailscale status --json 2>/dev/null | grep -oE '"DNSName":[[:space:
 TS_IP="$(tailscale ip -4 2>/dev/null | head -1 || true)"
 
 echo ""
-echo "✓ Done. rak00n console reachable at:"
+echo "✓ Done. orb2 console reachable at:"
 [ -n "$HOST_FQDN" ] && echo "    https://${HOST_FQDN}/        (HTTPS — use this for remote voice + iOS)"
 [ -n "$TS_IP" ]      && echo "    http://${TS_IP}:${UI_PORT}/   (tailnet IP, no HTTPS)"
 echo ""
-echo "  rak00n auth is on — sign in with your console credentials."
-echo "  For HTTPS, set RAK00N_AUTH_COOKIE_SECURE=1 in .env, then:"
-echo "    ./scripts/rak00n-stack.sh up"
-[ "$FUNNEL" = true ] && echo "  ⚠ Funnel exposes this to the public internet (still behind rak00n auth)."
+echo "  orb2 auth is on — sign in with your console credentials."
+echo "  For HTTPS, set ORB2_AUTH_COOKIE_SECURE=1 in .env, then:"
+echo "    ./scripts/orb2-stack.sh up"
+[ "$FUNNEL" = true ] && echo "  ⚠ Funnel exposes this to the public internet (still behind orb2 auth)."

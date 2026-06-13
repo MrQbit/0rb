@@ -52,7 +52,7 @@ export async function runChannelTurn(input: ChannelTurnInput): Promise<string> {
   // WhatsApp, Telegram) actually REMEMBER — previously each turn was
   // stateless because we never loaded/saved history like the HTTP path does.
   const previousMessages = ((await input.store.getSession(input.sessionId).catch(() => null)) ?? []) as any[]
-  const sessionTtl = Number(process.env.RAK00N_API_SESSION_TTL || 604800)
+  const sessionTtl = Number(process.env.ORB2_API_SESSION_TTL || 604800)
 
   // Model router: route this turn to a stronger cloud model by intent when
   // enabled (voice stays local for latency). null → local default.

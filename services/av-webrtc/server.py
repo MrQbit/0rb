@@ -1,19 +1,19 @@
 """
-rak00n WebRTC A/V ingest.
+orb2 WebRTC A/V ingest.
 
 A remote laptop's browser shares its camera + mic over WebRTC; this service
 (aiortc) terminates the peer connection on the Spark, samples video frames
-(~2 fps) into JPEGs, and pushes the latest one to the rak00n API's in-memory
+(~2 fps) into JPEGs, and pushes the latest one to the orb2 API's in-memory
 frame buffer (POST /v1/av/frame). The agent's Vision tool then "sees" it.
 
-Signaling is a single authed POST /offer (the browser sends its rak00n
+Signaling is a single authed POST /offer (the browser sends its orb2
 session token); the same token authorizes the frame pushes, so only the
 signed-in owner's stream reaches the agent.
 
 Env:
-  RAK00N_API_URL      where to push frames (default http://rak00n-api:8080)
-  RAK00N_AV_FPS       frame sample rate (default 2)
-  RAK00N_AV_PORT      listen port (default 8993)
+  ORB2_API_URL      where to push frames (default http://orb2-api:8080)
+  ORB2_AV_FPS       frame sample rate (default 2)
+  ORB2_AV_PORT      listen port (default 8993)
 """
 import asyncio
 import io
@@ -28,9 +28,9 @@ from PIL import Image
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("av-webrtc")
 
-API_URL = os.environ.get("RAK00N_API_URL", "http://rak00n-api:8080").rstrip("/")
-FPS = float(os.environ.get("RAK00N_AV_FPS", "2"))
-PORT = int(os.environ.get("RAK00N_AV_PORT", "8993"))
+API_URL = os.environ.get("ORB2_API_URL", "http://orb2-api:8080").rstrip("/")
+FPS = float(os.environ.get("ORB2_AV_FPS", "2"))
+PORT = int(os.environ.get("ORB2_AV_PORT", "8993"))
 pcs: set[RTCPeerConnection] = set()
 
 

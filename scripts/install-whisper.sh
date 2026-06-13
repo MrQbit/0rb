@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Install the local voice stack: whisper.cpp (STT) + Piper (TTS).
-# Default backend for RAK00N voice (RAK00N_VOICE_BACKEND=whisper).
+# Default backend for ORB2 voice (ORB2_VOICE_BACKEND=whisper).
 #
 # Env:
 #   WHISPER_DIR   install dir for whisper.cpp (default ~/.rakoon/whisper.cpp)
@@ -63,10 +63,10 @@ echo ""
 echo "═════════════════════════════════════════════════════════"
 echo "  Add to your env (EnvironmentFile / configmap / shell):"
 echo "═════════════════════════════════════════════════════════"
-echo "  RAK00N_VOICE_ENABLED=1"
-echo "  RAK00N_VOICE_BACKEND=whisper"
-echo "  RAK00N_WHISPER_BIN=$WHISPER_BIN"
-echo "  RAK00N_WHISPER_MODEL=$WHISPER_MODEL_PATH"
-echo "  RAK00N_PIPER_BIN=$PIPER_BIN"
-echo "  RAK00N_PIPER_MODEL=$VOICE_ONNX"
-echo "  RAK00N_PIPER_SAMPLE_RATE=22050"
+echo "  ORB2_VOICE_ENABLED=1"
+echo "  ORB2_VOICE_BACKEND=whisper"
+echo "  ORB2_WHISPER_BIN=$WHISPER_BIN"
+echo "  ORB2_WHISPER_MODEL=$WHISPER_MODEL_PATH"
+echo "  ORB2_PIPER_BIN=$PIPER_BIN"
+echo "  ORB2_PIPER_MODEL=$VOICE_ONNX"
+echo "  ORB2_PIPER_SAMPLE_RATE=22050"

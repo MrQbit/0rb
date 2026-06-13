@@ -14,7 +14,7 @@
  * even though keys are encrypted — it should NOT be committed to source control.
  * It is listed in .gitignore.
  *
- * The RAK00N_BUILD_SECRET must be the same value that is embedded in the installer
+ * The ORB2_BUILD_SECRET must be the same value that is embedded in the installer
  * binary at build time. Store it in your CI/CD secrets vault.
  */
 
@@ -49,16 +49,16 @@ if (existsSync(installerEnvPath)) {
 
 // ─── Derive encryption key ────────────────────────────────────────────────────
 
-const BUILD_SECRET = process.env.RAK00N_BUILD_SECRET
+const BUILD_SECRET = process.env.ORB2_BUILD_SECRET
 if (!BUILD_SECRET) {
-  console.error('Error: RAK00N_BUILD_SECRET env var is required')
+  console.error('Error: ORB2_BUILD_SECRET env var is required')
   process.exit(1)
 }
 
 // 32-byte key = SHA-256(buildSecret + appSalt)
 // The appSalt is public (in source) — provides domain separation between
-// different RAK00N builds. The buildSecret is the actual secret.
-const APP_SALT = 'rak00n.managed.credentials.v1'
+// different ORB2 builds. The buildSecret is the actual secret.
+const APP_SALT = 'orb2.managed.credentials.v1'
 const encryptionKey = createHash('sha256')
   .update(BUILD_SECRET + APP_SALT)
   .digest()
@@ -76,13 +76,13 @@ interface SlotData {
 const slots: SlotData[] = []
 
 for (const n of [1, 2, 3]) {
-  const apiKey = process.env[`RAK00N_MANAGED_KEY_${n}`]
-  const endpoint = process.env[`RAK00N_MANAGED_ENDPOINT_${n}`]
-  const model = process.env[`RAK00N_MANAGED_MODEL_${n}`]
-  const label = process.env[`RAK00N_MANAGED_LABEL_${n}`]
+  const apiKey = process.env[`ORB2_MANAGED_KEY_${n}`]
+  const endpoint = process.env[`ORB2_MANAGED_ENDPOINT_${n}`]
+  const model = process.env[`ORB2_MANAGED_MODEL_${n}`]
+  const label = process.env[`ORB2_MANAGED_LABEL_${n}`]
 
   if (!apiKey || !endpoint || !model) {
-    console.warn(`Warning: slot ${n} incomplete — skipping (set RAK00N_MANAGED_KEY_${n}, RAK00N_MANAGED_ENDPOINT_${n}, RAK00N_MANAGED_MODEL_${n})`)
+    console.warn(`Warning: slot ${n} incomplete — skipping (set ORB2_MANAGED_KEY_${n}, ORB2_MANAGED_ENDPOINT_${n}, ORB2_MANAGED_MODEL_${n})`)
     continue
   }
 
@@ -91,12 +91,12 @@ for (const n of [1, 2, 3]) {
     apiKey,
     endpoint,
     model,
-    label: label ?? `RAK00N Managed ${n}`,
+    label: label ?? `ORB2 Managed ${n}`,
   })
 }
 
 if (slots.length === 0) {
-  console.error('Error: no complete credential slots found. Provide at least RAK00N_MANAGED_KEY_1, RAK00N_MANAGED_ENDPOINT_1, RAK00N_MANAGED_MODEL_1')
+  console.error('Error: no complete credential slots found. Provide at least ORB2_MANAGED_KEY_1, ORB2_MANAGED_ENDPOINT_1, ORB2_MANAGED_MODEL_1')
   process.exit(1)
 }
 

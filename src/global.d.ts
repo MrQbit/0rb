@@ -35,7 +35,7 @@ declare module 'semver' {
   export = semver
 }
 
-declare module '@anthropic-ai/rak00n-agent-sdk' {
+declare module '@anthropic-ai/orb2-agent-sdk' {
   const sdk: any
   export = sdk
 }

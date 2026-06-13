@@ -8,7 +8,7 @@
 import type { Store } from '../store/store.js'
 import { emitWidget } from '../widgets/bus.js'
 
-/** Local todo shape (was rak00n-core's TodoList). The native TodoWrite tool
+/** Local todo shape (was orb2-core's TodoList). The native TodoWrite tool
  *  produces this; we persist + mirror it to the `todo` widget. */
 export type TodoItem = {
   content: string

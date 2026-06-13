@@ -1,7 +1,7 @@
 {
   "name": "0rb",
   "version": "0.1.25",
-  "description": "0rb — a self-hosted personal AI agent (the rak00n engine) for any LLM: local Ollama/vLLM, OpenAI, Gemini, and 200+ models via OpenRouter",
+  "description": "0rb — a self-hosted personal AI agent (the orb2 engine) for any LLM: local Ollama/vLLM, OpenAI, Gemini, and 200+ models via OpenRouter",
   "type": "module",
   "files": [
     "dist/api.mjs",
@@ -111,10 +111,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/[owner]/rak00n"
+    "url": "https://github.com/[owner]/orb2"
   },
   "keywords": [
-    "rak00n",
+    "orb2",
     "openai",
     "llm",
     "cli",

@@ -19,7 +19,7 @@ export type MintedKey = {
   hash: string
 }
 
-const KEY_PREFIX = 'rak00n_'
+const KEY_PREFIX = 'orb2_'
 const PLAINTEXT_BYTES = 32 // 64 hex chars
 
 export function mintApiKey(): MintedKey {

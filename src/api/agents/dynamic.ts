@@ -2,13 +2,13 @@
  * Dynamic sub-agent definitions registered at runtime via the
  * /v1/agents API surface. Two backing stores are kept in sync:
  *
- *   1. Redis -- rak00n:agent:def:<id>             individual entries
- *               rak00n:agent:def:index             set of known ids
+ *   1. Redis -- orb2:agent:def:<id>             individual entries
+ *               orb2:agent:def:index             set of known ids
  *   2. Filesystem mirror -- <FS_ROOT>/<id>.md   markdown frontmatter,
  *      so an operator inspecting the discovery cache (or an EMU
  *      repo committed back to git) gets a human-readable artifact.
  *
- * When RAK00N_AGENT_FS_ROOT is unset, only Redis is used.
+ * When ORB2_AGENT_FS_ROOT is unset, only Redis is used.
  *
  * Conflict policy: dynamic agents never override built-ins -- the
  * server merges them after the logical-agent list at consumption
@@ -18,8 +18,8 @@ import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from '
 import { join } from 'node:path'
 import type { Store } from '../store/store.js'
 
-const REDIS_INDEX_KEY = 'rak00n:agent:def:index'
-const REDIS_PREFIX = 'rak00n:agent:def:'
+const REDIS_INDEX_KEY = 'orb2:agent:def:index'
+const REDIS_PREFIX = 'orb2:agent:def:'
 
 async function readIndex(store: Store): Promise<string[]> {
   const raw = await store.getKv(REDIS_INDEX_KEY)
@@ -75,7 +75,7 @@ export type DynamicAgentInput = {
 }
 
 function fsRoot(): string | undefined {
-  const v = process.env.RAK00N_AGENT_FS_ROOT
+  const v = process.env.ORB2_AGENT_FS_ROOT
   return v && v.trim().length > 0 ? v.trim() : undefined
 }
 

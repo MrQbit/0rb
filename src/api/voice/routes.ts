@@ -11,9 +11,9 @@ export async function tryHandleVoiceRoute(method: string, pathname: string): Pro
   if (!pathname.startsWith('/v1/voice')) return null
 
   if (method === 'GET' && pathname === '/v1/voice/status') {
-    const voiceEnabled = process.env.RAK00N_VOICE_ENABLED === '1'
+    const voiceEnabled = process.env.ORB2_VOICE_ENABLED === '1'
     if (!voiceEnabled) {
-      return jsonResponse(200, { available: false, reason: 'RAK00N_VOICE_ENABLED not set' })
+      return jsonResponse(200, { available: false, reason: 'ORB2_VOICE_ENABLED not set' })
     }
     const backend = await getVoiceBackend()
     const status = await backend.getStatus()

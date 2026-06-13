@@ -112,7 +112,7 @@ export type AgentRunResult = {
  *
  *   1. Build the tool registry (built-in core tools + extraTools),
  *      filtered by the per-key allow/deny lists.
- *   2. Compose the system prompt from appendSystemPromptExtra (rak00n's
+ *   2. Compose the system prompt from appendSystemPromptExtra (orb2's
  *      persona/context — see agentContext.ts).
  *   3. Run the agent loop, streaming text + tool events out via hooks.
  *   4. Return final text, tokens, and the final message array for resumption.
@@ -141,8 +141,8 @@ export async function runAgentTurn(
     : registry
 
   // --- System prompt ------------------------------------------------------
-  // appendSystemPromptExtra carries rak00n's persona + grounding (date,
-  // Widget guidance, plugin list). On the agent core — which has no rak00n
+  // appendSystemPromptExtra carries orb2's persona + grounding (date,
+  // Widget guidance, plugin list). On the agent core — which has no orb2
   // base prompt of its own — this becomes the full system prompt.
   const systemPrompt = input.appendSystemPromptExtra?.trim() || undefined
 

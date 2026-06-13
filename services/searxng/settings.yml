@@ -1,11 +1,11 @@
-# SearXNG config for rak00n — a private metasearch backend for the WebSearch
+# SearXNG config for orb2 — a private metasearch backend for the WebSearch
 # tool (no API key). Internal only (not published); the agent queries it at
 # http://searxng:8080/search?...&format=json. The secret is injected from the
 # SEARXNG_SECRET env (the image replaces "ultrasecretkey").
 use_default_settings: true
 
 general:
-  instance_name: "rak00n search"
+  instance_name: "orb2 search"
   donation_url: false
   privacypolicy_url: false
 

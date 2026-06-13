@@ -19,8 +19,8 @@ function jsonResponse(status: number, body: unknown): Response {
   })
 }
 
-const STREAM_ABORT_PREFIX = 'rak00n:stream:abort:'
-const WORKER_STATE_PREFIX = 'rak00n:worker:'
+const STREAM_ABORT_PREFIX = 'orb2:stream:abort:'
+const WORKER_STATE_PREFIX = 'orb2:worker:'
 
 export async function markTurnAborted(store: Store, turnId: string): Promise<void> {
   await store.putKv(STREAM_ABORT_PREFIX + turnId, '1', 600)

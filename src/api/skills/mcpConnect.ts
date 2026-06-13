@@ -4,7 +4,7 @@ import { ListToolsResultSchema } from '@modelcontextprotocol/sdk/types.js'
 import type { SkillMcpServer } from './loader.js'
 
 /**
- * Minimal structural MCP connection type (was rak00n-core's MCPServerConnection).
+ * Minimal structural MCP connection type (was orb2-core's MCPServerConnection).
  * Only the fields this module and its callers actually read are modelled.
  */
 export type MCPServerConnection = {
@@ -63,7 +63,7 @@ function createTransport(
       requestInit: {
         headers: {
           ...headers,
-          'User-Agent': 'rak00n-api/skill-mcp',
+          'User-Agent': 'orb2-api/skill-mcp',
         },
       },
     },
@@ -135,7 +135,7 @@ async function connectWithRetry(
   for (let attempt = 0; attempt <= CONNECT_MAX_RETRIES; attempt++) {
     const transport = createTransport(url, headers, serverName, tokenOverride)
     const client = new Client(
-      { name: 'rak00n', version: '0.2.0' },
+      { name: 'orb2', version: '0.2.0' },
       { capabilities: {} },
     )
     try {

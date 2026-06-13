@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────────────────
-# rak00n k3d Teardown
+# orb2 k3d Teardown
 # ──────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
-CLUSTER_NAME="${RAK00N_K3D_CLUSTER:-rak00n-dev}"
+CLUSTER_NAME="${ORB2_K3D_CLUSTER:-orb2-dev}"
 
 echo "→ Uninstalling Helm release..."
-helm uninstall rak00n -n rak00n 2>/dev/null || true
+helm uninstall orb2 -n orb2 2>/dev/null || true
 
 if [ "${1:-}" = "--full" ]; then
   echo "→ Deleting k3d cluster '$CLUSTER_NAME'..."

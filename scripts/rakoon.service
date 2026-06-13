@@ -1,5 +1,5 @@
 [Unit]
-Description=rak00n AI coding agent
+Description=orb2 AI coding agent
 After=network.target
 
 [Service]

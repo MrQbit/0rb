@@ -67,8 +67,8 @@ jobs:
       - name: Upload installer assets to release
         run: |
           gh release upload "${{ github.event.release.tag_name }}" \
-            dist/installers/rak00n-installer-macos \
-            dist/installers/rak00n-installer-windows.exe \
+            dist/installers/orb2-installer-macos \
+            dist/installers/orb2-installer-windows.exe \
             --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -80,17 +80,17 @@ jobs:
           APPEND=$(cat <<EOF
 
           ## Downloads
-          - **macOS**: \`rak00n-installer-macos\`
-          - **Windows**: \`rak00n-installer-windows.exe\`
+          - **macOS**: \`orb2-installer-macos\`
+          - **Windows**: \`orb2-installer-windows.exe\`
 
           ## One-line install (macOS/Linux)
           \`\`\`bash
-          gh release download -R rak00n-ai/rak00n -p "rak00n-installer-macos" -D /tmp --clobber && chmod +x /tmp/rak00n-installer-macos && /tmp/rak00n-installer-macos && rm /tmp/rak00n-installer-macos && source ~/.zshrc
+          gh release download -R orb2-ai/orb2 -p "orb2-installer-macos" -D /tmp --clobber && chmod +x /tmp/orb2-installer-macos && /tmp/orb2-installer-macos && rm /tmp/orb2-installer-macos && source ~/.zshrc
           \`\`\`
 
           ## One-line install (Windows PowerShell)
           \`\`\`powershell
-          gh release download -R rak00n-ai/rak00n -p "rak00n-installer-windows.exe" -D \$env:TEMP --clobber; & "\$env:TEMP\\rak00n-installer-windows.exe"
+          gh release download -R orb2-ai/orb2 -p "orb2-installer-windows.exe" -D \$env:TEMP --clobber; & "\$env:TEMP\\orb2-installer-windows.exe"
           \`\`\`
 
           Build: ${{ steps.sha.outputs.short }}
@@ -135,9 +135,9 @@ jobs:
           file: Dockerfile.grpc
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}/rak00n-grpc:latest
-            ghcr.io/${{ github.repository }}/rak00n-grpc:${{ github.event.release.tag_name }}
-            ghcr.io/${{ github.repository }}/rak00n-grpc:v${{ needs.build-installers.outputs.version }}
-            ghcr.io/${{ github.repository }}/rak00n-grpc:${{ github.sha }}
+            ghcr.io/${{ github.repository }}/orb2-grpc:latest
+            ghcr.io/${{ github.repository }}/orb2-grpc:${{ github.event.release.tag_name }}
+            ghcr.io/${{ github.repository }}/orb2-grpc:v${{ needs.build-installers.outputs.version }}
+            ghcr.io/${{ github.repository }}/orb2-grpc:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

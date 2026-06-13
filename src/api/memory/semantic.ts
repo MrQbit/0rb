@@ -15,10 +15,10 @@ const VEC_PREFIX = 'mem:vec:'
 const TTL_S = 60 * 60 * 24 * 365 // 1y
 
 export function semanticMemoryEnabled(): boolean {
-  return !!process.env.RAK00N_EMBED_URL
+  return !!process.env.ORB2_EMBED_URL
 }
 function embedUrl(): string {
-  return (process.env.RAK00N_EMBED_URL || '').replace(/\/+$/, '')
+  return (process.env.ORB2_EMBED_URL || '').replace(/\/+$/, '')
 }
 
 type Entry = { id: string; text: string; vector: number[]; meta?: Record<string, unknown>; ts: string }
@@ -95,7 +95,7 @@ export async function executeRecall(
   args: { query?: string; k?: number },
   ctx: { store: Store },
 ): Promise<string> {
-  if (!semanticMemoryEnabled()) return 'Semantic memory is not configured (RAK00N_EMBED_URL unset).'
+  if (!semanticMemoryEnabled()) return 'Semantic memory is not configured (ORB2_EMBED_URL unset).'
   const query = (args?.query || '').trim()
   if (!query) return 'Provide a query to recall.'
   let hits: Awaited<ReturnType<typeof searchSemantic>>

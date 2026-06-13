@@ -1,5 +1,5 @@
 /**
- * RAK00N REST API server.
+ * ORB2 REST API server.
  *
  * Routes:
  *   - Public: /healthz, /readyz, /metrics, /openapi.json, /docs (Swagger)
@@ -11,9 +11,9 @@
  *   - Sessions: GET /v1/sessions, GET/DELETE /v1/sessions/{id}
  *   - Audit: GET /v1/audit (admin)
  *
- * Auth model: Bearer `rak00n_*` API keys + an ambient `service`
+ * Auth model: Bearer `orb2_*` API keys + an ambient `service`
  * identity used inside trusted clusters (controlled by
- * `RAK00N_API_AUTH_REQUIRED`).
+ * `ORB2_API_AUTH_REQUIRED`).
  */
 import { randomUUID } from 'node:crypto'
 import { readFileSync, existsSync } from 'node:fs'
@@ -328,7 +328,7 @@ async function handleGithubDeviceStart(
     // depth — the device code itself is sufficient at GitHub's API,
     // but we tie it to the API-key owner so a leaked device code can't
     // be used to bind to another user's session).
-    await ctx.store.putKv(`rak00n:github:device:${code.device_code}`, oid, 900)
+    await ctx.store.putKv(`orb2:github:device:${code.device_code}`, oid, 900)
     return jsonResponse(200, {
       device_code: code.device_code,
       user_code: code.user_code,
@@ -360,7 +360,7 @@ async function handleGithubDevicePoll(
   if (!deviceCode) {
     return jsonResponse(400, { error: 'device_code is required' })
   }
-  const boundOid = await ctx.store.getKv(`rak00n:github:device:${deviceCode}`)
+  const boundOid = await ctx.store.getKv(`orb2:github:device:${deviceCode}`)
   if (!boundOid || boundOid !== oid) {
     return jsonResponse(403, {
       error: 'device_code does not belong to this caller',
@@ -403,7 +403,7 @@ async function handleGithubDevicePoll(
       name: profile?.name,
       email: profile?.email,
     })
-    await ctx.store.delKv(`rak00n:github:device:${deviceCode}`)
+    await ctx.store.delKv(`orb2:github:device:${deviceCode}`)
     return jsonResponse(200, {
       pending: false,
       login,
@@ -486,11 +486,11 @@ export async function startApiServer(config: ApiServerConfig) {
     host: config.host,
     agent: config.agentId,
     redis: process.env.REDIS_URL ? 'on' : 'memory',
-    auth_required: process.env.RAK00N_API_AUTH_REQUIRED === '1',
+    auth_required: process.env.ORB2_API_AUTH_REQUIRED === '1',
   })
 
   const openApiSpec = buildOpenApiSpec({
-    version: process.env.RAK00N_API_VERSION || 'dev',
+    version: process.env.ORB2_API_VERSION || 'dev',
     agentId: config.agentId,
   })
 
@@ -502,7 +502,7 @@ export async function startApiServer(config: ApiServerConfig) {
   const handler = (req: Request) =>
     handleRequest(req, { ...config, store, audit, openApiSpec })
 
-  const maxBodyMb = Number(process.env.RAK00N_API_MAX_BODY_MB ?? 4)
+  const maxBodyMb = Number(process.env.ORB2_API_MAX_BODY_MB ?? 4)
   const voiceWs = voiceWebSocketHandlers(store)
   const server = Bun.serve({
     hostname: config.host,
@@ -518,7 +518,7 @@ export async function startApiServer(config: ApiServerConfig) {
     maxRequestBodySize: Math.max(1, maxBodyMb) * 1024 * 1024,
     fetch(req: Request, srv: { upgrade: (req: Request, opts?: unknown) => boolean }) {
       // Upgrade the voice socket before falling through to HTTP routing.
-      if (process.env.RAK00N_VOICE_ENABLED === '1') {
+      if (process.env.ORB2_VOICE_ENABLED === '1') {
         const reqUrl = new URL(req.url)
         const { pathname } = reqUrl
         if (isVoiceWsRequest(pathname)) {
@@ -596,10 +596,10 @@ export async function startApiServer(config: ApiServerConfig) {
 
       // Boot discovery worker (skills/MCPs/agents from configured EMU
       // repos, allowlisted to the private GitHub org). No-op when
-      // RAK00N_DISCOVERY_PATHS is empty.
+      // ORB2_DISCOVERY_PATHS is empty.
       startDiscoveryWorker()
 
-      // Re-index dynamic agents from the FS mirror (RAK00N_AGENT_FS_ROOT).
+      // Re-index dynamic agents from the FS mirror (ORB2_AGENT_FS_ROOT).
       // No-op when the env var is unset; otherwise re-populates Redis
       // entries that were lost on a fresh data directory.
       reconcileFsAgents(store).catch(err => {
@@ -612,34 +612,34 @@ export async function startApiServer(config: ApiServerConfig) {
       await initKillSwitch(store)
 
       // Phase 6: runtime feature flags. Today only `skills`. Booted
-      // from RAK00N_SKILLS_ENABLED env, runtime override in Redis.
+      // from ORB2_SKILLS_ENABLED env, runtime override in Redis.
       await initFeatureFlags(store)
       log.info('feature_flags_loaded', getAllFeatureFlags())
 
       // Start relay reporter if configured
-      const relayUrl = process.env.RAK00N_RELAY_URL
+      const relayUrl = process.env.ORB2_RELAY_URL
       if (relayUrl) {
         const reporter = initRelayReporter({
           relayUrl,
-          eventSecret: process.env.RAK00N_RELAY_EVENT_SECRET || '',
-          instanceId: process.env.RAK00N_INSTANCE_ID,
+          eventSecret: process.env.ORB2_RELAY_EVENT_SECRET || '',
+          instanceId: process.env.ORB2_INSTANCE_ID,
         })
         // Models may not be probed yet; start with empty, heartbeat will update
         const info: InstanceInfo = {
           instanceId: '',
           agentId: config.agentId,
-          version: process.env.RAK00N_API_VERSION || 'dev',
+          version: process.env.ORB2_API_VERSION || 'dev',
           startedAt: new Date().toISOString(),
           models: [],
-          workerMode: process.env.RAK00N_WORKER_MODE ?? 'in-process',
-          environment: process.env.RAK00N_ENVIRONMENT || 'dev',
+          workerMode: process.env.ORB2_WORKER_MODE ?? 'in-process',
+          environment: process.env.ORB2_ENVIRONMENT || 'dev',
           secretSource: getVaultClient() ? 'vault' : 'redis',
           features: { thinking: true, activity: true, vault: !!getVaultClient(), workers: isWorkerModeEnabled() },
         }
         await reporter.start(store, info)
         log.info('relay_reporter_configured', { relayUrl })
 
-        // Periodic memory digest sync (opt-in via RAK00N_RELAY_MEMORY_SYNC=true)
+        // Periodic memory digest sync (opt-in via ORB2_RELAY_MEMORY_SYNC=true)
         if (reporter.isMemorySyncEnabled()) {
           const collectDigest = async () => {
             try {
@@ -671,7 +671,7 @@ export async function startApiServer(config: ApiServerConfig) {
               : null
             const snap = await buildDashboardSnapshot({
               store,
-              workerMode: process.env.RAK00N_WORKER_MODE ?? 'in-process',
+              workerMode: process.env.ORB2_WORKER_MODE ?? 'in-process',
               defaultModel: process.env.OPENAI_MODEL ?? null,
               workerStats: workerStats as any,
               redisOk: await store.ping().catch(() => false),
@@ -710,7 +710,7 @@ type RuntimeContext = ApiServerConfig & {
 }
 
 function corsHeaders(req: Request): Record<string, string> {
-  const allowed = process.env.RAK00N_CORS_ORIGINS || ''
+  const allowed = process.env.ORB2_CORS_ORIGINS || ''
   if (!allowed) return {}
   const origin = req.headers.get('origin') || ''
   if (!origin) return {}
@@ -785,14 +785,14 @@ function gateForChat(): Response | null {
   if (c.state === 'disabled') {
     return jsonResponse(503, {
       error: `chat surface disabled (source: ${c.source})`,
-      code: 'RAK00N_DISABLED',
+      code: 'ORB2_DISABLED',
       reason: c.reason ?? null,
     })
   }
   if (c.state === 'draining') {
     return jsonResponse(503, {
       error: 'instance is draining; in-flight turns will finish, no new turns accepted',
-      code: 'RAK00N_DRAINING',
+      code: 'ORB2_DRAINING',
       reason: c.reason ?? null,
     })
   }
@@ -839,7 +839,7 @@ async function dispatch(
     const id = pubMatch[1]!
     let sub = pubMatch[2] || '/'
     if (sub === '/' || sub === '') sub = '/index.html'
-    const wsRoot = process.env.RAK00N_API_WORKSPACE_ROOT || '/workspace'
+    const wsRoot = process.env.ORB2_API_WORKSPACE_ROOT || '/workspace'
     const { join, normalize } = await import('node:path')
     const base = normalize(join(wsRoot, '.published', id))
     const filePath = normalize(join(base, sub))
@@ -886,7 +886,7 @@ async function dispatch(
   // bypasses the normal session-auth gate. Runs an agent turn for the sender
   // and returns the reply for the bridge to send back over WhatsApp.
   if (method === 'POST' && pathname === '/v1/channels/whatsapp/inbound') {
-    const secret = process.env.RAK00N_WHATSAPP_BRIDGE_SECRET || ''
+    const secret = process.env.ORB2_WHATSAPP_BRIDGE_SECRET || ''
     if (!secret || req.headers.get('x-bridge-secret') !== secret) {
       return jsonResponse(401, { error: 'bad bridge secret' })
     }
@@ -932,7 +932,7 @@ async function dispatch(
     const workerStats = isWorkerModeEnabled() ? await getWorkerStats(ctx.store).catch(() => null) : null
     const snap = await buildDashboardSnapshot({
       store: ctx.store,
-      workerMode: process.env.RAK00N_WORKER_MODE ?? 'in-process',
+      workerMode: process.env.ORB2_WORKER_MODE ?? 'in-process',
       defaultModel: process.env.OPENAI_MODEL ?? null,
       workerStats: workerStats as any,
       redisOk: await ctx.store.ping().catch(() => false),
@@ -950,14 +950,14 @@ async function dispatch(
     })
   }
   if (method === 'GET' && pathname === '/docs/integration') {
-    // SPA moved to rak00n-ui (https://github.com/rak00n-core-ui).
+    // SPA moved to orb2-ui (https://github.com/orb2-core-ui).
     // Keep the route present so any external link doesn't 404 — it now
     // returns a small redirect hint pointing the operator at the UI host.
     if (ctx.webDir && existsSync(ctx.webDir + '/integration.html')) {
       return serveStatic(ctx.webDir, 'integration.html')
     }
     return new Response(
-      'The integration guide is served by rak00n-ui (open / on the UI host).',
+      'The integration guide is served by orb2-ui (open / on the UI host).',
       { status: 410, headers: { 'content-type': 'text/plain; charset=utf-8' } },
     )
   }
@@ -967,7 +967,7 @@ async function dispatch(
       path.join(process.cwd(), fname),
       path.join(path.dirname(process.argv[1] || ''), fname),
       path.join(path.dirname(process.argv[1] || ''), '..', fname),
-      path.join('/opt/rak00n-api', fname),
+      path.join('/opt/orb2-api', fname),
     ]
     for (const fp of searchPaths) {
       try {
@@ -991,7 +991,7 @@ async function dispatch(
     return jsonResponse(200, buildAgentCard(ctx))
   }
   // SPA used to be served by this process from /, /index.html, and
-  // /web/*. Those routes were moved to a dedicated rak00n-ui nginx pod
+  // /web/*. Those routes were moved to a dedicated orb2-ui nginx pod
   // in v0.3.0. If the operator still mounts a SPA build at
   // ctx.webDir (legacy single-pod mode) we keep serving it so existing
   // deployments don't break; otherwise we return a small JSON hint
@@ -1001,9 +1001,9 @@ async function dispatch(
       return serveStatic(ctx.webDir, 'index.html')
     }
     return jsonResponse(200, {
-      name: 'rak00n-api',
+      name: 'orb2-api',
       message:
-        'The console SPA is served by rak00n-ui (separate pod). This is the API process.',
+        'The console SPA is served by orb2-ui (separate pod). This is the API process.',
       docs: '/docs',
       openapi: '/openapi.json',
       info: '/v1/info',
@@ -1013,7 +1013,7 @@ async function dispatch(
     if (ctx.webDir && existsSync(ctx.webDir + '/' + pathname.slice('/web/'.length))) {
       return serveStatic(ctx.webDir, pathname.slice('/web/'.length))
     }
-    return new Response('SPA moved to rak00n-ui', { status: 410 })
+    return new Response('SPA moved to orb2-ui', { status: 410 })
   }
 
   // ─────────── First-run setup / claim ───────────
@@ -1101,7 +1101,7 @@ async function dispatch(
     if (!isSkillsEnabled() && method !== 'GET') {
       return jsonResponse(503, {
         error: 'skills feature disabled for this deployment',
-        code: 'RAK00N_SKILLS_DISABLED',
+        code: 'ORB2_SKILLS_DISABLED',
       })
     }
     if (method === 'GET') {
@@ -1119,7 +1119,7 @@ async function dispatch(
     if (!isSkillsEnabled()) {
       return jsonResponse(503, {
         error: 'skills feature disabled for this deployment',
-        code: 'RAK00N_SKILLS_DISABLED',
+        code: 'ORB2_SKILLS_DISABLED',
       })
     }
     return await handleCreateSkill(req, ctx)
@@ -1130,7 +1130,7 @@ async function dispatch(
     if (!isSkillsEnabled()) {
       return jsonResponse(503, {
         error: 'skills feature disabled for this deployment',
-        code: 'RAK00N_SKILLS_DISABLED',
+        code: 'ORB2_SKILLS_DISABLED',
       })
     }
     return await handleToggleSkill(skillToggleMatch[1]!, skillToggleMatch[2]! as 'enable' | 'disable', ctx)
@@ -1251,7 +1251,7 @@ async function dispatch(
     if (owner !== 'owner') setFrame('owner', buf)
     return jsonResponse(200, { ok: true, bytes: buf.length })
   }
-  // The persisted memory of what rak00n has seen.
+  // The persisted memory of what orb2 has seen.
   if (method === 'GET' && pathname === '/v1/av/sightings') {
     const owner = attributionFor(identity).oid || 'owner'
     const { recentSightings } = await import('./vision/vision.js')
@@ -1397,7 +1397,7 @@ async function dispatch(
         enabled: false,
         status: 'unconfigured',
         instance_id: null,
-        relay_url: process.env.RAK00N_RELAY_URL || null,
+        relay_url: process.env.ORB2_RELAY_URL || null,
         last_beat_at: null,
         registered_at: null,
         error: null,
@@ -1455,7 +1455,7 @@ async function dispatch(
   if (method === 'GET' && wsMatch) {
     const wsSid = wsMatch[1]!
     const wsPath = (wsMatch[2] || '/index.html').replace(/^\/+/, '')
-    const wsRoot = process.env.RAK00N_API_WORKSPACE_ROOT || '/workspace'
+    const wsRoot = process.env.ORB2_API_WORKSPACE_ROOT || '/workspace'
     const resolved = path.resolve(path.join(wsRoot, wsSid), wsPath)
     if (!resolved.startsWith(path.resolve(wsRoot, wsSid))) {
       return jsonResponse(403, { error: 'Path traversal' })
@@ -1496,7 +1496,7 @@ async function dispatch(
   if (canvasGitMatch) {
     const gitSid = canvasGitMatch[1]!
     const op = canvasGitMatch[2]!
-    const wsRoot = process.env.RAK00N_API_WORKSPACE_ROOT || '/workspace'
+    const wsRoot = process.env.ORB2_API_WORKSPACE_ROOT || '/workspace'
     const cwd = path.resolve(path.join(wsRoot, gitSid))
     if (!cwd.startsWith(path.resolve(wsRoot))) {
       return jsonResponse(403, { error: 'Path traversal' })
@@ -1647,31 +1647,31 @@ function handleStatus(ctx: RuntimeContext): Response {
 }
 
 function handleInfo(ctx: RuntimeContext): Response {
-  const ownerToken = process.env.RAK00N_OWNER_TOKEN?.trim()
+  const ownerToken = process.env.ORB2_OWNER_TOKEN?.trim()
   return jsonResponse(200, {
     agent_id: ctx.agentId,
     instance_id: getRelayReporter()?.getInstanceId() || null,
-    version: process.env.RAK00N_API_VERSION || 'dev',
-    public_url: process.env.RAK00N_PUBLIC_URL || null,
-    auth_required: (process.env.RAK00N_API_AUTH_REQUIRED ?? '0') === '1',
-    single_user: process.env.RAK00N_API_AUTH_REQUIRED !== '1',
+    version: process.env.ORB2_API_VERSION || 'dev',
+    public_url: process.env.ORB2_PUBLIC_URL || null,
+    auth_required: (process.env.ORB2_API_AUTH_REQUIRED ?? '0') === '1',
+    single_user: process.env.ORB2_API_AUTH_REQUIRED !== '1',
     owner_token_hint: ownerToken ? ownerToken.slice(-4) : null,
     llm: {
       endpoint: process.env.OPENAI_BASE_URL ?? null,
       deployment: process.env.OPENAI_MODEL ?? null,
       api_version: process.env.AZURE_OPENAI_API_VERSION ?? null,
     },
-    worker_mode: process.env.RAK00N_WORKER_MODE ?? 'in-process',
-    environment: process.env.RAK00N_ENVIRONMENT || 'dev',
+    worker_mode: process.env.ORB2_WORKER_MODE ?? 'in-process',
+    environment: process.env.ORB2_ENVIRONMENT || 'dev',
     secret_source: getVaultClient() ? 'vault' : 'redis',
-    relay_url: process.env.RAK00N_RELAY_URL || null,
+    relay_url: process.env.ORB2_RELAY_URL || null,
     features: {
       thinking: true,
       activity: true,
       vault: !!getVaultClient(),
       workers: isWorkerModeEnabled(),
       skills: isSkillsEnabled(),
-      canvas: process.env.RAK00N_CANVAS !== 'false',
+      canvas: process.env.ORB2_CANVAS !== 'false',
       canvas_pod: isCanvasModeEnabled(),
     },
     default_mcp_servers: getDefaultMcpServers().map(s => ({
@@ -1690,8 +1690,8 @@ function buildAgentCard(ctx: RuntimeContext): Record<string, unknown> {
     description: t.description,
   }))
   // Build the agent's base URL for the A2A spec `url` field.
-  // RAK00N_A2A_BASE_URL overrides for production; defaults to localhost.
-  const baseUrl = process.env.RAK00N_A2A_BASE_URL
+  // ORB2_A2A_BASE_URL overrides for production; defaults to localhost.
+  const baseUrl = process.env.ORB2_A2A_BASE_URL
     || `http://${ctx.host === '0.0.0.0' ? 'localhost' : ctx.host}:${ctx.port}`
   const agentUrl = `${baseUrl.replace(/\/+$/, '')}/a2a`
 
@@ -1699,8 +1699,8 @@ function buildAgentCard(ctx: RuntimeContext): Record<string, unknown> {
     name: ctx.agentId,
     url: agentUrl,
     description:
-      'RAK00N — general-purpose agentic coding assistant with read/write/edit/grep/run tools.',
-    version: process.env.RAK00N_API_VERSION || 'dev',
+      'ORB2 — general-purpose agentic coding assistant with read/write/edit/grep/run tools.',
+    version: process.env.ORB2_API_VERSION || 'dev',
     capabilities: {
       contentTypes: ['application/json', 'text/plain'],
       messaging: ['http', 'json', 'jsonrpc'],
@@ -2054,7 +2054,7 @@ async function getFoundryModels(): Promise<ModelEntry[]> {
 
 // Kick off probe at import time in Foundry mode
 const _isFoundryMode = ['1', 'true', 'yes', 'on'].includes(
-  (process.env.RAK00N_USE_FOUNDRY ?? '').trim().toLowerCase(),
+  (process.env.ORB2_USE_FOUNDRY ?? '').trim().toLowerCase(),
 )
 if (_isFoundryMode) getFoundryModels()
 
@@ -2271,7 +2271,7 @@ async function handleApproveJob(jobId: string, ctx: RuntimeContext): Promise<Res
     correlationId: job.id,
     messageVersion: '1.0',
     messageTimestamp: new Date().toISOString(),
-    source: 'rak00n-api',
+    source: 'orb2-api',
     body: {
       userId: job.ownerId,
       contextId: job.sessionId,
@@ -2280,7 +2280,7 @@ async function handleApproveJob(jobId: string, ctx: RuntimeContext): Promise<Res
       messageId: randomUUID(),
       agentResponseId: randomUUID(),
       state: 'working',
-      agentId: 'rak00n',
+      agentId: 'orb2',
       timestamp: new Date().toISOString(),
       metadata: { approved: true },
     },
@@ -2386,54 +2386,54 @@ async function handleVaultConsolidateStatus(ctx: RuntimeContext): Promise<Respon
 // (Obsolete keys removed: RabbitMQ/Fabric, PersonaPlex, whisper.cpp/Piper,
 // MCP_SERVER_TOKEN — none apply to the GPU-service voice stack.)
 const SETTINGS_KEYS = [
-  // Voice (STT/TTS run as GPU services; see RAK00N_STT_URL/RAK00N_TTS_URL)
-  'RAK00N_VOICE_ENABLED', 'RAK00N_VOICE_BACKEND', 'RAK00N_TTS_VOICE',
-  'RAK00N_STT_URL', 'RAK00N_TTS_URL',
+  // Voice (STT/TTS run as GPU services; see ORB2_STT_URL/ORB2_TTS_URL)
+  'ORB2_VOICE_ENABLED', 'ORB2_VOICE_BACKEND', 'ORB2_TTS_VOICE',
+  'ORB2_STT_URL', 'ORB2_TTS_URL',
   // Home Assistant — the device backbone (lights/locks/climate/etc.)
-  'RAK00N_HA_URL', 'RAK00N_HA_TOKEN',
+  'ORB2_HA_URL', 'ORB2_HA_TOKEN',
   // Home location — used for the concierge's "nearby stores" search
-  'RAK00N_HOME_LOCATION',
+  'ORB2_HOME_LOCATION',
   // Push (FCM) — proactive nudges to the 0rb apps
-  'RAK00N_FCM_PROJECT_ID', 'RAK00N_FCM_SERVICE_ACCOUNT',
+  'ORB2_FCM_PROJECT_ID', 'ORB2_FCM_SERVICE_ACCOUNT',
   // Access — who may sign in, and how OTP codes are emailed
-  'RAK00N_AUTH_ALLOWED_EMAILS',
-  'RAK00N_SMTP_HOST', 'RAK00N_SMTP_PORT', 'RAK00N_SMTP_USER', 'RAK00N_SMTP_PASS', 'RAK00N_SMTP_FROM',
+  'ORB2_AUTH_ALLOWED_EMAILS',
+  'ORB2_SMTP_HOST', 'ORB2_SMTP_PORT', 'ORB2_SMTP_USER', 'ORB2_SMTP_PASS', 'ORB2_SMTP_FROM',
   // Telegram channel
-  'RAK00N_TELEGRAM_BOT_TOKEN', 'RAK00N_TELEGRAM_OWNER_ID',
+  'ORB2_TELEGRAM_BOT_TOKEN', 'ORB2_TELEGRAM_OWNER_ID',
   // WhatsApp channel
-  'RAK00N_OWNER_PHONE',
+  'ORB2_OWNER_PHONE',
   // Models — the active model (applied to process.env so chat + voice use it)
   // and the HuggingFace token for gated downloads. BASE_URL/API_KEY let the
   // user point the brain at a cloud OpenAI-compatible endpoint if they can't
   // run locally (endpoint/key changes apply on the next api restart).
-  'OPENAI_MODEL', 'OPENAI_BASE_URL', 'OPENAI_API_KEY', 'RAK00N_HF_TOKEN',
+  'OPENAI_MODEL', 'OPENAI_BASE_URL', 'OPENAI_API_KEY', 'ORB2_HF_TOKEN',
   // Model router — default local; route by intent to OpenRouter when enabled.
-  'RAK00N_ROUTER_ENABLED', 'RAK00N_OPENROUTER_KEY', 'RAK00N_ROUTER_STRONG_MODEL',
+  'ORB2_ROUTER_ENABLED', 'ORB2_OPENROUTER_KEY', 'ORB2_ROUTER_STRONG_MODEL',
   // Connected apps (set from Settings → Apps; enable the matching tools live)
-  'RAK00N_YOUTUBE_API_KEY', 'RAK00N_SPOTIFY_CLIENT_ID', 'RAK00N_SPOTIFY_CLIENT_SECRET',
-  'RAK00N_NEWSAPI_KEY', 'RAK00N_VERCEL_TOKEN', 'RAK00N_VERCEL_TEAM_ID',
+  'ORB2_YOUTUBE_API_KEY', 'ORB2_SPOTIFY_CLIENT_ID', 'ORB2_SPOTIFY_CLIENT_SECRET',
+  'ORB2_NEWSAPI_KEY', 'ORB2_VERCEL_TOKEN', 'ORB2_VERCEL_TEAM_ID',
   // Cloud Storage (Google Drive + Microsoft OneDrive) — OAuth client creds
-  'RAK00N_GOOGLE_CLIENT_ID', 'RAK00N_GOOGLE_CLIENT_SECRET',
-  'RAK00N_MS_CLIENT_ID', 'RAK00N_MS_CLIENT_SECRET',
+  'ORB2_GOOGLE_CLIENT_ID', 'ORB2_GOOGLE_CLIENT_SECRET',
+  'ORB2_MS_CLIENT_ID', 'ORB2_MS_CLIENT_SECRET',
   // Apps registry — comma-separated ids of widgets the user turned OFF.
-  'RAK00N_WIDGETS_DISABLED',
+  'ORB2_WIDGETS_DISABLED',
 ] as const
 
 // Keys returned as plaintext (non-secret config). All others are masked.
 const SETTINGS_PLAINTEXT_KEYS = new Set([
-  'RAK00N_VOICE_ENABLED', 'RAK00N_VOICE_BACKEND', 'RAK00N_TTS_VOICE',
-  'RAK00N_STT_URL', 'RAK00N_TTS_URL',
-  'RAK00N_AUTH_ALLOWED_EMAILS',
-  'RAK00N_SMTP_HOST', 'RAK00N_SMTP_PORT', 'RAK00N_SMTP_FROM',
-  'RAK00N_TELEGRAM_OWNER_ID', 'RAK00N_OWNER_PHONE', 'OPENAI_MODEL', 'OPENAI_BASE_URL',
-  'RAK00N_WIDGETS_DISABLED', 'RAK00N_ROUTER_ENABLED', 'RAK00N_ROUTER_STRONG_MODEL',
+  'ORB2_VOICE_ENABLED', 'ORB2_VOICE_BACKEND', 'ORB2_TTS_VOICE',
+  'ORB2_STT_URL', 'ORB2_TTS_URL',
+  'ORB2_AUTH_ALLOWED_EMAILS',
+  'ORB2_SMTP_HOST', 'ORB2_SMTP_PORT', 'ORB2_SMTP_FROM',
+  'ORB2_TELEGRAM_OWNER_ID', 'ORB2_OWNER_PHONE', 'OPENAI_MODEL', 'OPENAI_BASE_URL',
+  'ORB2_WIDGETS_DISABLED', 'ORB2_ROUTER_ENABLED', 'ORB2_ROUTER_STRONG_MODEL',
 ])
 
 // Keys that trigger channel hot-reload when updated (no restart needed).
 const CHANNEL_SETTINGS_KEYS = new Set([
-  'RAK00N_VOICE_ENABLED', 'RAK00N_VOICE_BACKEND', 'RAK00N_TTS_VOICE',
-  'RAK00N_STT_URL', 'RAK00N_TTS_URL',
-  'RAK00N_TELEGRAM_BOT_TOKEN', 'RAK00N_TELEGRAM_OWNER_ID', 'RAK00N_OWNER_PHONE',
+  'ORB2_VOICE_ENABLED', 'ORB2_VOICE_BACKEND', 'ORB2_TTS_VOICE',
+  'ORB2_STT_URL', 'ORB2_TTS_URL',
+  'ORB2_TELEGRAM_BOT_TOKEN', 'ORB2_TELEGRAM_OWNER_ID', 'ORB2_OWNER_PHONE',
 ])
 
 const SETTINGS_KV_PREFIX = 'setting:'
@@ -2757,7 +2757,7 @@ async function handleSpawnWorker(
 ): Promise<Response> {
   if (!isWorkerModeEnabled()) {
     return jsonResponse(503, {
-      error: 'worker mode not enabled (RAK00N_WORKER_MODE=k8s-jobs)',
+      error: 'worker mode not enabled (ORB2_WORKER_MODE=k8s-jobs)',
       code: 'WORKERS_DISABLED',
     })
   }
@@ -2866,8 +2866,8 @@ async function handleListAgents(ctx: RuntimeContext): Promise<Response> {
   const logicalAgents = [
     {
       id: 'default',
-      name: 'RAK00N default agent',
-      description: 'Standard RAK00N agent loop with full tool palette.',
+      name: 'ORB2 default agent',
+      description: 'Standard ORB2 agent loop with full tool palette.',
     },
     {
       id: 'skill-runner',
@@ -3011,7 +3011,7 @@ async function handleToolInvoke(
   }
 
   const sessionId = body.session_id?.trim() || randomUUID()
-  const workspaceRoot = process.env.RAK00N_API_WORKSPACE_ROOT || '/workspace'
+  const workspaceRoot = process.env.ORB2_API_WORKSPACE_ROOT || '/workspace'
   let workingDirectory: string
   try {
     workingDirectory = safeJoinUnderWorkspace(workspaceRoot, body.working_directory, sessionId)
@@ -3201,7 +3201,7 @@ async function handleChat(
       turn_id: body.turn_id,
     })
   }
-  const workspaceRoot = process.env.RAK00N_API_WORKSPACE_ROOT || '/workspace'
+  const workspaceRoot = process.env.ORB2_API_WORKSPACE_ROOT || '/workspace'
   let workingDirectory: string
   try {
     workingDirectory = safeJoinUnderWorkspace(workspaceRoot, body.working_directory, sessionId)
@@ -3228,7 +3228,7 @@ async function handleChat(
   const resolvedModel =
     requestedModel ||
     stickyModel ||
-    process.env.RAK00N_DEFAULT_MODEL ||
+    process.env.ORB2_DEFAULT_MODEL ||
     'claude-sonnet-4-5'
 
   // Cross-user isolation: if the client supplied a session_id that
@@ -3718,7 +3718,7 @@ async function handleChat(
           canvasInfo = await createCanvasPod(ctx.store, sessionId, {
             ...DEFAULT_CANVAS_CONFIG,
             template: canvasTemplate,
-            runtimeClassName: process.env.RAK00N_CANVAS_RUNTIME_CLASS || undefined,
+            runtimeClassName: process.env.ORB2_CANVAS_RUNTIME_CLASS || undefined,
           })
         }
         sse.send('canvas_ready', {

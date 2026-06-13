@@ -1,5 +1,5 @@
 /**
- * REST + SSE API entrypoint for the RAK00N agent.
+ * REST + SSE API entrypoint for the ORB2 agent.
  *
  * Designed to run inside an ART agent pod where the eya-operator has
  * cloned `art-platform-secret` into a per-agent K8s Secret and mounts
@@ -10,12 +10,12 @@
  * operator. We honour those automatically.
  *
  * Local dev / openwopr fallback: when LLM_KEY is unset but
- * RAK00N_TENANT_ID + RAK00N_CLIENT_ID are present, the legacy keyvault →
+ * ORB2_TENANT_ID + ORB2_CLIENT_ID are present, the legacy keyvault →
  * client_credentials → Foundry-route path is taken instead.
  *
  * Auth model: the API trusts its network boundary. Health, metadata,
  * and SPA static routes are anonymous; /v1/* requires a Bearer
- * `rak00n_*` API key when `RAK00N_API_AUTH_REQUIRED=1`. Inside a secure
+ * `orb2_*` API key when `ORB2_API_AUTH_REQUIRED=1`. Inside a secure
  * cluster (default) every /v1/* call is allowed but identified as
  * `service:<agent-id>` for audit attribution.
  *
@@ -37,7 +37,7 @@ if (!(globalThis as any).MACRO) {
     MACRO: {
       VERSION: pkg.version,
       DISPLAY_VERSION: pkg.version,
-      PACKAGE_URL: 'rak00n',
+      PACKAGE_URL: 'orb2',
     },
   })
 }
@@ -50,30 +50,30 @@ async function main() {
   // the RunCode/SubmitJob tools need an out-of-process executor again.
 
   // ─── Optional: keyvault bootstrap (legacy openwopr deployment) ───
-  // When `RAK00N_KEYVAULT_NAME` is set, fetch the Foundry SP creds
+  // When `ORB2_KEYVAULT_NAME` is set, fetch the Foundry SP creds
   // from Key Vault before the credential resolver runs. This keeps
   // the openwopr deployment working without any env changes; ART
-  // deployments don't set RAK00N_KEYVAULT_NAME so the block is skipped.
-  if (process.env.RAK00N_KEYVAULT_NAME) {
+  // deployments don't set ORB2_KEYVAULT_NAME so the block is skipped.
+  if (process.env.ORB2_KEYVAULT_NAME) {
     const { loadKeyVaultSecrets } = await import('../api/foundry/keyvault.js')
     const map: Record<string, string> = {
-      'RAK00N-TENANT-ID': 'RAK00N_TENANT_ID',
-      'RAK00N-CLIENT-ID': 'RAK00N_CLIENT_ID',
-      'RAK00N-CLIENT-SECRET': 'RAK00N_CLIENT_SECRET',
+      'ORB2-TENANT-ID': 'ORB2_TENANT_ID',
+      'ORB2-CLIENT-ID': 'ORB2_CLIENT_ID',
+      'ORB2-CLIENT-SECRET': 'ORB2_CLIENT_SECRET',
     }
-    if (process.env.RAK00N_KEYVAULT_SECRET_MAP) {
+    if (process.env.ORB2_KEYVAULT_SECRET_MAP) {
       for (const k of Object.keys(map)) delete map[k]
-      for (const pair of process.env.RAK00N_KEYVAULT_SECRET_MAP.split(',')) {
+      for (const pair of process.env.ORB2_KEYVAULT_SECRET_MAP.split(',')) {
         const [secret, env] = pair.trim().split(':').map(s => s.trim())
         if (secret && env) map[secret] = env
       }
     }
     const names = Object.keys(map)
     console.log(
-      `[api] Loading ${names.length} secret(s) from keyvault ${process.env.RAK00N_KEYVAULT_NAME}: ${names.join(', ')}`,
+      `[api] Loading ${names.length} secret(s) from keyvault ${process.env.ORB2_KEYVAULT_NAME}: ${names.join(', ')}`,
     )
     const fetched = await loadKeyVaultSecrets(
-      { vaultName: process.env.RAK00N_KEYVAULT_NAME },
+      { vaultName: process.env.ORB2_KEYVAULT_NAME },
       names,
     )
     for (const [secretName, envName] of Object.entries(map)) {
@@ -84,11 +84,11 @@ async function main() {
   }
 
   // ─── Resolve LLM credential ───
-  // When RAK00N_USE_FOUNDRY=1 the @anthropic-ai/foundry-sdk handles auth
+  // When ORB2_USE_FOUNDRY=1 the @anthropic-ai/foundry-sdk handles auth
   // directly via ANTHROPIC_FOUNDRY_API_KEY / ANTHROPIC_FOUNDRY_BASE_URL.
   // Skip the OpenAI-shim credential bootstrap so it doesn't clobber the
-  // provider flag (RAK00N_USE_OPENAI would shadow RAK00N_USE_FOUNDRY).
-  const useFoundry = (process.env.RAK00N_USE_FOUNDRY ?? '').trim().toLowerCase()
+  // provider flag (ORB2_USE_OPENAI would shadow ORB2_USE_FOUNDRY).
+  const useFoundry = (process.env.ORB2_USE_FOUNDRY ?? '').trim().toLowerCase()
   const isFoundry = ['1', 'true', 'yes', 'on'].includes(useFoundry)
 
   if (isFoundry) {
@@ -183,7 +183,7 @@ async function main() {
     process.env.OPENAI_BASE_URL = cred.endpoint
     process.env.OPENAI_MODEL = cred.modelId
     process.env.AZURE_OPENAI_API_VERSION = cred.apiVersion
-    process.env.RAK00N_USE_OPENAI = '1'
+    process.env.ORB2_USE_OPENAI = '1'
 
     // Periodic refresh for sources that need it.
     const refreshMs = source.refreshAfterMs()
@@ -209,8 +209,8 @@ async function main() {
   // ─── Ensure an admin/bootstrap key exists ───
   // Bootstrap admin minting is now done inside startApiServer via
   // bootstrapAdminKey() (auth/bootstrap.ts), seeded from the
-  // RAK00N_BOOTSTRAP_ADMIN_KEY env var (or the deprecated
-  // RAK00N_API_BOOTSTRAP_TOKEN alias). The legacy random-mint path
+  // ORB2_BOOTSTRAP_ADMIN_KEY env var (or the deprecated
+  // ORB2_API_BOOTSTRAP_TOKEN alias). The legacy random-mint path
   // that printed the plaintext key to stdout has been removed.
   await ensureBootstrapAdminKey()
 
@@ -218,11 +218,11 @@ async function main() {
   const { startApiServer } = await import('../api/server.js')
 
   const port = parseInt(
-    process.env.AGENT_PORT || process.env.RAK00N_API_PORT || '8090',
+    process.env.AGENT_PORT || process.env.ORB2_API_PORT || '8090',
     10,
   )
-  const host = process.env.RAK00N_API_HOST || '0.0.0.0'
-  const webDirEnv = process.env.RAK00N_API_WEB_DIR
+  const host = process.env.ORB2_API_HOST || '0.0.0.0'
+  const webDirEnv = process.env.ORB2_API_WEB_DIR
   let webDir: string
   if (webDirEnv) {
     webDir = resolve(process.cwd(), webDirEnv)
@@ -233,7 +233,7 @@ async function main() {
     const inCwd = resolve(process.cwd(), 'web')
     webDir = existsSync(nextToBundle) ? nextToBundle : existsSync(inCwd) ? inCwd : resolve(process.cwd(), 'src', 'web')
   }
-  const agentId = process.env.AGENT_ID || 'rak00n-api'
+  const agentId = process.env.AGENT_ID || 'orb2-api'
 
   // The core's background housekeeping (autoDream/MagicDocs/skillImprovement)
   // was removed in the re-platform. The API-side dream scheduler below covers
@@ -266,11 +266,11 @@ async function main() {
     agentId,
     webDir,
     sessionTtlSeconds: parseInt(
-      process.env.RAK00N_API_SESSION_TTL || '86400',
+      process.env.ORB2_API_SESSION_TTL || '86400',
       10,
     ),
     maxConcurrentStreams: parseInt(
-      process.env.RAK00N_API_MAX_STREAMS || '100',
+      process.env.ORB2_API_MAX_STREAMS || '100',
       10,
     ),
   })
@@ -323,41 +323,41 @@ async function main() {
  * `kubectl logs` to do the very first key-issuance call. Subsequent
  * starts find the existing record and stay quiet.
  *
- * `RAK00N_API_BOOTSTRAP_TOKEN` (optional) lets ops pre-seed the
+ * `ORB2_API_BOOTSTRAP_TOKEN` (optional) lets ops pre-seed the
  * plaintext from a sealed Secret instead of relying on log scraping.
  */
 async function ensureBootstrapAdminKey(): Promise<void> {
-  // Forward the deprecated RAK00N_API_BOOTSTRAP_TOKEN env var into the
-  // canonical RAK00N_BOOTSTRAP_ADMIN_KEY name so existing deployments
+  // Forward the deprecated ORB2_API_BOOTSTRAP_TOKEN env var into the
+  // canonical ORB2_BOOTSTRAP_ADMIN_KEY name so existing deployments
   // keep working. The actual bootstrap (idempotent, no stdout leak,
   // K8s-Secret-backed) runs inside startApiServer via
   // bootstrapAdminKey().
-  const legacy = process.env.RAK00N_API_BOOTSTRAP_TOKEN?.trim()
-  if (legacy && !process.env.RAK00N_BOOTSTRAP_ADMIN_KEY) {
+  const legacy = process.env.ORB2_API_BOOTSTRAP_TOKEN?.trim()
+  if (legacy && !process.env.ORB2_BOOTSTRAP_ADMIN_KEY) {
     console.warn(
-      '[api] RAK00N_API_BOOTSTRAP_TOKEN is deprecated; rename to RAK00N_BOOTSTRAP_ADMIN_KEY',
+      '[api] ORB2_API_BOOTSTRAP_TOKEN is deprecated; rename to ORB2_BOOTSTRAP_ADMIN_KEY',
     )
-    process.env.RAK00N_BOOTSTRAP_ADMIN_KEY = legacy
+    process.env.ORB2_BOOTSTRAP_ADMIN_KEY = legacy
   }
 
-  // Single-user convenience: RAK00N_OWNER_TOKEN doubles as the bootstrap
+  // Single-user convenience: ORB2_OWNER_TOKEN doubles as the bootstrap
   // admin key so the operator only has to set one token.
-  const ownerToken = process.env.RAK00N_OWNER_TOKEN?.trim()
-  if (ownerToken && !process.env.RAK00N_BOOTSTRAP_ADMIN_KEY) {
-    process.env.RAK00N_BOOTSTRAP_ADMIN_KEY = ownerToken
-    console.log('[api] RAK00N_OWNER_TOKEN used as bootstrap admin key')
+  const ownerToken = process.env.ORB2_OWNER_TOKEN?.trim()
+  if (ownerToken && !process.env.ORB2_BOOTSTRAP_ADMIN_KEY) {
+    process.env.ORB2_BOOTSTRAP_ADMIN_KEY = ownerToken
+    console.log('[api] ORB2_OWNER_TOKEN used as bootstrap admin key')
   }
 
-  if (!process.env.RAK00N_BOOTSTRAP_ADMIN_KEY) {
-    if (process.env.RAK00N_API_AUTH_REQUIRED !== '1') {
+  if (!process.env.ORB2_BOOTSTRAP_ADMIN_KEY) {
+    if (process.env.ORB2_API_AUTH_REQUIRED !== '1') {
       console.warn(
-        '[api] No RAK00N_OWNER_TOKEN set. Running without auth locally is fine, ' +
-        'but set RAK00N_OWNER_TOKEN before exposing this instance remotely.',
+        '[api] No ORB2_OWNER_TOKEN set. Running without auth locally is fine, ' +
+        'but set ORB2_OWNER_TOKEN before exposing this instance remotely.',
       )
     } else {
       console.warn(
-        '[api] RAK00N_BOOTSTRAP_ADMIN_KEY not set; the cluster will start with NO admin key. ' +
-        'Set RAK00N_OWNER_TOKEN (or RAK00N_BOOTSTRAP_ADMIN_KEY) on first deploy.',
+        '[api] ORB2_BOOTSTRAP_ADMIN_KEY not set; the cluster will start with NO admin key. ' +
+        'Set ORB2_OWNER_TOKEN (or ORB2_BOOTSTRAP_ADMIN_KEY) on first deploy.',
       )
     }
   }

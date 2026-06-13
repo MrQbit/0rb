@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Install cloudflared and create a named tunnel for rak00n.
+# Install cloudflared and create a named tunnel for orb2.
 # Usage: bash scripts/setup-cloudflare-tunnel.sh [--domain rakoon.yourdomain.com]
 set -euo pipefail
 
 DOMAIN="${1#--domain=}"
 DOMAIN="${DOMAIN:-}"
 
-echo "=== rak00n Cloudflare Tunnel Setup ==="
+echo "=== orb2 Cloudflare Tunnel Setup ==="
 
 # Install cloudflared
 if ! command -v cloudflared &>/dev/null; then
@@ -66,7 +66,7 @@ echo "✓ Tunnel config written to config/cloudflare-tunnel.yml"
 if command -v systemctl &>/dev/null; then
   cat > /etc/systemd/system/rakoon-tunnel.service <<UNIT
 [Unit]
-Description=rak00n Cloudflare Tunnel
+Description=orb2 Cloudflare Tunnel
 After=network.target
 
 [Service]

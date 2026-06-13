@@ -1,0 +1,71 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: orb2
+  namespace: {{ include "orb2.namespace" . }}
+  labels:
+    {{- include "orb2.labels" . | nindent 4 }}
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  rules:
+    - http:
+        paths:
+          # API routes — proxy directly to orb2-api
+          - path: /v1
+            pathType: Prefix
+            backend:
+              service:
+                name: orb2-api
+                port:
+                  number: 8080
+          - path: /a2a
+            pathType: Prefix
+            backend:
+              service:
+                name: orb2-api
+                port:
+                  number: 8080
+          - path: /healthz
+            pathType: Exact
+            backend:
+              service:
+                name: orb2-api
+                port:
+                  number: 8080
+          - path: /readyz
+            pathType: Exact
+            backend:
+              service:
+                name: orb2-api
+                port:
+                  number: 8080
+          - path: /metrics
+            pathType: Exact
+            backend:
+              service:
+                name: orb2-api
+                port:
+                  number: 8080
+          - path: /openapi.json
+            pathType: Exact
+            backend:
+              service:
+                name: orb2-api
+                port:
+                  number: 8080
+          - path: /docs
+            pathType: Prefix
+            backend:
+              service:
+                name: orb2-api
+                port:
+                  number: 8080
+          # UI — catch-all SPA
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: orb2-ui
+                port:
+                  number: 80

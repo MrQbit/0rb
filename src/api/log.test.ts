@@ -4,7 +4,7 @@ import { redactHeaders, SENSITIVE_HEADERS } from './log.ts'
 describe('redactHeaders', () => {
   test('redacts Authorization, Cookie, X-API-Key', () => {
     const h = new Headers()
-    h.set('Authorization', 'Bearer rak00n_secret')
+    h.set('Authorization', 'Bearer orb2_secret')
     h.set('Cookie', 'session=xxxx')
     h.set('X-API-Key', 'key123')
     h.set('Content-Type', 'application/json')
@@ -39,8 +39,8 @@ describe('redactHeaders', () => {
   })
 
   test('no plaintext token from Authorization survives in serialization', () => {
-    const r = redactHeaders({ Authorization: 'Bearer rak00n_aaaaaaaa' })
+    const r = redactHeaders({ Authorization: 'Bearer orb2_aaaaaaaa' })
     const json = JSON.stringify(r)
-    expect(json).not.toContain('rak00n_aaaaaaaa')
+    expect(json).not.toContain('orb2_aaaaaaaa')
   })
 })

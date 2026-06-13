@@ -2,13 +2,13 @@
  * First-run setup / claim.
  *
  * A freshly-booted 0rb on the LAN must not be operable by whoever connects
- * first. When setup is required (RAK00N_SETUP_REQUIRED=1, the shipped default)
+ * first. When setup is required (ORB2_SETUP_REQUIRED=1, the shipped default)
  * and no owner credentials exist yet, the instance is *unclaimed*: every /v1
  * route is locked (423) except this one, and the operator claims it with a
  * one-time **setup code** printed to the host console at boot.
  *
  * Claiming sets the owner username/password, logs them in, and unlocks the box.
- * After that, normal auth applies. In dev (RAK00N_SETUP_REQUIRED unset) nothing
+ * After that, normal auth applies. In dev (ORB2_SETUP_REQUIRED unset) nothing
  * changes.
  *
  *   GET  /v1/setup/status            → { claimed, needs_setup }
@@ -29,7 +29,7 @@ async function readJson(req: Request): Promise<any> { try { return await req.jso
 
 /** Setup is enforced only when explicitly required (shipped product default). */
 export function setupRequired(): boolean {
-  return process.env.RAK00N_SETUP_REQUIRED === '1'
+  return process.env.ORB2_SETUP_REQUIRED === '1'
 }
 
 /** The instance is claimed once owner credentials exist. */
@@ -53,7 +53,7 @@ let setupCode: string | null = null
 export function getSetupCode(): string {
   if (!setupCode) {
     // Allow ops to pin it (kiosk provisioning); else generate a friendly code.
-    setupCode = (process.env.RAK00N_SETUP_CODE || '').trim() ||
+    setupCode = (process.env.ORB2_SETUP_CODE || '').trim() ||
       Array.from({ length: 8 }, () => 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 31)]).join('')
   }
   return setupCode
@@ -118,12 +118,12 @@ export async function tryHandleSetupRoute(
     const token = String(body?.token || '').trim()
     if (!url || !token) return jsonResponse(400, { error: 'Home Assistant url and token are required' })
     // Apply for this process + test the connection.
-    process.env.RAK00N_HA_URL = url
-    process.env.RAK00N_HA_TOKEN = token
+    process.env.ORB2_HA_URL = url
+    process.env.ORB2_HA_TOKEN = token
     try {
       const devices = await haStates()
-      await persistSetting(store, 'RAK00N_HA_URL', url)
-      await persistSetting(store, 'RAK00N_HA_TOKEN', token)
+      await persistSetting(store, 'ORB2_HA_URL', url)
+      await persistSetting(store, 'ORB2_HA_TOKEN', token)
       log.info('setup_home_connected', { devices: devices.length })
       return jsonResponse(200, { ok: true, devices: devices.length })
     } catch (e) {
@@ -137,7 +137,7 @@ export async function tryHandleSetupRoute(
     if (!address) return jsonResponse(400, { error: 'address required' })
     const geo = await geocode(address)
     if (!geo) return jsonResponse(404, { error: `Couldn't locate "${address}"` })
-    await persistSetting(store, 'RAK00N_HOME_LOCATION', address)
+    await persistSetting(store, 'ORB2_HOME_LOCATION', address)
     return jsonResponse(200, { ok: true, resolved: geo.name, lat: geo.lat, lng: geo.lng })
   }
 

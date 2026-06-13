@@ -4,8 +4,8 @@ import { spawnSync } from 'child_process'
 
 const ROOT = resolve(new URL('..', import.meta.url).pathname)
 const DIST_DIR = join(ROOT, 'dist', 'installers')
-const ENV_FILE = process.env.RAK00N_INSTALLER_ENV_FILE
-  ? resolve(process.env.RAK00N_INSTALLER_ENV_FILE)
+const ENV_FILE = process.env.ORB2_INSTALLER_ENV_FILE
+  ? resolve(process.env.ORB2_INSTALLER_ENV_FILE)
   : join(ROOT, 'installer', 'managed-endpoints.env')
 
 function fail(message: string): never {
@@ -88,12 +88,12 @@ function main(): void {
     process.env[key] ??= value
   }
 
-  const buildSecret = process.env.RAK00N_BUILD_SECRET?.trim() ?? ''
+  const buildSecret = process.env.ORB2_BUILD_SECRET?.trim() ?? ''
   const hasCredentials = !!(
     buildSecret &&
-    process.env.RAK00N_MANAGED_KEY_1?.trim() &&
-    process.env.RAK00N_MANAGED_ENDPOINT_1?.trim() &&
-    process.env.RAK00N_MANAGED_MODEL_1?.trim()
+    process.env.ORB2_MANAGED_KEY_1?.trim() &&
+    process.env.ORB2_MANAGED_ENDPOINT_1?.trim() &&
+    process.env.ORB2_MANAGED_MODEL_1?.trim()
   )
 
   if (!hasCredentials) {
@@ -118,12 +118,12 @@ function main(): void {
 
   mkdirSync(DIST_DIR, { recursive: true })
 
-  const macTarget = process.env.RAK00N_INSTALLER_MAC_TARGET ?? 'bun-darwin-arm64'
-  const winTarget = process.env.RAK00N_INSTALLER_WINDOWS_TARGET ?? 'bun-windows-x64'
+  const macTarget = process.env.ORB2_INSTALLER_MAC_TARGET ?? 'bun-darwin-arm64'
+  const winTarget = process.env.ORB2_INSTALLER_WINDOWS_TARGET ?? 'bun-windows-x64'
 
   const defineSecret = buildSecret
-    ? `RAK00N_BUILD_SECRET_DEFINE=${JSON.stringify(buildSecret)}`
-    : `RAK00N_BUILD_SECRET_DEFINE=${JSON.stringify('')}`
+    ? `ORB2_BUILD_SECRET_DEFINE=${JSON.stringify(buildSecret)}`
+    : `ORB2_BUILD_SECRET_DEFINE=${JSON.stringify('')}`
 
   run('bun', [
     'build',
@@ -134,7 +134,7 @@ function main(): void {
     defineSecret,
     'installer/index.ts',
     '--outfile',
-    'dist/installers/rak00n-installer-macos',
+    'dist/installers/orb2-installer-macos',
   ])
 
   run('bun', [
@@ -146,14 +146,14 @@ function main(): void {
     defineSecret,
     'installer/index.ts',
     '--outfile',
-    'dist/installers/rak00n-installer-windows.exe',
+    'dist/installers/orb2-installer-windows.exe',
   ])
 
   // Re-sign macOS binary — Bun's --compile produces a malformed Mach-O
   // signature that macOS Gatekeeper rejects. Strip it and ad-hoc sign so
   // the binary runs without manual codesign intervention.
   if (process.platform === 'darwin') {
-    const macBinary = join(DIST_DIR, 'rak00n-installer-macos')
+    const macBinary = join(DIST_DIR, 'orb2-installer-macos')
     run('codesign', ['--remove-signature', macBinary])
     run('codesign', ['--force', '--sign', '-', macBinary])
     console.log('✓ macOS binary re-signed (ad-hoc)')
@@ -161,8 +161,8 @@ function main(): void {
 
   console.log('')
   console.log('✓ Installers built:')
-  console.log('  - dist/installers/rak00n-installer-macos')
-  console.log('  - dist/installers/rak00n-installer-windows.exe')
+  console.log('  - dist/installers/orb2-installer-macos')
+  console.log('  - dist/installers/orb2-installer-windows.exe')
 }
 
 main()

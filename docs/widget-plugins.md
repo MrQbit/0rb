@@ -5,10 +5,10 @@ into the widgets directory and it appears in Settings → Apps and renders when 
 `Widget` of its `type` is emitted (by you or the agent).
 
 ## Where
-- **Spark / self-hosted:** `<workspace>/.widgets/` (the `RAK00N_API_WORKSPACE_ROOT`
+- **Spark / self-hosted:** `<workspace>/.widgets/` (the `ORB2_API_WORKSPACE_ROOT`
   volume; `/workspace/.widgets` by default).
 - **Desktop install:** under the app's user-data folder.
-- Override anywhere with `RAK00N_WIDGETS_DIR`.
+- Override anywhere with `ORB2_WIDGETS_DIR`.
 
 ## Shape
 ```

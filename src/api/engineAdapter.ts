@@ -92,7 +92,7 @@ export async function runCleanTurn(input: RunCleanInput): Promise<RunCleanResult
     const streaming = input.stream ?? !!input.onText
     const settings = {
       stream: streaming,
-      maxContextTokens: Number(process.env.RAK00N_MAX_CONTEXT_TOKENS || 120000),
+      maxContextTokens: Number(process.env.ORB2_MAX_CONTEXT_TOKENS || 120000),
       maxTurns: input.maxTurns ?? 24,
       systemPromptOverride: input.systemPrompt,
     }

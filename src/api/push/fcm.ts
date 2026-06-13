@@ -7,8 +7,8 @@
  * through FCM too (Firebase fronts APNs), so one path serves both.
  *
  * Config (off until set):
- *   RAK00N_FCM_PROJECT_ID         Firebase project id
- *   RAK00N_FCM_SERVICE_ACCOUNT    service-account JSON (inline) or a file path
+ *   ORB2_FCM_PROJECT_ID         Firebase project id
+ *   ORB2_FCM_SERVICE_ACCOUNT    service-account JSON (inline) or a file path
  *
  * Tokens live in the store under push:fcm_tokens. Best-effort throughout —
  * never throws into the caller (the proactive watcher).
@@ -20,7 +20,7 @@ const TOKENS_KEY = 'push:fcm_tokens'
 const SCOPE = 'https://www.googleapis.com/auth/firebase.messaging'
 
 export function pushEnabled(): boolean {
-  return !!(process.env.RAK00N_FCM_PROJECT_ID && process.env.RAK00N_FCM_SERVICE_ACCOUNT)
+  return !!(process.env.ORB2_FCM_PROJECT_ID && process.env.ORB2_FCM_SERVICE_ACCOUNT)
 }
 
 // ─────────────────────────── token registry ───────────────────────────
@@ -55,7 +55,7 @@ async function accessToken(): Promise<string | null> {
   if (cachedToken && cachedToken.exp > Date.now() + 60_000) return cachedToken.value
   try {
     const { GoogleAuth } = await import('google-auth-library')
-    const sa = (process.env.RAK00N_FCM_SERVICE_ACCOUNT || '').trim()
+    const sa = (process.env.ORB2_FCM_SERVICE_ACCOUNT || '').trim()
     const credentials = sa.startsWith('{') ? JSON.parse(sa) : undefined
     const auth = new GoogleAuth({
       ...(credentials ? { credentials } : { keyFile: sa }),
@@ -82,7 +82,7 @@ export async function sendPush(store: Store, title: string, body: string, data: 
   if (!tokens.length) return
   const bearer = await accessToken()
   if (!bearer) return
-  const project = process.env.RAK00N_FCM_PROJECT_ID
+  const project = process.env.ORB2_FCM_PROJECT_ID
   const url = `https://fcm.googleapis.com/v1/projects/${project}/messages:send`
   const dead: string[] = []
   for (const token of tokens) {

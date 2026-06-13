@@ -7,11 +7,11 @@
  * debounced so you get one nudge per situation, cleared when it's resolved.
  *
  * Config:
- *   RAK00N_HOME_PROACTIVE        '0' to disable (default on when HA configured)
- *   RAK00N_HOME_WATCH_SECONDS    poll interval (default 60)
- *   RAK00N_HOME_OPEN_ALERT_MIN   minutes open/unlocked before a nudge (default 10)
+ *   ORB2_HOME_PROACTIVE        '0' to disable (default on when HA configured)
+ *   ORB2_HOME_WATCH_SECONDS    poll interval (default 60)
+ *   ORB2_HOME_OPEN_ALERT_MIN   minutes open/unlocked before a nudge (default 10)
  *
- * Notifications go to Telegram (RAK00N_TELEGRAM_BOT_TOKEN + _OWNER_ID) when set;
+ * Notifications go to Telegram (ORB2_TELEGRAM_BOT_TOKEN + _OWNER_ID) when set;
  * otherwise they're logged (and surface in the audit trail).
  */
 import { haEnabled, haStates, type HaEntity } from '../connectors/homeAssistant.js'
@@ -28,13 +28,13 @@ const since = new Map<string, number>()
 const alerted = new Set<string>()
 
 function enabled(): boolean {
-  return haEnabled() && process.env.RAK00N_HOME_PROACTIVE !== '0'
+  return haEnabled() && process.env.ORB2_HOME_PROACTIVE !== '0'
 }
 function intervalMs(): number {
-  return Math.max(10, Number(process.env.RAK00N_HOME_WATCH_SECONDS || 60)) * 1000
+  return Math.max(10, Number(process.env.ORB2_HOME_WATCH_SECONDS || 60)) * 1000
 }
 function thresholdMs(): number {
-  return Math.max(0, Number(process.env.RAK00N_HOME_OPEN_ALERT_MIN ?? 10)) * 60_000
+  return Math.max(0, Number(process.env.ORB2_HOME_OPEN_ALERT_MIN ?? 10)) * 60_000
 }
 
 /** Is this entity in a state Orb should keep an eye on? Returns a label or null. */
@@ -65,8 +65,8 @@ async function notifyOwner(text: string): Promise<void> {
   }
 
   // Telegram, if configured.
-  const token = process.env.RAK00N_TELEGRAM_BOT_TOKEN
-  const chatId = process.env.RAK00N_TELEGRAM_OWNER_ID
+  const token = process.env.ORB2_TELEGRAM_BOT_TOKEN
+  const chatId = process.env.ORB2_TELEGRAM_OWNER_ID
   if (token && chatId) {
     try {
       await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {

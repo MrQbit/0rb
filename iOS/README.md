@@ -1,6 +1,6 @@
-# rak00n — iOS app
+# orb2 — iOS app
 
-A native SwiftUI client for your rak00n agent, with the same NVIDIA-green
+A native SwiftUI client for your orb2 agent, with the same NVIDIA-green
 identity, sign-in, streaming chat, and **voice** (the audio-reactive orb,
 mic streaming, and spoken replies) as the web console.
 
@@ -12,13 +12,13 @@ streaming chat (`/v1/chat/stream`), and the voice WebSocket
 
 This folder is plain Swift source so you can drop it into a fresh project:
 
-1. Xcode → **New → Project → iOS → App**. Product name **Rak00n**,
+1. Xcode → **New → Project → iOS → App**. Product name **Orb2**,
    Interface **SwiftUI**, Language **Swift**. (Or open this `iOS/` folder
    and add a target.)
-2. Delete the generated `ContentView.swift`, then **drag the `Rak00n/`
+2. Delete the generated `ContentView.swift`, then **drag the `Orb2/`
    folder's `.swift` files** into the project (check "Copy items if needed").
 3. In the target's **Info** tab add:
-   - `NSMicrophoneUsageDescription` = "rak00n uses the microphone for voice."
+   - `NSMicrophoneUsageDescription` = "orb2 uses the microphone for voice."
    - (If pointing at an `http://` server) **App Transport Security** →
      allow arbitrary loads, or better: use the Tailscale **https** URL.
 4. Set the deployment target to **iOS 16+**.
@@ -33,7 +33,7 @@ your Tailscale HTTPS address `https://<machine>.<tailnet>.ts.net`
 your LAN. It's remembered. Then sign in with your console credentials.
 
 ## Files
-- `Rak00nApp.swift` — entry point + app state
+- `Orb2App.swift` — entry point + app state
 - `Theme.swift` — colors / identity
 - `AppConfig.swift` — server URL persistence
 - `APIClient.swift` — auth + streaming chat

@@ -171,14 +171,14 @@ export async function handleA2aRpc(
  *   2. JSON-RPC `params.metadata.bearerToken` (BFF also embeds it
  *      here as a structural fallback for service-key deployments).
  *
- * `rak00n_*` prefixed keys are Rak00n API keys, never user bearers, so
+ * `orb2_*` prefixed keys are Orb2 API keys, never user bearers, so
  * they are filtered out.
  */
 function extractUserBearer(req: Request, rpc: JsonRpcRequest): string | undefined {
   const authHeader = req.headers.get('Authorization') ?? ''
   if (/^Bearer\s+/i.test(authHeader)) {
     const t = authHeader.replace(/^Bearer\s+/i, '').trim()
-    if (t && !/^rak00n_/i.test(t)) return t
+    if (t && !/^orb2_/i.test(t)) return t
   }
   const meta = (rpc.params as Record<string, unknown> | undefined)?.metadata as
     | Record<string, unknown>
@@ -303,7 +303,7 @@ async function handleMessageStream(
   const taskId = (params.id as string) || randomUUID()
   const sessionId = (params.sessionId as string) || randomUUID()
   const model = params.model as string | undefined
-  const workspaceRoot = process.env.RAK00N_API_WORKSPACE_ROOT || '/workspace'
+  const workspaceRoot = process.env.ORB2_API_WORKSPACE_ROOT || '/workspace'
   const workingDirectory = path.join(workspaceRoot, sessionId)
   ensureDir(workingDirectory)
 
@@ -524,7 +524,7 @@ async function handleTasksSend(
   const taskId = (params.id as string) || randomUUID()
   const sessionId = (params.sessionId as string) || randomUUID()
   const model = params.model as string | undefined
-  const workspaceRoot = process.env.RAK00N_API_WORKSPACE_ROOT || '/workspace'
+  const workspaceRoot = process.env.ORB2_API_WORKSPACE_ROOT || '/workspace'
   const workingDirectory = path.join(workspaceRoot, sessionId)
   ensureDir(workingDirectory)
 
@@ -645,7 +645,7 @@ async function handleTasksSendSubscribe(
   const taskId = (params.id as string) || randomUUID()
   const sessionId = (params.sessionId as string) || randomUUID()
   const model = params.model as string | undefined
-  const workspaceRoot = process.env.RAK00N_API_WORKSPACE_ROOT || '/workspace'
+  const workspaceRoot = process.env.ORB2_API_WORKSPACE_ROOT || '/workspace'
   const workingDirectory = path.join(workspaceRoot, sessionId)
   ensureDir(workingDirectory)
 

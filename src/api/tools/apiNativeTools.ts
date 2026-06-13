@@ -99,13 +99,13 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
   const defs = [
     {
       name: 'ClusterOps',
-      description: 'Control the Kubernetes cluster rak00n runs inside: list pods/jobs/deployments, read pod logs, delete a pod/job, scale a deployment, check rollout status. Use for orchestrating worker jobs and canvas pods, and diagnosing cluster state.',
+      description: 'Control the Kubernetes cluster orb2 runs inside: list pods/jobs/deployments, read pod logs, delete a pod/job, scale a deployment, check rollout status. Use for orchestrating worker jobs and canvas pods, and diagnosing cluster state.',
       input_schema: {
         type: 'object',
         properties: {
           op: { type: 'string', enum: ['list_pods', 'list_jobs', 'list_deployments', 'pod_logs', 'delete_pod', 'delete_job', 'scale', 'rollout_status'] },
           name: { type: 'string', description: 'Resource name (pod/job/deployment) for ops that target one' },
-          namespace: { type: 'string', description: 'Namespace (defaults to rak00n\'s own)' },
+          namespace: { type: 'string', description: 'Namespace (defaults to orb2\'s own)' },
           replicas: { type: 'number', description: 'Replica count for the "scale" op' },
           tail_lines: { type: 'number', description: 'Log tail line count for pod_logs (default 200)' },
         },
@@ -115,7 +115,7 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
     },
     {
       name: 'DockerOps',
-      description: 'Control Docker on the host (DGX Spark): list/inspect/restart/stop/start containers. Requires the host docker socket; disabled unless RAK00N_DOCKER_OPS_ENABLED=1.',
+      description: 'Control Docker on the host (DGX Spark): list/inspect/restart/stop/start containers. Requires the host docker socket; disabled unless ORB2_DOCKER_OPS_ENABLED=1.',
       input_schema: {
         type: 'object',
         properties: {
@@ -258,11 +258,11 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
         title: { type: 'string' },
         id: { type: 'string', description: 'Reuse the same id to update the same model widget as you iterate.' },
       }, required: ['script'] },
-      available: !!process.env.RAK00N_BLENDER_URL,
+      available: !!process.env.ORB2_BLENDER_URL,
     },
     {
       name: 'Publish',
-      description: "Publish the CURRENT Canvas app to a public shareable link that anyone can open WITHOUT a rak00n account. Workflow: first build the page with the Canvas tool (assemble the charts/content the user wants to share into one self-contained HTML app), then call Publish. Returns the public URL. Use when the user asks to share/publish/send a page or report to someone.",
+      description: "Publish the CURRENT Canvas app to a public shareable link that anyone can open WITHOUT a orb2 account. Workflow: first build the page with the Canvas tool (assemble the charts/content the user wants to share into one self-contained HTML app), then call Publish. Returns the public URL. Use when the user asks to share/publish/send a page or report to someone.",
       input_schema: { type: 'object', properties: { title: { type: 'string', description: 'A title for the published page.' } } },
       available: true,
     },
@@ -304,13 +304,13 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
     },
     {
       name: 'SelfUpdate',
-      description: 'Update rak00n\'s own running code: patch the Deployment to a new container image and watch the blue-green rollout to completion. Build and import the image FIRST (via Bash/sandbox), then call this with the image ref. With 2+ replicas the agent stays reachable throughout.',
+      description: 'Update orb2\'s own running code: patch the Deployment to a new container image and watch the blue-green rollout to completion. Build and import the image FIRST (via Bash/sandbox), then call this with the image ref. With 2+ replicas the agent stays reachable throughout.',
       input_schema: {
         type: 'object',
         properties: {
-          image: { type: 'string', description: 'New container image ref, e.g. rak00n-api:dev-2' },
-          deployment: { type: 'string', description: 'Deployment name (default rak00n-api)' },
-          container: { type: 'string', description: 'Container name (default rak00n-api)' },
+          image: { type: 'string', description: 'New container image ref, e.g. orb2-api:dev-2' },
+          deployment: { type: 'string', description: 'Deployment name (default orb2-api)' },
+          container: { type: 'string', description: 'Container name (default orb2-api)' },
           timeout_s: { type: 'number', description: 'Max seconds to wait for rollout (default 180)' },
         },
         required: ['image'],
@@ -319,7 +319,7 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
     },
     {
       name: 'SelfBuild',
-      description: 'Full self-update build loop: build a new container image from rak00n\'s own (already-edited, already-tested) source, import it into the k3d cluster, then roll it out via blue-green SelfUpdate. Edit + test your source FIRST. Requires host docker (RAK00N_DOCKER_OPS_ENABLED=1). Set build_only:true to build+import without rolling out.',
+      description: 'Full self-update build loop: build a new container image from orb2\'s own (already-edited, already-tested) source, import it into the k3d cluster, then roll it out via blue-green SelfUpdate. Edit + test your source FIRST. Requires host docker (ORB2_DOCKER_OPS_ENABLED=1). Set build_only:true to build+import without rolling out.',
       input_schema: {
         type: 'object',
         properties: {
@@ -451,7 +451,7 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
       try {
         const { mkdir, writeFile } = await import('node:fs/promises')
         const { join } = await import('node:path')
-        const wsRoot = process.env.RAK00N_API_WORKSPACE_ROOT || '/workspace'
+        const wsRoot = process.env.ORB2_API_WORKSPACE_ROOT || '/workspace'
         const dir = join(wsRoot, ctx.sessionId, '.widget')
         await mkdir(dir, { recursive: true })
         await writeFile(join(dir, `${id}.html`), args.html)
@@ -508,7 +508,7 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
         label = `${hits[0].title} — ${hits[0].artist}`
       }
       const r = await spotifyApi(ctx.store, '/me/player/play', { method: 'PUT', body: JSON.stringify(uri ? { uris: [uri] } : {}) })
-      if (r.status === 404) return `Showing "${label}". Open Spotify (or the rak00n player) so there's an active device, then I can start it.`
+      if (r.status === 404) return `Showing "${label}". Open Spotify (or the orb2 player) so there's an active device, then I can start it.`
       if (!r.ok && r.status !== 204) return `Spotify play returned ${r.status}. ${label ? `Showing "${label}".` : ''}`
       return `Playing${label ? ` "${label}"` : ''} on your Spotify.`
     } catch (e) { return `[ERROR] ${(e as Error).message}` }
@@ -524,7 +524,7 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
       else if (action === 'previous') r = await spotifyApi(ctx.store, '/me/player/previous', { method: 'POST' })
       else if (action === 'volume') r = await spotifyApi(ctx.store, `/me/player/volume?volume_percent=${Math.max(0, Math.min(100, Number(args?.volume) || 50))}`, { method: 'PUT' })
       else return `Unknown action "${action}".`
-      if (r.status === 404) return 'No active Spotify device — open Spotify or the rak00n player first.'
+      if (r.status === 404) return 'No active Spotify device — open Spotify or the orb2 player first.'
       return `Done (${action}).`
     } catch (e) { return `[ERROR] ${(e as Error).message}` }
   })
@@ -629,10 +629,10 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
     const script = String(args?.script || '').trim()
     if (!script) return 'Provide a Blender Python (bpy) script that builds the scene.'
     const id = (typeof args?.id === 'string' && args.id.trim()) ? args.id.trim() : 'model-main'
-    const wsRoot = process.env.RAK00N_API_WORKSPACE_ROOT || '/workspace'
+    const wsRoot = process.env.ORB2_API_WORKSPACE_ROOT || '/workspace'
     const out = `${wsRoot}/${ctx.sessionId}/.widget/${id}.glb`
     try {
-      const base = (process.env.RAK00N_BLENDER_URL || 'http://blender:8996').replace(/\/+$/, '')
+      const base = (process.env.ORB2_BLENDER_URL || 'http://blender:8996').replace(/\/+$/, '')
       const r = await fetch(`${base}/run`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ script, out }) })
       const d = (await r.json()) as any
       if (!d.ok) return `[ERROR] Blender failed: ${String(d.stderr || d.error || 'unknown').slice(-700)}`
@@ -644,7 +644,7 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
     try {
       const { mkdir, readdir, copyFile, stat } = await import('node:fs/promises')
       const { join } = await import('node:path')
-      const wsRoot = process.env.RAK00N_API_WORKSPACE_ROOT || '/workspace'
+      const wsRoot = process.env.ORB2_API_WORKSPACE_ROOT || '/workspace'
       const src = join(wsRoot, ctx.sessionId, '.canvas')
       let entries: string[]
       try { entries = await readdir(src) } catch { return '[ERROR] Nothing to publish — build the page with the Canvas tool first, then call Publish.' }
@@ -663,7 +663,7 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
         }
         await walk(src, '')
         try {
-          const url = await deployToVercel(files, `rak00n-${args?.title || 'share'}`)
+          const url = await deployToVercel(files, `orb2-${args?.title || 'share'}`)
           return `Published to Vercel (public, no login): ${url}`
         } catch (e) { /* fall back to internal publish below */ void e }
       }
@@ -678,8 +678,8 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
         }
       }
       await cp(src, dst)
-      await ctx.store.putKv(`published:${id}`, JSON.stringify({ title: args?.title || 'rak00n', created: Date.now() }), 60 * 60 * 24 * 365).catch(() => {})
-      const base = (process.env.RAK00N_PUBLIC_URL || '').replace(/\/+$/, '')
+      await ctx.store.putKv(`published:${id}`, JSON.stringify({ title: args?.title || 'orb2', created: Date.now() }), 60 * 60 * 24 * 365).catch(() => {})
+      const base = (process.env.ORB2_PUBLIC_URL || '').replace(/\/+$/, '')
       const url = `${base}/pub/${id}/`
       return `Published! Public link (no login required): ${url} — share it with anyone.`
     } catch (e) { return `[ERROR] publish failed: ${(e as Error).message}` }
@@ -721,7 +721,7 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
 
     // Local stores — needs a location.
     if (mode !== 'online') {
-      const place = String(args?.near || process.env.RAK00N_HOME_LOCATION || '').trim()
+      const place = String(args?.near || process.env.ORB2_HOME_LOCATION || '').trim()
       if (!place) {
         parts.push("For nearby stores, tell me roughly where you are (or set a home location).")
       } else {

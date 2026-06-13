@@ -3,7 +3,7 @@
 // Brings up everything the orb needs ON THIS MACHINE and returns the local URL
 // the Electron shell should load:
 //   1. Ollama  — ensure installed + running, pull the default Qwen-VL model.
-//   2. rak00n-api — spawn the compiled Bun binary with MemoryStore, pointed at
+//   2. orb2-api — spawn the compiled Bun binary with MemoryStore, pointed at
 //      Ollama, with the owner/keys/brain config passed as env.
 // Durable config lives in the Electron config.json; we pass it as env each
 // launch so the in-memory store doesn't need to persist it.
@@ -104,9 +104,9 @@ async function ensureModel(onStatus) {
   return { ok: false, message: 'Could not download a model. Check your connection.' }
 }
 
-// ── rak00n-api ───────────────────────────────────────────────────────────────
+// ── orb2-api ───────────────────────────────────────────────────────────────
 function apiBinaryPath() {
-  const name = process.platform === 'win32' ? 'rak00n-api.exe' : 'rak00n-api'
+  const name = process.platform === 'win32' ? 'orb2-api.exe' : 'orb2-api'
   // Packaged: extraResources/bin/<name>. Dev: ./bin/<name>.
   const base = app.isPackaged ? process.resourcesPath : __dirname
   return path.join(base, 'bin', name)
@@ -123,20 +123,20 @@ function startApi(cfg, model) {
   const env = {
     ...process.env,
     NODE_ENV: 'production',
-    RAK00N_STANDALONE: '1',
-    RAK00N_API_PORT: String(API_PORT),
-    RAK00N_API_HOST: '127.0.0.1',
+    ORB2_STANDALONE: '1',
+    ORB2_API_PORT: String(API_PORT),
+    ORB2_API_HOST: '127.0.0.1',
     // No REDIS_URL → MemoryStore (single-user local).
     // Brain = local Ollama (OpenAI-compatible).
     OPENAI_BASE_URL: `${OLLAMA_URL}/v1`,
     OPENAI_MODEL: model,
     OPENAI_API_KEY: 'ollama',
     // Owner + auth so only the user gets in.
-    RAK00N_API_AUTH_REQUIRED: '1',
-    RAK00N_AUTH_ALLOWED_EMAILS: cfg.ownerEmail || '',
+    ORB2_API_AUTH_REQUIRED: '1',
+    ORB2_AUTH_ALLOWED_EMAILS: cfg.ownerEmail || '',
     // Workspace + memory under the user's app data.
-    RAK00N_API_WORKSPACE_ROOT: path.join(app.getPath('userData'), 'workspace'),
-    RAK00N_COWORK_MEMORY_PATH_OVERRIDE: path.join(app.getPath('userData'), 'memory'),
+    ORB2_API_WORKSPACE_ROOT: path.join(app.getPath('userData'), 'workspace'),
+    ORB2_COWORK_MEMORY_PATH_OVERRIDE: path.join(app.getPath('userData'), 'memory'),
     // Baked owner-level app keys (safe to share; public-data only).
     ...loadPackagedKeys(),
   }
@@ -159,13 +159,13 @@ async function startLocal(cfg, onStatus) {
     if (!oll.ok) return oll
     const m = await ensureModel(onStatus)
     if (!m.ok) return m
-    onStatus?.('Starting rak00n…')
+    onStatus?.('Starting orb2…')
     var model = m.model
   }
   const api = startApi(cfg, typeof model !== 'undefined' ? model : (cfg.brain?.model || ''))
   if (!api.ok) return api
   const healthy = await waitHealthy(`http://127.0.0.1:${API_PORT}/healthz`, 45000)
-  if (!healthy) return { ok: false, message: 'rak00n didn’t start in time.' }
+  if (!healthy) return { ok: false, message: 'orb2 didn’t start in time.' }
   return { ok: true, url: `http://127.0.0.1:${API_PORT}` }
 }
 

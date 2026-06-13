@@ -1,4 +1,4 @@
-# rak00n Cloudflare Tunnel configuration template.
+# orb2 Cloudflare Tunnel configuration template.
 # Run scripts/setup-cloudflare-tunnel.sh to generate with your tunnel ID,
 # or fill in manually.
 #

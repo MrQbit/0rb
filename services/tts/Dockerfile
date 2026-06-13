@@ -10,7 +10,7 @@ RUN apt-get update \
 
 # Install into the existing uv-managed venv that already holds torch+cu130.
 # transformers + snac power the optional Orpheus expressive engine; they sit
-# unused (no weights loaded) unless RAK00N_TTS_ENGINE=orpheus.
+# unused (no weights loaded) unless ORB2_TTS_ENGINE=orpheus.
 RUN uv pip install --python /app/moshi/.venv/bin/python \
     "kokoro>=0.9.2" "soundfile>=0.12.1" "fastapi>=0.110" "uvicorn>=0.29" "numpy>=1.26" \
     "transformers>=4.45" "snac>=1.2.0"
@@ -24,6 +24,6 @@ RUN uv pip install --python /app/moshi/.venv/bin/python \
 WORKDIR /srv
 COPY server.py /srv/server.py
 
-ENV RAK00N_TTS_PORT=8991
+ENV ORB2_TTS_PORT=8991
 EXPOSE 8991
 CMD ["/app/moshi/.venv/bin/python", "/srv/server.py"]

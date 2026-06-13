@@ -1,0 +1,8 @@
+apiVersion: v2
+name: orb2
+description: "orb2 — personal AI coding agent (local-first, DGX Spark)"
+type: application
+version: 0.1.0
+appVersion: "0.1.25"
+maintainers:
+  - name: MrQbit

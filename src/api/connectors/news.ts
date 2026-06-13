@@ -1,17 +1,17 @@
 /**
  * News connector — headlines/search via NewsAPI (newsapi.org, API key only).
  * Returns clean article results the agent shows as a results widget.
- * Configure RAK00N_NEWSAPI_KEY.
+ * Configure ORB2_NEWSAPI_KEY.
  */
 export function newsEnabled(): boolean {
-  return !!(process.env.RAK00N_NEWSAPI_KEY || '').trim()
+  return !!(process.env.ORB2_NEWSAPI_KEY || '').trim()
 }
 
 export type NewsResult = { title: string; source: string; url: string; thumbnail?: string; description?: string }
 
 export async function newsSearch(query: string, max = 8): Promise<NewsResult[]> {
-  const key = (process.env.RAK00N_NEWSAPI_KEY || '').trim()
-  if (!key) throw new Error('News is not connected (RAK00N_NEWSAPI_KEY unset)')
+  const key = (process.env.ORB2_NEWSAPI_KEY || '').trim()
+  if (!key) throw new Error('News is not connected (ORB2_NEWSAPI_KEY unset)')
   // Use top-headlines for a topic/empty query, /everything for a specific one.
   const q = query.trim()
   const url = q

@@ -1,4 +1,4 @@
-// rak00n sign-in (email / Telegram OTP). External file so the page works
+// orb2 sign-in (email / Telegram OTP). External file so the page works
 // under a strict CSP (script-src 'self') — inline scripts are blocked.
 (function () {
   var emailEl = document.getElementById('email');

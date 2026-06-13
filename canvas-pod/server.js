@@ -1,5 +1,5 @@
 /**
- * rak00n canvas pod server.
+ * orb2 canvas pod server.
  *
  * Port 9090 — RPC endpoint for the API server to write files and init templates.
  * Port 5173 — Static file server for the canvas SPA (served via /v1/preview proxy).

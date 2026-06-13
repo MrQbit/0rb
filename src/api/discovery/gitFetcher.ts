@@ -4,7 +4,7 @@
  * actually consume are checked out (sparse checkout) so we never
  * pull large source trees:
  *
- *   .rak00n/skills/      .rak00n/agents/
+ *   .orb2/skills/      .orb2/agents/
  *   .mcp.json          mcp_servers.json
  *
  * Git URL is verified via isAllowedGitUrl() before any subprocess
@@ -17,8 +17,8 @@ import { join } from 'node:path'
 import { isAllowedGitUrl } from './config.js'
 
 const SPARSE_PATTERNS = [
-  '.rak00n/skills/*',
-  '.rak00n/agents/*',
+  '.orb2/skills/*',
+  '.orb2/agents/*',
   '.mcp.json',
   'mcp_servers.json',
 ]

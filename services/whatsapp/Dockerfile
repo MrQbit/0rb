@@ -1,4 +1,4 @@
-# rak00n WhatsApp bridge — Node + Baileys (WhatsApp Web).
+# orb2 WhatsApp bridge — Node + Baileys (WhatsApp Web).
 FROM node:20-slim
 
 WORKDIR /app

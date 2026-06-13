@@ -23,15 +23,15 @@ function buildMinimalEnv(): Record<string, string> {
 }
 
 export function isSandboxEnabled(): boolean {
-  return process.env.RAK00N_SANDBOX_ENABLED !== '0' && process.env.RAK00N_SANDBOX_ENABLED !== 'false'
+  return process.env.ORB2_SANDBOX_ENABLED !== '0' && process.env.ORB2_SANDBOX_ENABLED !== 'false'
 }
 
 function sandboxMode(): 'pod' | 'inproc' {
-  const m = (process.env.RAK00N_SANDBOX_MODE ?? '').trim().toLowerCase()
+  const m = (process.env.ORB2_SANDBOX_MODE ?? '').trim().toLowerCase()
   if (m === 'pod') return 'pod'
   if (m === 'inproc' || m === 'in-process' || m === 'in_process') return 'inproc'
-  // Default: pod if RAK00N_SANDBOX_URL is set (cluster), inproc otherwise (dev).
-  return process.env.RAK00N_SANDBOX_URL ? 'pod' : 'inproc'
+  // Default: pod if ORB2_SANDBOX_URL is set (cluster), inproc otherwise (dev).
+  return process.env.ORB2_SANDBOX_URL ? 'pod' : 'inproc'
 }
 
 async function executeViaPod(
@@ -39,7 +39,7 @@ async function executeViaPod(
   code: string,
   stdin: string | undefined,
 ): Promise<CodeExecResult> {
-  const base = process.env.RAK00N_SANDBOX_URL || 'http://rak00n-sandbox:9091'
+  const base = process.env.ORB2_SANDBOX_URL || 'http://orb2-sandbox:9091'
   const start = Date.now()
   try {
     const res = await fetch(`${base.replace(/\/+$/, '')}/run`, {
@@ -78,7 +78,7 @@ export async function executeCode(
   if (!isSandboxEnabled()) {
     return {
       stdout: '',
-      stderr: 'Code execution is disabled (RAK00N_SANDBOX_ENABLED=0)',
+      stderr: 'Code execution is disabled (ORB2_SANDBOX_ENABLED=0)',
       exitCode: 1,
       durationMs: 0,
       timedOut: false,

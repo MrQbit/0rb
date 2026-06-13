@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>rak00n — setup</title>
+<title>orb2 — setup</title>
 <style>
   :root{ --nv:#76b900; --nv-b:#8fd400; --ink:#e9f1e2; --dim:#93a08f; --line:rgba(255,255,255,.10);
          --glass:rgba(14,19,16,.7); --edge:rgba(118,185,0,.25); }
@@ -50,13 +50,13 @@
 <body>
   <div class="card">
     <div class="orb"></div>
-    <h1>Welcome to <b>rak00n</b></h1>
+    <h1>Welcome to <b>orb2</b></h1>
     <p class="sub">A couple of details and your orb is ready.</p>
 
     <label>Your email (this becomes the owner account that can sign in)</label>
     <input id="email" type="email" placeholder="you@example.com" autocomplete="email" />
 
-    <label>How should rak00n think?</label>
+    <label>How should orb2 think?</label>
     <div class="choice">
       <div class="opt sel" data-mode="local">
         <div class="t">Run on this machine</div>
@@ -67,13 +67,13 @@
         <div class="d">Older machine? Use an OpenAI-compatible API instead.</div>
       </div>
       <div class="opt" data-mode="server">
-        <div class="t">Connect to my rak00n</div>
-        <div class="d">Already running rak00n on a box — connect to it.</div>
+        <div class="t">Connect to my orb2</div>
+        <div class="d">Already running orb2 on a box — connect to it.</div>
       </div>
     </div>
 
     <div class="grp on" id="grp-local">
-      <p class="hint">rak00n runs entirely on this computer using a local AI model (Qwen-VL 8B — sees images, uses tools). Needs <a href="https://ollama.com/download" target="_blank">Ollama</a> (we'll guide you if it's missing). First launch downloads the model once.</p>
+      <p class="hint">orb2 runs entirely on this computer using a local AI model (Qwen-VL 8B — sees images, uses tools). Needs <a href="https://ollama.com/download" target="_blank">Ollama</a> (we'll guide you if it's missing). First launch downloads the model once.</p>
     </div>
 
     <div class="grp" id="grp-server">
@@ -89,10 +89,10 @@
       </div>
       <label>API key</label>
       <input id="ckey" type="password" placeholder="sk-…" autocomplete="off" />
-      <p class="hint">rak00n runs on this machine but thinks via the cloud. Key stays on your computer. Works with OpenAI, OpenRouter, Together, Groq…</p>
+      <p class="hint">orb2 runs on this machine but thinks via the cloud. Key stays on your computer. Works with OpenAI, OpenRouter, Together, Groq…</p>
     </div>
 
-    <button class="btn" id="go">Start rak00n</button>
+    <button class="btn" id="go">Start orb2</button>
     <div class="err" id="err"></div>
 
     <!-- Boot / setup progress -->
@@ -114,13 +114,13 @@
   });
 
   // Live status from the main process (model download, startup…).
-  window.rak00nSetup.onStatus(msg=>{ const m=$('#statusMsg'); if(m) m.textContent=msg; });
+  window.orb2Setup.onStatus(msg=>{ const m=$('#statusMsg'); if(m) m.textContent=msg; });
   function showStatus(msg){ $('#go').style.display='none'; document.querySelector('.choice').style.display='none';
     document.querySelectorAll('.grp,.sub,label,#email').forEach(e=>e.style.display='none');
     $('#status').style.display='block'; $('#statusMsg').textContent=msg||'Starting…'; }
 
   // If we were opened as a boot splash, skip the form entirely.
-  if(new URLSearchParams(location.search).get('booting')) showStatus('Starting rak00n…');
+  if(new URLSearchParams(location.search).get('booting')) showStatus('Starting orb2…');
 
   $('#go').onclick=async()=>{
     const err=$('#err'); err.textContent='';
@@ -135,11 +135,11 @@
       if(!cfg.brain.endpoint || !cfg.brain.model){ err.textContent='Enter the cloud endpoint and model.'; return; }
     }
     // local: nothing extra — the backend orchestrator handles Ollama + model.
-    showStatus(mode==='local' ? 'Setting up your local rak00n…' : 'Setting things up…');
+    showStatus(mode==='local' ? 'Setting up your local orb2…' : 'Setting things up…');
     try{
-      const r = await window.rak00nSetup.save(cfg);
+      const r = await window.orb2Setup.save(cfg);
       if(r && r.ok===false){
-        if(r.needsInstall){ $('#statusMsg').innerHTML = (r.message||'A component is needed.')+'<br><br><a href="'+(r.url||'https://ollama.com/download')+'" target="_blank" style="color:var(--nv)">Download it</a>, then reopen rak00n.'; }
+        if(r.needsInstall){ $('#statusMsg').innerHTML = (r.message||'A component is needed.')+'<br><br><a href="'+(r.url||'https://ollama.com/download')+'" target="_blank" style="color:var(--nv)">Download it</a>, then reopen orb2.'; }
         else $('#statusMsg').textContent = '⚠ '+(r.message||'Setup failed.');
       }
       // on success the window closes itself (main swaps to the orb)

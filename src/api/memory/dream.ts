@@ -4,7 +4,7 @@
  * The upstream autoDream triggers off filesystem session transcripts +
  * mtime gates — but the API keeps sessions in Redis, so that scan is always
  * empty and the dream never fires. Here we drive the same consolidation on a
- * simple periodic scheduler instead: every RAK00N_DREAM_INTERVAL_HOURS, if
+ * simple periodic scheduler instead: every ORB2_DREAM_INTERVAL_HOURS, if
  * auto-memory is enabled, run a consolidation agent turn that reviews and
  * organizes /memory, then refresh the semantic index.
  *
@@ -19,7 +19,7 @@ let scheduler: ReturnType<typeof setInterval> | null = null
 let running = false
 
 function intervalMs(): number {
-  const h = Number(process.env.RAK00N_DREAM_INTERVAL_HOURS || 6)
+  const h = Number(process.env.ORB2_DREAM_INTERVAL_HOURS || 6)
   return Math.max(0.05, h) * 3_600_000
 }
 
@@ -72,9 +72,9 @@ export function startDreamScheduler(store: Store): void {
     running = true
     try {
       const { isAutoMemoryEnabled } = await import('./memPath.js')
-      // Auto-dream gate: on unless RAK00N_DISABLE_AUTO_DREAM is truthy.
+      // Auto-dream gate: on unless ORB2_DISABLE_AUTO_DREAM is truthy.
       const dreamDisabled = ['1', 'true', 'yes', 'on'].includes(
-        (process.env.RAK00N_DISABLE_AUTO_DREAM || '').trim().toLowerCase(),
+        (process.env.ORB2_DISABLE_AUTO_DREAM || '').trim().toLowerCase(),
       )
       if (isAutoMemoryEnabled() && !dreamDisabled) {
         log.info('dream_scheduled_start')
@@ -89,5 +89,5 @@ export function startDreamScheduler(store: Store): void {
   }
   scheduler = setInterval(() => void tick(), intervalMs())
   if (typeof (scheduler as any).unref === 'function') (scheduler as any).unref()
-  log.info('dream_scheduler_started', { intervalHours: Number(process.env.RAK00N_DREAM_INTERVAL_HOURS || 6) })
+  log.info('dream_scheduler_started', { intervalHours: Number(process.env.ORB2_DREAM_INTERVAL_HOURS || 6) })
 }

@@ -1,4 +1,4 @@
-# rak00n
+# orb2
 
 Your personal **Jarvis** — a single-user AI agent that runs on **your own
 hardware**. Local brain, local voice, native vision, durable memory, no cloud
@@ -10,7 +10,7 @@ Designed for an **NVIDIA DGX Spark (GB10)** but it runs in three modes — fully
 local on any NVIDIA box, or with the model in the cloud for hardware-constrained
 machines (see **[DEPLOYMENT.md](DEPLOYMENT.md)** for Linux / Windows / macOS).
 
-> Built on a fork of the RAK00N agent CLI; the app layer is platform-agnostic.
+> Built on a fork of the ORB2 agent CLI; the app layer is platform-agnostic.
 
 ---
 
@@ -41,7 +41,7 @@ machines (see **[DEPLOYMENT.md](DEPLOYMENT.md)** for Linux / Windows / macOS).
   Server-side gate; managed users from the console.
 - **Self-evolution** — the agent can edit its own source, build it, validate it
   in a throwaway sandbox, and promote it to the running instance with automatic
-  rollback. Gated by `RAK00N_SELF_MODIFY_ENABLED`.
+  rollback. Gated by `ORB2_SELF_MODIFY_ENABLED`.
 - **Self-healing** — Docker Compose with restart policies + a watchdog; comes
   back on its own after a reboot.
 - **iOS app** — native SwiftUI client ([`iOS/`](iOS/)).
@@ -60,7 +60,7 @@ all services on one network, each with a healthcheck + restart policy:
 | `blender` | headless Blender — agent-authored 3D → glTF (:8996) | |
 | `av-webrtc` | WebRTC A/V ingest (:8993) | |
 | `redis` | sessions + runtime config + vectors/graph (Redis Stack) | |
-| `rak00n-api` | the agent (Bun) — rak00n is the brain | |
+| `orb2-api` | the agent (Bun) — orb2 is the brain | |
 | `whatsapp` | WhatsApp Web bridge (Baileys, :8995) | |
 | `searxng` | private web-search backend for the WebSearch tool | |
 | `ui` | nginx console — front door (HTTP :9080, HTTPS :9443) | |
@@ -79,10 +79,10 @@ On a fresh DGX Spark (aarch64 + NVIDIA), with Docker + the NVIDIA Container
 Toolkit installed:
 
 ```bash
-git clone https://github.com/MrQbit/rak00n.git && cd rak00n
+git clone https://github.com/MrQbit/0rb.git && cd orb2
 bash scripts/install.sh        # registry, .env, build, up
 # then edit .env (allowed email, SMTP, Telegram/WhatsApp) and:
-./scripts/rak00n-stack.sh restart
+./scripts/orb2-stack.sh restart
 ```
 
 `install.sh` starts a local image registry, generates `.env` from
@@ -93,10 +93,10 @@ CPU services run even before the GPU images exist.
 ## Run it
 
 ```bash
-./scripts/rak00n-stack.sh up        # start the whole stack
-./scripts/rak00n-stack.sh status    # ps + health
-./scripts/rak00n-stack.sh logs rak00n-api
-./scripts/rak00n-stack.sh heal      # tail the watchdog
+./scripts/orb2-stack.sh up        # start the whole stack
+./scripts/orb2-stack.sh status    # ps + health
+./scripts/orb2-stack.sh logs orb2-api
+./scripts/orb2-stack.sh heal      # tail the watchdog
 ```
 
 Open **http://localhost:9080** (or **https://localhost:9443** for camera/mic),
@@ -110,14 +110,14 @@ and the console's **Settings** panel (the gear on the orb page).
 
 - **Brain** — `OPENAI_BASE_URL`, `OPENAI_MODEL` (point local or at a cloud
   endpoint). See [DEPLOYMENT.md](DEPLOYMENT.md).
-- **Auth** — email/Telegram OTP. Allowlist via `RAK00N_AUTH_ALLOWED_EMAILS` or
-  Settings → Allowed users. Email codes need `RAK00N_SMTP_*`.
-- **Telegram** — `RAK00N_TELEGRAM_BOT_TOKEN` + `RAK00N_TELEGRAM_OWNER_ID`.
-- **WhatsApp** — `RAK00N_OWNER_PHONE`; link from Settings → Channels (scan the QR).
-- **Voice** — `RAK00N_VOICE_ENABLED`, `RAK00N_STT_URL`, `RAK00N_TTS_URL`, `RAK00N_TTS_VOICE`.
+- **Auth** — email/Telegram OTP. Allowlist via `ORB2_AUTH_ALLOWED_EMAILS` or
+  Settings → Allowed users. Email codes need `ORB2_SMTP_*`.
+- **Telegram** — `ORB2_TELEGRAM_BOT_TOKEN` + `ORB2_TELEGRAM_OWNER_ID`.
+- **WhatsApp** — `ORB2_OWNER_PHONE`; link from Settings → Channels (scan the QR).
+- **Voice** — `ORB2_VOICE_ENABLED`, `ORB2_STT_URL`, `ORB2_TTS_URL`, `ORB2_TTS_VOICE`.
 - **Connected apps** — YouTube/Spotify/News/Vercel + Google/Microsoft cloud
-  storage are configured from Settings → Apps (or the matching `RAK00N_*` env).
-- **Self-evolution** — `RAK00N_SELF_MODIFY_ENABLED`, `RAK00N_SELF_SRC_HOST`.
+  storage are configured from Settings → Apps (or the matching `ORB2_*` env).
+- **Self-evolution** — `ORB2_SELF_MODIFY_ENABLED`, `ORB2_SELF_SRC_HOST`.
 
 ## Remote access
 
@@ -128,25 +128,25 @@ bash scripts/setup-tailscale.sh            # tailnet-only
 bash scripts/setup-tailscale.sh --funnel   # also public
 ```
 
-Then set `RAK00N_PUBLIC_URL` in `.env` to your `https://<machine>.<tailnet>.ts.net`
-URL. Everything stays behind rak00n's email/Telegram-OTP auth.
+Then set `ORB2_PUBLIC_URL` in `.env` to your `https://<machine>.<tailnet>.ts.net`
+URL. Everything stays behind orb2's email/Telegram-OTP auth.
 
 ## Repository layout
 
 ```
 docker-compose.spark.yml   the stack
 .env.example               configuration template
-scripts/                   install.sh, rak00n-stack.sh, watchdog, tailscale, self-evolve
+scripts/                   install.sh, orb2-stack.sh, watchdog, tailscale, self-evolve
 services/                  tts stt embed blender av-webrtc whatsapp searxng (Dockerfiles)
 src/api/                   the agent API (auth, voice, channels, memory, vision, canvas, connectors)
-src/tools/CanvasTool/      rak00n's visual surface
+src/tools/CanvasTool/      orb2's visual surface
 web/public/                the orb console (index.html, orb.css, orb-shell.js)
 iOS/                       native app source
 ```
 
 ## Security
 
-rak00n is single-user and allowlisted; the API + voice socket are gated by the
+orb2 is single-user and allowlisted; the API + voice socket are gated by the
 session, and the console shell is gated server-side. Self-evolution is
 sandbox-validated with rollback and gated by a flag. See
 [SECURITY.md](SECURITY.md).

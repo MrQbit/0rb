@@ -30,8 +30,8 @@ async function readJson(req: Request): Promise<Record<string, unknown> | null> {
   }
 }
 
-const MEM_KEY_PREFIX = 'rak00n:memory:session:'
-const MEM_INDEX_KEY = 'rak00n:memory:index'
+const MEM_KEY_PREFIX = 'orb2:memory:session:'
+const MEM_INDEX_KEY = 'orb2:memory:index'
 
 type MemoryEntry = {
   id: string
@@ -207,7 +207,7 @@ export async function tryHandleMemoryRoute(
   // memory files. Also runs after each dream.
   if (method === 'POST' && pathname === '/v1/memory/reindex') {
     const { reindexFileMemory, semanticMemoryEnabled } = await import('./semantic.js')
-    if (!semanticMemoryEnabled()) return jsonResponse(400, { error: 'semantic memory disabled (RAK00N_EMBED_URL unset)' })
+    if (!semanticMemoryEnabled()) return jsonResponse(400, { error: 'semantic memory disabled (ORB2_EMBED_URL unset)' })
     const chunks = await reindexFileMemory(ctx.store)
     return jsonResponse(200, { ok: true, chunks })
   }
@@ -225,7 +225,7 @@ export async function tryHandleMemoryRoute(
   // memory files into the relationship graph (Phase 2). Also runs after a dream.
   if (method === 'POST' && pathname === '/v1/memory/graph/rebuild') {
     const { rebuildGraphFromMemory, graphMemoryEnabled } = await import('./graph.js')
-    if (!graphMemoryEnabled()) return jsonResponse(400, { error: 'graph memory disabled (RAK00N_MEMORY_GRAPH=0)' })
+    if (!graphMemoryEnabled()) return jsonResponse(400, { error: 'graph memory disabled (ORB2_MEMORY_GRAPH=0)' })
     const triples = await rebuildGraphFromMemory(ctx.store)
     return jsonResponse(200, { ok: true, triples })
   }

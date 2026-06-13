@@ -17,6 +17,6 @@ RUN uv pip install --python /app/moshi/.venv/bin/python \
 WORKDIR /srv
 COPY server.py /srv/server.py
 
-ENV RAK00N_VISION_PORT=8992
+ENV ORB2_VISION_PORT=8992
 EXPOSE 8992
 CMD ["/app/moshi/.venv/bin/python", "/srv/server.py"]

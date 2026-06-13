@@ -1,8 +1,8 @@
 """
 atomic_chat_provider.py
 -----------------------
-Adds native Atomic Chat support to RAK00N.
-Lets RAK00N route requests to any locally-running model via
+Adds native Atomic Chat support to ORB2.
+Lets ORB2 route requests to any locally-running model via
 Atomic Chat (Apple Silicon only) at 127.0.0.1:1337.
 
 Atomic Chat exposes an OpenAI-compatible API, so messages are forwarded

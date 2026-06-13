@@ -1,4 +1,4 @@
-/* ─── rak00n Design System — NVIDIA Green ─── */
+/* ─── orb2 Design System — NVIDIA Green ─── */
 :root {
   /* NVIDIA green accent system */
   --accent: #76b900;            /* NVIDIA green */
@@ -1096,28 +1096,28 @@ section[data-pane="policy"] table.table td { vertical-align: top; }
 }
 
 /* Eye animation keyframes */
-@keyframes rak00n-blink {
+@keyframes orb2-blink {
   0%, 92%, 100% { transform: scaleY(1); }
   96% { transform: scaleY(0.07); }
 }
-@keyframes rak00n-think {
+@keyframes orb2-think {
   0%, 100% { fill: #76b900; filter: drop-shadow(0 0 2px #76b900); }
   50%       { fill: #8fd400; filter: drop-shadow(0 0 8px #76b900) drop-shadow(0 0 16px rgba(143,212,0,.6)); }
 }
-@keyframes rak00n-speak {
+@keyframes orb2-speak {
   0%, 100% { fill: #00e5ff; filter: drop-shadow(0 0 3px #00e5ff); }
   50%       { fill: #00bcd4; filter: drop-shadow(0 0 10px #00e5ff); }
 }
-@keyframes rak00n-error {
+@keyframes orb2-error {
   0%, 100% { fill: #ef4444; }
   50%       { fill: #ff6b6b; filter: drop-shadow(0 0 6px #ef4444); }
 }
 
-/* Eye states (applied to .rak00n-eye circles or the img) */
-.brand-logo-wrap.state-idle    .rak00n-eye { animation: rak00n-blink 7s 1s infinite; transform-box: fill-box; transform-origin: center; }
-.brand-logo-wrap.state-thinking .rak00n-eye { animation: rak00n-think 1.4s ease-in-out infinite; }
-.brand-logo-wrap.state-speaking .rak00n-eye { animation: rak00n-speak 0.8s ease-in-out infinite; }
-.brand-logo-wrap.state-error    .rak00n-eye { animation: rak00n-error 1s ease-in-out infinite; }
+/* Eye states (applied to .orb2-eye circles or the img) */
+.brand-logo-wrap.state-idle    .orb2-eye { animation: orb2-blink 7s 1s infinite; transform-box: fill-box; transform-origin: center; }
+.brand-logo-wrap.state-thinking .orb2-eye { animation: orb2-think 1.4s ease-in-out infinite; }
+.brand-logo-wrap.state-speaking .orb2-eye { animation: orb2-speak 0.8s ease-in-out infinite; }
+.brand-logo-wrap.state-error    .orb2-eye { animation: orb2-error 1s ease-in-out infinite; }
 
 /* Fallback filter-based animation when using <img> (no SVG element access) */
 .brand-logo-wrap.state-thinking > img { animation: logo-think-filter 1.4s ease-in-out infinite; }

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Headless Blender HTTP service for rak00n.
+Headless Blender HTTP service for orb2.
 
 POST /run { "script": "<bpy python>", "out": "/workspace/.../x.glb" }
   → clears the scene, runs the agent's bpy script, exports a .glb to `out`.

@@ -1,5 +1,5 @@
 /**
- * Runtime feature flags for rak00n-art.
+ * Runtime feature flags for orb2-art.
  *
  * Today we expose ONE flag -- `skills` -- so the same image can be
  * shipped to clients that don't want the skills/MCP-helper surface
@@ -8,9 +8,9 @@
  *
  * Sources, in increasing precedence:
  *
- *   1. Env var `RAK00N_SKILLS_ENABLED` (default: '1' = enabled). Read
+ *   1. Env var `ORB2_SKILLS_ENABLED` (default: '1' = enabled). Read
  *      once at boot and used as the initial value.
- *   2. Redis KV `rak00n:features:skills` ('1' or '0'). Persists an
+ *   2. Redis KV `orb2:features:skills` ('1' or '0'). Persists an
  *      admin-set runtime override across restarts and replicas.
  *
  * If either source EXPLICITLY sets the flag to false, the feature is
@@ -35,8 +35,8 @@ export type FeatureFlagSnapshot = {
   actor?: string
 }
 
-const KEY_SKILLS = 'rak00n:features:skills'
-const KEY_SKILLS_META = 'rak00n:features:skills:meta'
+const KEY_SKILLS = 'orb2:features:skills'
+const KEY_SKILLS_META = 'orb2:features:skills:meta'
 
 let _store: Store | null = null
 let _envSkills = true
@@ -53,7 +53,7 @@ function parseEnvBool(value: string | undefined, defaultValue: boolean): boolean
 
 export async function initFeatureFlags(store: Store): Promise<void> {
   _store = store
-  _envSkills = parseEnvBool(process.env.RAK00N_SKILLS_ENABLED, true)
+  _envSkills = parseEnvBool(process.env.ORB2_SKILLS_ENABLED, true)
   await refresh()
   // 10s polling so a runtime change applied by another router replica
   // propagates without waiting for the next admin POST.
