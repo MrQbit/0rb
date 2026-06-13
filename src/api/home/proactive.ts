@@ -15,7 +15,11 @@
  * otherwise they're logged (and surface in the audit trail).
  */
 import { haEnabled, haStates, type HaEntity } from '../connectors/homeAssistant.js'
+import { sendPush } from '../push/fcm.js'
+import type { Store } from '../store/store.js'
 import { log } from '../log.js'
+
+let pushStore: Store | null = null
 
 let timer: ReturnType<typeof setInterval> | null = null
 /** entity_id → epoch ms when it first entered the "needs watching" state. */
@@ -53,6 +57,14 @@ function phrase(e: HaEntity, label: string, mins: number): string {
 }
 
 async function notifyOwner(text: string): Promise<void> {
+  let delivered = false
+
+  // Push to the 0rb apps (lock-screen notification, even when closed).
+  if (pushStore) {
+    try { await sendPush(pushStore, '0rb', text, { kind: 'home_alert' }); delivered = true } catch { /* best effort */ }
+  }
+
+  // Telegram, if configured.
   const token = process.env.RAK00N_TELEGRAM_BOT_TOKEN
   const chatId = process.env.RAK00N_TELEGRAM_OWNER_ID
   if (token && chatId) {
@@ -63,13 +75,14 @@ async function notifyOwner(text: string): Promise<void> {
         body: JSON.stringify({ chat_id: chatId, text }),
       })
       log.info('home_alert_sent', { channel: 'telegram', text })
-      return
+      delivered = true
     } catch (err) {
       log.warn('home_alert_send_failed', { error: (err as Error).message })
     }
   }
-  // No outbound channel configured — record it so it still surfaces.
-  log.info('home_alert', { text })
+
+  // Always record it (and it's the only surface if nothing's configured).
+  if (!delivered) log.info('home_alert', { text })
 }
 
 async function tick(): Promise<void> {
@@ -102,8 +115,10 @@ async function tick(): Promise<void> {
   }
 }
 
-/** Start the proactive loop. Idempotent; no-op unless HA + proactive are on. */
-export function startHomeWatcher(): void {
+/** Start the proactive loop. Idempotent; no-op unless HA + proactive are on.
+ *  Pass the store so nudges can also push to the 0rb apps via FCM. */
+export function startHomeWatcher(store?: Store): void {
+  if (store) pushStore = store
   if (timer || !enabled()) return
   timer = setInterval(() => { void tick() }, intervalMs())
   if (typeof (timer as any).unref === 'function') (timer as any).unref()

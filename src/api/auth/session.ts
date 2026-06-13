@@ -69,6 +69,23 @@ function secret(): string {
   return process.env.RAK00N_AUTH_SECRET || ''
 }
 
+/**
+ * Guarantee a session-signing secret exists. Without RAK00N_AUTH_SECRET,
+ * verifySession() rejects every token — so on first boot we load a persisted
+ * secret or generate + persist one. Must run before any login/claim.
+ */
+export async function ensureSessionSecret(store: Store): Promise<void> {
+  if (process.env.RAK00N_AUTH_SECRET) return
+  const KEY = 'auth:session_secret'
+  try {
+    const existing = await store.getKv(KEY)
+    if (existing) { process.env.RAK00N_AUTH_SECRET = existing; return }
+  } catch { /* fall through to generate */ }
+  const generated = randomBytes(32).toString('hex')
+  process.env.RAK00N_AUTH_SECRET = generated
+  try { await store.putKv(KEY, generated, 60 * 60 * 24 * 3650) } catch { /* best effort */ }
+}
+
 /** Whether username/password auth is switched on. */
 export function authEnabled(): boolean {
   return (process.env.RAK00N_API_AUTH_REQUIRED ?? '0') === '1'

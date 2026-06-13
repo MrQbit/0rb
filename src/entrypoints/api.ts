@@ -253,8 +253,9 @@ async function main() {
   // Proactive home watcher — nudges the owner when a door/lock is left open.
   // No-op unless Home Assistant is configured + proactive is enabled.
   try {
+    const { getStore } = await import('../api/store/store.js')
     const { startHomeWatcher } = await import('../api/home/proactive.js')
-    startHomeWatcher()
+    startHomeWatcher(await getStore())
   } catch (err) {
     console.warn('[api] home watcher init failed:', (err as Error).message)
   }

@@ -55,7 +55,7 @@ import {
 } from './auth/context.js'
 import { handleAuthRoutes } from './auth/routes.js'
 import {
-  authEnabled, verifySession, parseCookies, SESSION_COOKIE, signSession,
+  authEnabled, verifySession, parseCookies, SESSION_COOKIE, signSession, ensureSessionSecret,
 } from './auth/session.js'
 import { buildOpenApiSpec, SWAGGER_HTML } from './openapi.js'
 import { createSse, SSE_RESPONSE_HEADERS } from './sse.js'
@@ -121,6 +121,8 @@ import { isVoiceWsRequest, makeVoiceWsData, voiceWebSocketHandlers } from './voi
 import { tryHandleChannelsRoute } from './channels/routes.js'
 import { tryHandleClusterRoute } from './cluster/routes.js'
 import { tryHandleHomeRoute } from './home/routes.js'
+import { tryHandleSetupRoute, setupRequired, isClaimedCached, announceSetupIfNeeded } from './setup/routes.js'
+import { tryHandlePushRoute } from './push/routes.js'
 import { getFileMeta as filesGetMeta } from './files/storage.js'
 import { mintInstallationToken as mintGitHubAppToken } from './github/appAuth.js'
 import {
@@ -475,7 +477,9 @@ export async function startApiServer(config: ApiServerConfig) {
   const store = await getStore()
   const audit = createAuditEmitter(store)
 
+  await ensureSessionSecret(store)
   await bootstrapAdminKey(store)
+  await announceSetupIfNeeded(store)
 
   log.info('api_starting', {
     port: config.port,
@@ -1010,6 +1014,21 @@ async function dispatch(
       return serveStatic(ctx.webDir, pathname.slice('/web/'.length))
     }
     return new Response('SPA moved to rak00n-ui', { status: 410 })
+  }
+
+  // ─────────── First-run setup / claim ───────────
+  // The claim endpoints are always reachable; everything else on /v1 is locked
+  // (423) until the owner claims an unclaimed instance.
+  const setupResp = await tryHandleSetupRoute(method, pathname, req, ctx.store)
+  if (setupResp) return setupResp
+  if (
+    setupRequired() &&
+    pathname.startsWith('/v1/') &&
+    !pathname.startsWith('/v1/setup') &&
+    pathname !== '/v1/info' &&
+    !(await isClaimedCached(ctx.store))
+  ) {
+    return jsonResponse(423, { error: 'This 0rb is not set up yet', code: 'NEEDS_SETUP', needs_setup: true })
   }
 
   // ─────────── Worker bridge (HMAC-authenticated, no apikey identity) ───────────
@@ -1562,6 +1581,9 @@ async function dispatch(
   // ─── Home (device dashboard refresh + tap-to-control via Home Assistant) ───
   const homeResp = await tryHandleHomeRoute(method, pathname, req)
   if (homeResp) return homeResp
+  // ─── Push registration for the 0rb apps ───
+  const pushResp = await tryHandlePushRoute(method, pathname, req, ctx.store)
+  if (pushResp) return pushResp
   // ─── Discovery (skills/MCPs/agents from configured EMU repos) ───
   const discResp = await tryHandleDiscoveryRoute(req, pathname, identity, isAdmin)
   if (discResp) return discResp
@@ -2371,6 +2393,8 @@ const SETTINGS_KEYS = [
   'RAK00N_HA_URL', 'RAK00N_HA_TOKEN',
   // Home location — used for the concierge's "nearby stores" search
   'RAK00N_HOME_LOCATION',
+  // Push (FCM) — proactive nudges to the 0rb apps
+  'RAK00N_FCM_PROJECT_ID', 'RAK00N_FCM_SERVICE_ACCOUNT',
   // Access — who may sign in, and how OTP codes are emailed
   'RAK00N_AUTH_ALLOWED_EMAILS',
   'RAK00N_SMTP_HOST', 'RAK00N_SMTP_PORT', 'RAK00N_SMTP_USER', 'RAK00N_SMTP_PASS', 'RAK00N_SMTP_FROM',
