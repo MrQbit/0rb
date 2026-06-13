@@ -441,6 +441,7 @@
       case 'vercel': return (((s.deployments||[]).length)||0)+' deploys';
       case 'weather': return (s.current&&s.current.temp!=null)?(s.current.temp+'°'):'weather';
       case 'todo': { const it=s.items||[]; return (it.filter(i=>i.status==='completed').length)+'/'+it.length+' done'; }
+      case 'home': { const d=s.devices||[]; return (d.filter(x=>x.on===true).length)+' on · '+d.length; }
       default: return titleFor(s);
     }
   }
@@ -535,6 +536,7 @@
     else if(spec.type==='vercel') renderVercel(body, spec);
     else if(spec.type==='map') renderMap(body, spec, wg);
     else if(spec.type==='docker') renderDocker(body, spec);
+    else if(spec.type==='home') renderHome(body, spec, wg);
     else if(spec.type==='todo') renderTodo(body, spec);
     else if(spec.type==='app') renderApp(body, spec);
     else if(_plugins[spec.type]) renderPlugin(body, spec, _plugins[spec.type]);
@@ -555,6 +557,36 @@
       row.appendChild(g); row.appendChild(t); wrap.appendChild(row);
     });
     body.appendChild(wrap);
+  }
+
+  // ── Home (live device dashboard; user taps a tile, agent drives it too) ──
+  function renderHome(body, spec, wg){
+    const wrap=document.createElement('div'); wrap.className='wg-home';
+    const grid=document.createElement('div'); grid.className='wg-home-grid';
+    const devices=spec.devices||[];
+    if(!devices.length){ const e=document.createElement('div'); e.className='wg-note'; e.textContent='No devices yet — connect Home Assistant in Settings.'; body.appendChild(e); return; }
+    devices.forEach(d=>{
+      const card=document.createElement('div');
+      card.className='wg-home-card'+(d.on===true?' on':'')+(d.controllable?' ctl':'');
+      const ic=document.createElement('div'); ic.className='ic'; ic.textContent=d.icon||'•';
+      const nm=document.createElement('div'); nm.className='nm'; nm.textContent=d.name||'';
+      const st=document.createElement('div'); st.className='st'; st.textContent=d.sub||d.state||'';
+      card.appendChild(ic); card.appendChild(nm); card.appendChild(st);
+      if(d.controllable && d.entity_id){
+        card.title='Tap to toggle';
+        card.onclick=async()=>{
+          if(card.classList.contains('busy')) return;
+          card.classList.add('busy');
+          try{
+            const r=await fetch('/v1/home/control',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({entity_id:d.entity_id,action:'toggle'})});
+            if(r.ok){ d.on=(d.on===true)?false:true; card.classList.toggle('on', d.on===true); }
+          }catch{}
+          card.classList.remove('busy');
+        };
+      }
+      grid.appendChild(card);
+    });
+    wrap.appendChild(grid); body.appendChild(wrap);
   }
 
   // ── Custom widget plugins (runtime, no recompile) ──

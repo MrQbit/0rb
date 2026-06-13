@@ -120,6 +120,7 @@ import { tryHandleVoiceRoute } from './voice/routes.js'
 import { isVoiceWsRequest, makeVoiceWsData, voiceWebSocketHandlers } from './voice/websocket.js'
 import { tryHandleChannelsRoute } from './channels/routes.js'
 import { tryHandleClusterRoute } from './cluster/routes.js'
+import { tryHandleHomeRoute } from './home/routes.js'
 import { getFileMeta as filesGetMeta } from './files/storage.js'
 import { mintInstallationToken as mintGitHubAppToken } from './github/appAuth.js'
 import {
@@ -1558,6 +1559,9 @@ async function dispatch(
   // ─── Phase 4: stream control + observability ───
   const obsResp = await tryHandleObservabilityRoute(req, pathname, identity, ctx, isAdmin)
   if (obsResp) return obsResp
+  // ─── Home (device dashboard refresh + tap-to-control via Home Assistant) ───
+  const homeResp = await tryHandleHomeRoute(method, pathname, req)
+  if (homeResp) return homeResp
   // ─── Discovery (skills/MCPs/agents from configured EMU repos) ───
   const discResp = await tryHandleDiscoveryRoute(req, pathname, identity, isAdmin)
   if (discResp) return discResp

@@ -515,6 +515,27 @@ body {
 .apps-conn[open] > summary::before { content:'▾ '; }
 
 /* ── Tasks widget — console-styled live to-do list ───────────────────────── */
+/* ── Home device dashboard (orb-themed, tap-to-toggle tiles) ── */
+.wg-home-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(96px, 1fr)); gap:9px; }
+.wg-home-card {
+  position:relative; display:flex; flex-direction:column; align-items:center; gap:4px;
+  padding:12px 8px 10px; border-radius:12px; text-align:center;
+  background:rgba(255,255,255,.03); border:1px solid var(--glass-edge);
+  transition:transform .15s var(--spring), border-color .2s, background .2s, box-shadow .2s;
+}
+.wg-home-card.ctl { cursor:pointer; }
+.wg-home-card.ctl:hover { transform:translateY(-2px); border-color:rgba(118,185,0,.4); }
+.wg-home-card.on {
+  background:rgba(118,185,0,.12); border-color:rgba(118,185,0,.55);
+  box-shadow:0 0 18px rgba(118,185,0,.25);
+}
+.wg-home-card.busy { opacity:.5; pointer-events:none; }
+.wg-home-card .ic { font-size:22px; line-height:1; filter:grayscale(.4); transition:filter .2s; }
+.wg-home-card.on .ic { filter:none; }
+.wg-home-card .nm { font-size:11.5px; font-weight:600; color:var(--ink); line-height:1.2; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wg-home-card .st { font-size:10px; color:var(--ink-dim); font-family:var(--mono); }
+.wg-home-card.on .st { color:var(--nv); }
+
 .wg-todo { font-family: var(--mono); font-size: 12.5px; display:flex; flex-direction:column; gap:3px; }
 .wg-todo-row { display:flex; gap:9px; align-items:flex-start; padding:4px 6px; border-radius:6px; line-height:1.4; }
 .wg-todo-row .g { flex:none; width:13px; text-align:center; font-weight:700; }

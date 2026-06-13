@@ -700,18 +700,16 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
         const domains = args?.type ? [String(args.type)] : HOME_DOMAINS
         const all = await haStates(domains)
         if (!all.length) return 'No matching devices found in Home Assistant.'
-        // Group for a readable summary + a table widget.
         const byDomain = new Map<string, HaEntity[]>()
         for (const e of all) (byDomain.get(e.domain) ?? byDomain.set(e.domain, []).get(e.domain)!).push(e)
-        const rows = all.map(e => [e.name, prettyDomain(e.domain), e.state])
         emitWidget(ctx.sessionId, {
-          id: 'home-devices', type: 'table', title: 'Home', pill: `${all.length} devices`,
-          columns: ['Device', 'Type', 'State'], rows,
+          id: 'home', type: 'home', title: 'Home', pill: `${all.length} devices`,
+          devices: all.map(toDeviceCard),
         } as any)
         const summary = [...byDomain.entries()]
           .map(([d, es]) => `${prettyDomain(d)} (${es.length}): ${es.slice(0, 4).map(e => e.name).join(', ')}${es.length > 4 ? '…' : ''}`)
           .join(' · ')
-        return `Showed ${all.length} devices. ${summary}`
+        return `Showed ${all.length} devices on the Home dashboard. ${summary}`
       }
 
       const query = String(args?.query || '').trim()
@@ -744,6 +742,32 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
   })
 
   return tools
+}
+
+/** Map an HA entity to a device card for the `home` dashboard widget. */
+function toDeviceCard(e: HaEntity): any {
+  const icons: Record<string, string> = {
+    light: '💡', switch: '🔌', climate: '🌡️', lock: '🔒', cover: '🪟',
+    media_player: '📺', vacuum: '🤖', fan: '🌀', binary_sensor: '📡',
+    sensor: '📊', camera: '📷', scene: '✨',
+  }
+  let on: boolean | undefined
+  if (e.domain === 'lock') on = e.state === 'locked'
+  else if (e.domain === 'cover') on = e.state === 'open'
+  else if (e.domain === 'media_player') on = !['off', 'idle', 'standby', 'unavailable'].includes(e.state)
+  else if (['light', 'switch', 'fan'].includes(e.domain)) on = e.state === 'on'
+  const controllable = ['light', 'switch', 'fan', 'lock', 'cover'].includes(e.domain)
+  return {
+    entity_id: e.entity_id,
+    name: e.name,
+    domain: e.domain,
+    kind: prettyDomain(e.domain),
+    icon: icons[e.domain] || '•',
+    state: e.state,
+    on,
+    sub: describeAttrs(e),
+    controllable,
+  }
 }
 
 /** Human label for an HA domain. */
