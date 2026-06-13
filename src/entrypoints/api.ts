@@ -274,6 +274,14 @@ async function main() {
     ),
   })
 
+  // Advertise on the LAN over mDNS so the 0rb Control Panel auto-discovers us.
+  try {
+    const { advertiseOrb } = await import('../api/discovery/mdns.js')
+    advertiseOrb(port)
+  } catch (err) {
+    console.warn('[api] mdns advertise init failed:', (err as Error).message)
+  }
+
   // ─── Start in-process job queue ───
   const { startPollLoop } = await import('../api/jobs/inprocQueue.js')
   startPollLoop()
