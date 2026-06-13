@@ -42,7 +42,6 @@
     "@opentelemetry/sdk-trace-node": "2.6.1",
     "@opentelemetry/semantic-conventions": "1.40.0",
     "@whiskeysockets/baileys": "^6.7.16",
-    "acme-client": "^5.4.0",
     "ajv": "8.18.0",
     "amqplib": "^1.0.6",
     "auto-bind": "5.0.1",
