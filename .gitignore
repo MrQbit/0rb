@@ -9,3 +9,7 @@ dist/installers/
 .env
 dist/*.mjs
 dist/*.mjs.map
+
+# Operator/vendor setup notes — never publish
+docs/SETUP-AND-INTEGRATIONS.md
+docs/operator/
