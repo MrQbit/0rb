@@ -1,0 +1,33 @@
+name: Publish assets
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    name: Publish artifacts
+    uses: your-org/fabric-workflow-shared/.github/workflows/workflow_golang-publish.yml@v3
+    with:
+      go_version: ${{ vars.GO_VERSION }}
+      project_name: ${{ vars.PROJECT_NAME }}
+      sonarqube_host: ${{ vars.SONAR_HOST_URL }}
+      fabric_application_api_url: ${{ vars.FABRIC_APPLICATION_API_URL }}
+      fabric_application_id: ${{ vars.FABRIC_APPLICATION_ID }}
+      artifactory_helm_url: ${{ vars.JFROG_HELM_REPO_URL_DEV }}
+      registry_url: ${{ vars.JFROG_DOCKER_REGISTRY_SERVER_NAME_DEV }}
+    secrets:
+      NULLPLATFORM_API_KEY: ${{ secrets.NULLPLATFORM_API_KEY }}
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      ARTIFACTORY_USERNAME: ${{ vars.JF_USER }}
+      ARTIFACTORY_TOKEN: ${{ secrets.JF_PASS }}
+      REGISTRY_USERNAME: ${{ vars.JF_USER }}
+      REGISTRY_TOKEN: ${{ secrets.JF_PASS }}
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
+      TENANT_ID: ${{ vars.TENANT_ID }}
+      CLIENT_ID: ${{ secrets.PUBLISH_CLIENT_ID }}
+      CLIENT_SECRET: ${{ secrets.PUBLISH_CLIENT_SECRET }}
+      SCOPE: ${{ secrets.PUBLISH_SCOPE }}
+      GITHUB_APP_ID: ${{ secrets.GH_APP_ID }}
+      GITHUB_APP_PRIVATE_KEY: ${{ secrets.GH_PRIVATE_KEY }}

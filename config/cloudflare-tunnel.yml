@@ -1,0 +1,13 @@
+# rak00n Cloudflare Tunnel configuration template.
+# Run scripts/setup-cloudflare-tunnel.sh to generate with your tunnel ID,
+# or fill in manually.
+#
+# tunnel: <your-tunnel-id>
+# credentials-file: ~/.cloudflared/<your-tunnel-id>.json
+#
+# ingress:
+#   - hostname: rakoon.yourdomain.com
+#     service: http://localhost:9081   # UI
+#   - hostname: api.rakoon.yourdomain.com
+#     service: http://localhost:9080   # API
+#   - service: http_status:404

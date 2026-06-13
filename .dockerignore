@@ -1,0 +1,16 @@
+.git
+node_modules
+web/node_modules
+AGENT_DOCS
+docs
+*.md
+!dist/README.md
+!dist/ARCHITECTURE.md
+.DS_Store
+.env
+.rak00n
+.rak00n-profile.json
+calc.py
+calculate.py
+bun.lock
+package-lock.json

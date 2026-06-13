@@ -1,0 +1,168 @@
+[
+  {
+    "name":"SONAR_TOKEN",
+    "value":"please fill",
+    "type":"secret"
+  },
+  {
+    "name":"PROJECT_NAME",
+    "value":"please fill",
+    "type":"variable"
+  },
+  {
+    "name":"SONAR_HOST_URL",
+    "value":"https://sonarqube.example.com",
+    "type":"variable"
+  },
+  {
+    "name":"FABRIC_APPLICATION_API_URL",
+    "value":"please fill",
+    "type":"variable"
+  },
+  {
+    "name":"FABRIC_APPLICATION_ID",
+    "value":"please fill",
+    "type":"variable"
+  },
+  {
+    "name":"TENANT_ID",
+    "value":"5b973f99-77df-4beb-b27d-aa0c70b8482c",
+    "type":"variable"
+  },
+  {
+    "name":"MICROSOFT_LOGIN_URL",
+    "value":"https://login.microsoftonline.com",
+    "type":"variable"
+  },
+  {
+    "name":"CHECKMARX_TEAM",
+    "value":"please fill",
+    "type":"variable"
+  },
+  {
+    "name":"PROJECT_PORTFOLIO",
+    "value":"please fill",
+    "type":"variable"
+  },
+  {
+    "name":"CHECKMARX_USERNAME",
+    "value":"please fill",
+    "type":"variable"
+  },
+  {
+    "name":"CHECKMARX_URL",
+    "value":"https://vmey.checkmarx.net/",
+    "type":"variable"
+  },
+  {
+    "name":"CHECKMARX_PASSWORD",
+    "value":"please fill",
+    "type":"secret"
+  },
+  {
+    "name":"APM_ID",
+    "value":"please fill",
+    "type":"variable"
+  },
+  {
+    "name":"SPR_ID",
+    "value":"please fill",
+    "type":"variable"
+  },
+  {
+    "name":"JFROG_DOCKER_REGISTRY_SERVER_NAME_EY",
+    "value":"please fill",
+    "type":"variable"
+  },
+  {
+    "name":"JFROG_HELM_REPO_URL_EY",
+    "value":"please fill",
+    "type":"variable"
+  },
+  {
+    "name":"JFROG_GENERIC_REPO_URL_EY",
+    "value":"please fill",
+    "type":"variable"
+  },
+  {
+    "name":"JFROG_DOCKER_REGISTRY_SERVER_NAME_DEV",
+    "value":"please fill",
+    "type":"variable"
+  },
+  {
+    "name":"JFROG_HELM_REPO_URL_DEV",
+    "value":"please fill",
+    "type":"variable"
+  },
+  {
+    "name":"JFROG_GENERIC_REPO_URL_DEV",
+    "value":"please fill",
+    "type":"variable"
+  },
+  {
+    "name":"JF_URL",
+    "value":"please fill",
+    "type":"variable"
+  },
+  {
+    "name":"JF_USER",
+    "value":"please fill",
+    "type":"variable"
+  },
+  {
+    "name":"GH_TOKEN",
+    "value":"please fill",
+    "type":"secret"
+  },
+  {
+    "name":"JF_PASS",
+    "value":"please fill",
+    "type":"secret"
+  },
+  {
+    "name":"NULLPLATFORM_API_KEY",
+    "value":"please fill",
+    "type":"secret"
+  },
+  {
+    "name":"PUBLISH_SCOPE",
+    "value":"please fill",
+    "type":"secret"
+  },
+  {
+    "name":"MONGODB_CONNECTION_STRING",
+    "value":"please fill",
+    "type":"secret"
+  },
+  {
+    "name":"GH_APP_ID",
+    "value":"please fill",
+    "type":"secret"
+  },
+  {
+    "name":"GH_INSTALLATION_ID",
+    "value":"please fill",
+    "type":"secret"
+  },
+  {
+    "name":"GH_PRIVATE_KEY",
+    "value":"please fill",
+    "type":"secret"
+  },
+  {
+    "name":"MONGODB_DB",
+    "value":"please fill",
+    "type":"secret"
+  },
+  {
+    "name":"MONGODB_SOURCE_COLLECTION",
+    "value":"please fill",
+    "type":"secret"
+  },
+  {
+    "name":"MONGODB_TARGET_COLLECTION",
+    "value":"please fill",
+    "type":"secret"
+  }
+]
+

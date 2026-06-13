@@ -1,0 +1,360 @@
+# Release Branch Sync Workflow
+# Automatically syncs changes from lower release branches to higher ones and develop
+# Created by Policy Migration Tool
+#
+# Trigger: When a PR is merged to a release/* branch
+# Action: Creates PRs to sync changes to all higher release branches and develop
+#
+# Example: PR merged to release/r18.0.2 creates PRs to:
+#   - release/r18.0.3 (if exists)
+#   - release/r18.1 (if exists)
+#   - release/r19.0 (if exists)
+#   - develop
+
+name: Release Branch Sync
+
+on:
+  pull_request_target:
+    types: [closed]
+    branches:
+      - 'release/**'
+      - 'release/*'
+  workflow_dispatch:
+    inputs:
+      source_branch:
+        description: 'Source branch to sync from (e.g., release/r18.0.2)'
+        required: true
+        type: string
+      dry_run:
+        description: 'Dry run (no actual changes)'
+        required: false
+        default: false
+        type: boolean
+
+# Prevent multiple sync workflows from running simultaneously
+concurrency:
+  group: release-sync-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  sync-forward:
+    # Only run if PR was merged (not just closed) OR manual trigger
+    # Skip if PR was created by github-actions bot (prevents infinite loops from auto-created sync PRs)
+    if: (github.event.pull_request.merged == true && github.event.pull_request.user.login != 'github-actions[bot]') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Determine Source Branch
+        id: source
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "branch=${{ github.event.inputs.source_branch }}" >> $GITHUB_OUTPUT
+            echo "dry_run=${{ github.event.inputs.dry_run }}" >> $GITHUB_OUTPUT
+          else
+            echo "branch=${{ github.event.pull_request.base.ref }}" >> $GITHUB_OUTPUT
+            echo "dry_run=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Extract Work Item References
+        id: workitems
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          WORK_ITEMS=""
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            # Extract AB#<id> from the merged PR title, body, and commit messages
+            # Note: PR_TITLE and PR_BODY are passed via env vars to prevent script injection
+            FOUND=$(echo "$PR_TITLE $PR_BODY" | grep -oE 'AB#[0-9]+' | sort -u | tr '\n' ' ')
+            
+            # If not found, search in commit messages
+            if [ -z "$FOUND" ]; then
+              FOUND=$(git log "origin/${{ github.event.pull_request.base.ref }}" --oneline -20 | grep -oE 'AB#[0-9]+' | sort -u | tr '\n' ' ')
+            fi
+            
+            WORK_ITEMS=$(echo "$FOUND" | xargs)
+            echo "Found work items: $WORK_ITEMS"
+          fi
+          echo "refs=$WORK_ITEMS" >> $GITHUB_OUTPUT
+
+      - name: Determine Target Branches
+        id: targets
+        run: |
+          SOURCE="${{ steps.source.outputs.branch }}"
+          echo "Source branch: $SOURCE"
+          
+          # Get all release branches sorted by version
+          RELEASE_BRANCHES=$(git branch -r | grep -E 'origin/release/' | sed 's|origin/||' | sort -V)
+          
+          # Find branches higher than source
+          HIGHER_BRANCHES=""
+          FOUND_SOURCE=false
+          
+          for branch in $RELEASE_BRANCHES; do
+            branch=$(echo $branch | xargs)
+            if [ "$branch" = "$SOURCE" ]; then
+              FOUND_SOURCE=true
+              continue
+            fi
+            if [ "$FOUND_SOURCE" = true ]; then
+              HIGHER_BRANCHES="$HIGHER_BRANCHES $branch"
+            fi
+          done
+          
+          # Always add develop as final target
+          HIGHER_BRANCHES="$HIGHER_BRANCHES develop"
+          
+          echo "Target branches:$HIGHER_BRANCHES"
+          echo "branches=$HIGHER_BRANCHES" >> $GITHUB_OUTPUT
+
+      - name: Sync to Higher Branches
+        id: sync
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ steps.source.outputs.dry_run }}
+        run: |
+          SOURCE="${{ steps.source.outputs.branch }}"
+          TARGETS="${{ steps.targets.outputs.branches }}"
+          
+          TOTAL_SYNCS=0
+          TOTAL_CONFLICTS=0
+          TOTAL_UPTODATE=0
+          SYNCED_BRANCHES=""
+          CONFLICT_BRANCHES=""
+          UPTODATE_BRANCHES=""
+          CREATED_PRS=""
+          TOTAL_DIVERGED=0
+          DIVERGED_BRANCHES=""
+          
+          for TARGET in $TARGETS; do
+            TARGET=$(echo $TARGET | xargs)
+            [ -z "$TARGET" ] && continue
+            
+            # Check if target branch exists
+            if ! git rev-parse --verify "origin/$TARGET" >/dev/null 2>&1; then
+              echo "Target $TARGET does not exist, skipping"
+              continue
+            fi
+            
+            # Check if branches share a common ancestor
+            MERGE_BASE=$(git merge-base "origin/$SOURCE" "origin/$TARGET" 2>/dev/null || echo "")
+            if [ -z "$MERGE_BASE" ]; then
+              echo "WARNING: $TARGET has no common ancestor with $SOURCE - branches have entirely different histories"
+              echo "  This usually happens when branches were migrated independently with shallow clones"
+              echo "  SKIPPING - Manual cherry-pick required"
+              TOTAL_DIVERGED=$((TOTAL_DIVERGED + 1))
+              DIVERGED_BRANCHES="$DIVERGED_BRANCHES $TARGET"
+              continue
+            fi
+            
+            # Check if there are commits to sync
+            BEHIND=$(git rev-list --count "origin/$TARGET..origin/$SOURCE" 2>/dev/null || echo "0")
+            
+            if [ "$BEHIND" = "0" ]; then
+              echo "$TARGET is up to date with $SOURCE"
+              TOTAL_UPTODATE=$((TOTAL_UPTODATE + 1))
+              UPTODATE_BRANCHES="$UPTODATE_BRANCHES $TARGET"
+              continue
+            fi
+            
+            # Check if branches are too diverged (>1000 commits difference)
+            if [ "$BEHIND" -gt 1000 ]; then
+              echo "WARNING: $TARGET is $BEHIND commits behind $SOURCE - branches are too diverged"
+              echo "  This indicates the branches have significantly different histories"
+              echo "  SKIPPING - Manual cherry-pick required"
+              TOTAL_DIVERGED=$((TOTAL_DIVERGED + 1))
+              DIVERGED_BRANCHES="$DIVERGED_BRANCHES $TARGET"
+              continue
+            fi
+            
+            echo "Syncing $SOURCE -> $TARGET ($BEHIND commits)"
+            
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "  [DRY RUN] Would sync $BEHIND commits"
+              continue
+            fi
+            
+            # Create a sync branch to avoid 'Update branch' polluting the source release branch
+            # Format: sync/{source}-to-{target}-{timestamp}
+            TIMESTAMP=$(date +%Y%m%d%H%M%S)
+            SYNC_BRANCH="sync/${SOURCE##*/}-to-${TARGET##*/}-$TIMESTAMP"
+            
+            # Close any existing open sync PRs for the same source->target to prevent stale merges
+            # Use exact "source -> target" in search to avoid accidentally closing PRs for other branches
+            OLD_PRS=$(gh pr list --base "$TARGET" --search "Sync: $SOURCE -> $TARGET" --state open --json number,headRefName 2>/dev/null || echo "[]")
+            OLD_PR_COUNT=$(echo "$OLD_PRS" | jq 'length' 2>/dev/null || echo "0")
+            if [ "$OLD_PR_COUNT" -gt 0 ]; then
+              for i in $(seq 0 $((OLD_PR_COUNT - 1))); do
+                OLD_PR_NUM=$(echo "$OLD_PRS" | jq -r ".[$i].number")
+                OLD_BRANCH=$(echo "$OLD_PRS" | jq -r ".[$i].headRefName")
+                echo "  Closing superseded sync PR #$OLD_PR_NUM (branch: $OLD_BRANCH)"
+                gh pr close "$OLD_PR_NUM" --comment "Superseded by a newer sync PR from \`$SOURCE\`. The previous sync branch was outdated and may have caused conflicts." 2>/dev/null || true
+                # Clean up the old sync branch (only delete sync/ prefixed branches for safety)
+                if echo "$OLD_BRANCH" | grep -q "^sync/"; then
+                  git push origin --delete "$OLD_BRANCH" 2>/dev/null || true
+                fi
+              done
+            fi
+            
+            # Create a new sync branch and PR
+            {
+              # Create sync branch from source
+              git checkout -b "$SYNC_BRANCH" "origin/$SOURCE"
+              
+              # Check if merge would have conflicts by doing a test merge
+              HAS_CONFLICTS=false
+              if ! git merge "origin/$TARGET" --no-commit --no-ff -m "test" 2>/dev/null; then
+                HAS_CONFLICTS=true
+                git merge --abort 2>/dev/null || true
+              else
+                git reset --hard "origin/$SOURCE"
+              fi
+              
+              # Push sync branch
+              git push origin "$SYNC_BRANCH"
+              
+              # Create PR from sync branch (not from release branch directly)
+              # Include short timestamp in title to ensure uniqueness (avoid duplicate PR title errors)
+              SHORT_TS=$(date +%m%d-%H%M)
+              WORK_ITEMS="${{ steps.workitems.outputs.refs }}"
+              WI_SUFFIX=""
+              WI_BODY_LINE=""
+              if [ -n "$WORK_ITEMS" ]; then
+                WI_SUFFIX=" $WORK_ITEMS"
+                WI_BODY_LINE=$'\n\n'"**Work Items:** $WORK_ITEMS"
+              fi
+              if [ "$HAS_CONFLICTS" = true ]; then
+                PR_TITLE="Sync: $SOURCE -> $TARGET [$SHORT_TS] (conflicts)${WI_SUFFIX}"
+                PR_BODY="Automatic sync from \`$SOURCE\` to \`$TARGET\` ($BEHIND commits)"$'\n\n'":warning: **Merge conflicts detected** - manual resolution required.${WI_BODY_LINE}"$'\n\n'"_This PR uses a sync branch to protect the source release branch from accidental updates._"
+                TOTAL_CONFLICTS=$((TOTAL_CONFLICTS + 1))
+                CONFLICT_BRANCHES="$CONFLICT_BRANCHES $TARGET"
+              else
+                PR_TITLE="Sync: $SOURCE -> $TARGET [$SHORT_TS]${WI_SUFFIX}"
+                PR_BODY="Automatic sync from \`$SOURCE\` to \`$TARGET\` ($BEHIND commits)"$'\n\n'":white_check_mark: No conflicts detected - ready to merge.${WI_BODY_LINE}"$'\n\n'"_This PR uses a sync branch to protect the source release branch from accidental updates._"
+              fi
+              
+              echo "  Creating PR: $PR_TITLE (via sync branch $SYNC_BRANCH)"
+              PR_OUTPUT=$(gh pr create --base "$TARGET" --head "$SYNC_BRANCH" \
+                --title "$PR_TITLE" \
+                --body "$PR_BODY" 2>&1)
+              PR_EXIT=$?
+              
+              if [ $PR_EXIT -eq 0 ]; then
+                PR_URL=$(echo "$PR_OUTPUT" | grep -o 'https://github.com[^ ]*' | head -1)
+                echo "  Created PR: $PR_URL"
+                
+                # Trigger status-check-router via repository_dispatch.
+                # GITHUB_TOKEN cannot trigger pull_request events for other workflows,
+                # but CAN trigger repository_dispatch events.
+                PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+                HEAD_SHA=$(git rev-parse HEAD)
+                echo "  Triggering status-check-router via repository_dispatch (PR #$PR_NUMBER, SHA $HEAD_SHA)"
+                gh api "/repos/${{ github.repository }}/dispatches" \
+                  --method POST \
+                  -f event_type="sync-pr-created" \
+                  -f "client_payload[pr_number]=$PR_NUMBER" \
+                  -f "client_payload[head_sha]=$HEAD_SHA" \
+                  -f "client_payload[head_ref]=$SYNC_BRANCH"
+                
+                CREATED_PRS="$CREATED_PRS [$TARGET]($PR_URL)"
+                if [ "$HAS_CONFLICTS" = false ]; then
+                  TOTAL_SYNCS=$((TOTAL_SYNCS + 1))
+                  SYNCED_BRANCHES="$SYNCED_BRANCHES $TARGET"
+                fi
+              else
+                echo "  Failed to create PR: $PR_OUTPUT"
+                # Clean up sync branch on failure
+                git push origin --delete "$SYNC_BRANCH" 2>/dev/null || true
+              fi
+            }
+          done
+          
+          echo ""
+          echo "=== SUMMARY ==="
+          echo "Source: $SOURCE"
+          echo "Synced ($TOTAL_SYNCS):$SYNCED_BRANCHES"
+          echo "Conflicts ($TOTAL_CONFLICTS):$CONFLICT_BRANCHES"
+          echo "Up to date ($TOTAL_UPTODATE):$UPTODATE_BRANCHES"
+          echo "Diverged ($TOTAL_DIVERGED):$DIVERGED_BRANCHES"
+          
+          echo "total_syncs=$TOTAL_SYNCS" >> $GITHUB_OUTPUT
+          echo "total_conflicts=$TOTAL_CONFLICTS" >> $GITHUB_OUTPUT
+          echo "total_uptodate=$TOTAL_UPTODATE" >> $GITHUB_OUTPUT
+          echo "synced_branches=$SYNCED_BRANCHES" >> $GITHUB_OUTPUT
+          echo "conflict_branches=$CONFLICT_BRANCHES" >> $GITHUB_OUTPUT
+          echo "uptodate_branches=$UPTODATE_BRANCHES" >> $GITHUB_OUTPUT
+          echo "created_prs=$CREATED_PRS" >> $GITHUB_OUTPUT
+          echo "total_diverged=$TOTAL_DIVERGED" >> $GITHUB_OUTPUT
+          echo "diverged_branches=$DIVERGED_BRANCHES" >> $GITHUB_OUTPUT
+
+      - name: Create Summary
+        run: |
+          echo "## Release Branch Sync" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Source:** ${{ steps.source.outputs.branch }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -n "${{ steps.sync.outputs.synced_branches }}" ]; then
+            echo "**Synced (${{ steps.sync.outputs.total_syncs }}):**" >> $GITHUB_STEP_SUMMARY
+            for branch in ${{ steps.sync.outputs.synced_branches }}; do
+              echo "- $branch" >> $GITHUB_STEP_SUMMARY
+            done
+          fi
+          if [ -n "${{ steps.sync.outputs.conflict_branches }}" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Conflicts (${{ steps.sync.outputs.total_conflicts }}):**" >> $GITHUB_STEP_SUMMARY
+            for branch in ${{ steps.sync.outputs.conflict_branches }}; do
+              echo "- $branch" >> $GITHUB_STEP_SUMMARY
+            done
+          fi
+          if [ -n "${{ steps.sync.outputs.created_prs }}" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**PRs Created:**" >> $GITHUB_STEP_SUMMARY
+            echo "${{ steps.sync.outputs.created_prs }}" | tr ' ' '\n' | while read pr; do
+              [ -n "$pr" ] && echo "- $pr" >> $GITHUB_STEP_SUMMARY
+            done
+          fi
+          if [ -n "${{ steps.sync.outputs.uptodate_branches }}" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Up to date (${{ steps.sync.outputs.total_uptodate }}):**" >> $GITHUB_STEP_SUMMARY
+            for branch in ${{ steps.sync.outputs.uptodate_branches }}; do
+              echo "- $branch" >> $GITHUB_STEP_SUMMARY
+            done
+          fi
+          if [ -n "${{ steps.sync.outputs.diverged_branches }}" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Diverged (${{ steps.sync.outputs.total_diverged }}) - Manual cherry-pick required:**" >> $GITHUB_STEP_SUMMARY
+            for branch in ${{ steps.sync.outputs.diverged_branches }}; do
+              echo "- $branch" >> $GITHUB_STEP_SUMMARY
+            done
+          fi
+
+      - name: Check for issues
+        # Intentionally exits with code 1 to mark the workflow run as failed and draw attention.
+        # Ensure branch protection rules on the triggering PR are not affected by this status.
+        if: steps.sync.outputs.total_conflicts > 0 || steps.sync.outputs.total_diverged > 0
+        run: |
+          echo ""
+          echo "::warning::Sync completed with issues requiring manual attention"
+          if [ "${{ steps.sync.outputs.total_conflicts }}" -gt 0 ]; then
+            echo "::warning::${{ steps.sync.outputs.total_conflicts }} branch(es) have merge conflicts - PRs created for manual resolution"
+          fi
+          if [ "${{ steps.sync.outputs.total_diverged }}" -gt 0 ]; then
+            echo "::warning::${{ steps.sync.outputs.total_diverged }} branch(es) are too diverged - manual cherry-pick required"
+          fi
+          exit 1

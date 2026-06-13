@@ -1,0 +1,10 @@
+# GPU neural TTS. torch is inherited from the base image's CUDA venv.
+#   kokoro  (default) — Kokoro-82M, fast/stable
+#   orpheus           — Orpheus-3B emotive voice (transformers + SNAC, no vLLM)
+kokoro>=0.9.2
+soundfile>=0.12.1
+transformers>=4.45
+snac>=1.2.0
+fastapi>=0.110
+uvicorn>=0.29
+numpy>=1.26

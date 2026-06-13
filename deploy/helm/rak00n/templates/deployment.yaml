@@ -1,0 +1,165 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rak00n-api
+  namespace: {{ include "rak00n.namespace" . }}
+  labels:
+    {{- include "rak00n.labels" . | nindent 4 }}
+    app.kubernetes.io/component: router
+spec:
+  replicas: {{ .Values.router.replicas }}
+  {{- with .Values.router.rollingUpdate }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: {{ .maxSurge }}
+      maxUnavailable: {{ .maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "rak00n.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: router
+  template:
+    metadata:
+      labels:
+        {{- include "rak00n.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: router
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: rak00n-api
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        # Seed the writable skills emptyDir from the read-only image
+        # bundle on every pod start. The main container's volumeMount
+        # is the same emptyDir, so without this seed the skills would
+        # appear empty on every fresh pod (the mount shadows the
+        # /opt/rak00n-api/skills/ files COPYed in the image).
+        # `cp -n` ("no-clobber") so any skill added at runtime via
+        # PUT /v1/skills survives a pod restart if the volume is
+        # later promoted to a PVC; today the emptyDir is recreated
+        # so this is just defensive.
+        - name: skills-seed
+          image: {{ include "rak00n.image" . }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          command:
+            - sh
+            - -c
+            - >-
+              if [ -d /opt/rak00n-api/skills.bundled ]; then
+                cp -rn /opt/rak00n-api/skills.bundled/. /opt/rak00n-api/skills/ || true;
+              fi;
+              ls /opt/rak00n-api/skills/ | head -20
+          volumeMounts:
+            - name: rak00n-skills
+              mountPath: /opt/rak00n-api/skills
+      containers:
+        - name: rak00n-api
+          image: {{ include "rak00n.image" . }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: rak00n-config
+            - secretRef:
+                name: rak00n-secrets
+          {{- if or .Values.worker.enabled .Values.dockerOps.enabled (and .Values.github .Values.github.app .Values.github.app.enabled .Values.github.app.privateKeySecret.name) }}
+          env:
+            {{- if .Values.dockerOps.enabled }}
+            - name: RAK00N_DOCKER_OPS_ENABLED
+              value: "1"
+            {{- end }}
+            {{- if .Values.worker.enabled }}
+            - name: RAK00N_WORKER_MODE
+              value: "k8s-jobs"
+            - name: RAK00N_WORKER_IMAGE
+              value: {{ include "rak00n.image" . }}
+            - name: RAK00N_WORKER_IMAGE_PULL_POLICY
+              value: {{ .Values.global.imagePullPolicy | quote }}
+            - name: RAK00N_WORKER_NAMESPACE
+              value: {{ include "rak00n.namespace" . }}
+            - name: RAK00N_WORKER_SA
+              value: rak00n-api
+            - name: RAK00N_WORKER_TTL
+              value: {{ .Values.worker.ttlSecondsAfterFinished | quote }}
+            - name: RAK00N_WORKER_DEADLINE
+              value: {{ .Values.worker.activeDeadlineSeconds | quote }}
+            {{- end }}
+            {{- if and .Values.github .Values.github.app .Values.github.app.enabled .Values.github.app.privateKeySecret.name }}
+            - name: GITHUB_APP_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.github.app.privateKeySecret.name | quote }}
+                  key: {{ .Values.github.app.privateKeySecret.key | default "GITHUB_APP_PRIVATE_KEY" | quote }}
+            {{- end }}
+          {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            {{- toYaml .Values.router.resources | nindent 12 }}
+          volumeMounts:
+            - name: rak00n-skills
+              mountPath: /opt/rak00n-api/skills
+            - name: workspace
+              mountPath: /workspace
+            - name: tmp
+              mountPath: /tmp
+            - name: home
+              mountPath: /home/rak00n
+            {{- if .Values.files.persistence.enabled }}
+            - name: rak00n-files
+              mountPath: {{ .Values.files.root | quote }}
+            {{- end }}
+            {{- if .Values.dockerOps.enabled }}
+            - name: docker-sock
+              mountPath: /var/run/docker.sock
+            {{- end }}
+      volumes:
+        {{- if .Values.dockerOps.enabled }}
+        - name: docker-sock
+          hostPath:
+            path: {{ .Values.dockerOps.socketPath | quote }}
+            type: Socket
+        {{- end }}
+        - name: rak00n-skills
+          emptyDir: {}
+        - name: workspace
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+        - name: home
+          emptyDir: {}
+        {{- if .Values.files.persistence.enabled }}
+        - name: rak00n-files
+          persistentVolumeClaim:
+            claimName: {{ .Values.files.persistence.existingClaim | default .Values.files.persistence.claimName | default "rak00n-files" }}
+        {{- end }}

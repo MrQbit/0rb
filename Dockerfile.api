@@ -1,0 +1,67 @@
+# syntax=docker/dockerfile:1.7
+
+# ───────── Stage 1: bundle TS → single ESM ─────────
+FROM oven/bun:1.3.12 AS bundler
+WORKDIR /app
+COPY package.json ./
+RUN bun install --frozen-lockfile --production=false || bun install
+COPY tsconfig.json ./
+COPY src/ src/
+COPY scripts/ scripts/
+COPY proto/ proto/ 2>/dev/null || true
+RUN bun run scripts/build-api.ts
+
+# ───────── Stage 2: compile to native binary ─────────
+# `bun build --compile` produces a single self-contained executable that
+# embeds the ESM bundle + the Bun runtime. Source code is wrapped in a
+# pre-compiled blob, which is what the user means by "obfuscated".
+FROM oven/bun:1.3.12 AS compiler
+WORKDIR /app
+COPY --from=bundler /app/dist /app/dist
+RUN bun build \
+    --compile \
+    --minify \
+    --sourcemap=none \
+    --target=bun-linux-x64 \
+    /app/dist/api.mjs \
+    --outfile /out/rak00n-api
+
+# ───────── Stage 3: runtime image ─────────
+# Wolfi gives us a minimal glibc-compatible image with bash + coreutils,
+# which the agent's Bash tool needs to execute developer commands.
+FROM cgr.dev/chainguard/wolfi-base:latest
+LABEL org.opencontainers.image.title="rak00n-api"
+LABEL org.opencontainers.image.description="RAK00N REST + SSE API (Foundry via Entra)"
+LABEL org.opencontainers.image.source="https://github.com/MrQbit/rak00n"
+
+# Install the toolset the agent's Bash + edit tools rely on.
+# tini is PID 1; bash + coreutils + git for tools; ca-certificates for HTTPS;
+# the rest are common deps developers expect inside the workspace.
+RUN apk add --no-cache \
+      bash coreutils findutils grep sed gawk \
+      git curl jq \
+      tini ca-certificates \
+      python3 py3-pip nodejs
+
+# Non-root user; /workspace is per-session writable.
+RUN addgroup -g 10001 rak00n && adduser -u 10001 -G rak00n -D -h /home/rak00n rak00n && \
+    mkdir -p /workspace && chown -R rak00n:rak00n /workspace
+
+COPY --from=compiler /out/rak00n-api /usr/local/bin/rak00n-api
+COPY --from=bundler  /app/dist/web /opt/rak00n-api/web
+
+USER rak00n
+WORKDIR /workspace
+
+ENV RAK00N_API_PORT=8080 \
+    RAK00N_API_HOST=0.0.0.0 \
+    RAK00N_API_WEB_DIR=/opt/rak00n-api/web \
+    RAK00N_API_WORKSPACE_ROOT=/workspace \
+    RAK00N_STANDALONE=1 \
+    RAK00N_USE_FOUNDRY=1 \
+    NODE_ENV=production
+
+EXPOSE 8080
+
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["/usr/local/bin/rak00n-api"]

@@ -1,0 +1,128 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PR Security Findings",
+  "type": "object",
+  "required": ["scan_id", "scan_date", "scan_type", "findings", "summary"],
+  "properties": {
+    "scan_id": {
+      "type": "string",
+      "pattern": "^pr-scan-",
+      "description": "Unique scan identifier: pr-scan-<PR_NUMBER>-<YYYY-MM-DD>"
+    },
+    "scan_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "scan_type": {
+      "type": "string",
+      "enum": ["pr"]
+    },
+    "pr_number": {
+      "type": "integer"
+    },
+    "pr_title": {
+      "type": "string"
+    },
+    "base_branch": {
+      "type": "string"
+    },
+    "head_branch": {
+      "type": "string"
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "severity", "stride_category", "vulnerability_type", "cwe", "file", "line_range", "analysis", "confidence"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^VULN-\\d{3}$"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+          },
+          "stride_category": {
+            "type": "string",
+            "enum": ["Spoofing", "Tampering", "Repudiation", "InfoDisclosure", "DoS", "ElevationOfPrivilege"]
+          },
+          "vulnerability_type": {
+            "type": "string"
+          },
+          "cwe": {
+            "type": "string",
+            "pattern": "^CWE-\\d+$"
+          },
+          "file": {
+            "type": "string"
+          },
+          "line_range": {
+            "type": "string"
+          },
+          "code_context": {
+            "type": "string"
+          },
+          "analysis": {
+            "type": "string"
+          },
+          "exploit_scenario": {
+            "type": "string"
+          },
+          "existing_mitigations": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "recommended_fix": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0.8,
+            "maximum": 1.0
+          }
+        }
+      }
+    },
+    "false_positives": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "reason"],
+        "properties": {
+          "id": { "type": "string" },
+          "reason": { "type": "string" },
+          "evidence": { "type": "string" }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["total_findings", "by_severity", "by_stride", "files_analyzed"],
+      "properties": {
+        "total_findings": { "type": "integer" },
+        "by_severity": {
+          "type": "object",
+          "properties": {
+            "CRITICAL": { "type": "integer" },
+            "HIGH": { "type": "integer" },
+            "MEDIUM": { "type": "integer" },
+            "LOW": { "type": "integer" }
+          }
+        },
+        "by_stride": {
+          "type": "object",
+          "properties": {
+            "Spoofing": { "type": "integer" },
+            "Tampering": { "type": "integer" },
+            "Repudiation": { "type": "integer" },
+            "InfoDisclosure": { "type": "integer" },
+            "DoS": { "type": "integer" },
+            "ElevationOfPrivilege": { "type": "integer" }
+          }
+        },
+        "files_analyzed": { "type": "integer" }
+      }
+    }
+  }
+}

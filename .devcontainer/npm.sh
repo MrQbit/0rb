@@ -1,0 +1,11 @@
+npm config set @your-scope-xd:registry=https://$MOTIF_ARTIF_REGISTRY_URL/
+npm config set //$MOTIF_ARTIF_REGISTRY_URL/:_password="$MOTIF_SERVICE_ACCOUNT_PASS"
+npm config set //$MOTIF_ARTIF_REGISTRY_URL/:username="$MOTIF_SERVICE_ACCOUNT"
+npm config set //$MOTIF_ARTIF_REGISTRY_URL/:email="$MOTIF_SERVICE_ACCOUNT"
+npm config set @your-scope:registry=https://$MFE_CORE_ARTIF_REGISTRY_URL/
+npm config set //$MFE_CORE_ARTIF_REGISTRY_URL/:_password="$MFE_CORE_SERVICE_ACCOUNT_PASS"
+npm config set //$MFE_CORE_ARTIF_REGISTRY_URL/:username="$MFE_CORE_SERVICE_ACCOUNT"
+npm config set //$MFE_CORE_ARTIF_REGISTRY_URL/:email="$MFE_CORE_SERVICE_ACCOUNT"
+npm config set @your-scope-studio:registry=https://npm.example.com
+npm config set registry=https://registry.npmjs.com/
+npm set save-exact=true

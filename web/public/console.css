@@ -1,0 +1,155 @@
+/* ============================================================================
+   console.css — reskins the legacy console to the orb design language.
+   Loaded after styles.css, so these rules win. Settings-focused; the chat
+   and old chrome are gone (chat lives on the orb page).
+   ========================================================================== */
+:root {
+  --nv:#76b900; --nv-bright:#8fd400; --nv-teal:#00c878;
+  --bg-0:#06080a; --bg-1:#0a0e0d; --ink:#e9f1e2; --ink-dim:#8a978a;
+  --line:rgba(255,255,255,.08); --glass:rgba(14,19,16,.66); --glass-edge:rgba(118,185,0,.22);
+  --font: ui-sans-serif,-apple-system,"Segoe UI",Inter,system-ui,sans-serif;
+}
+
+body {
+  background:
+    radial-gradient(1100px 700px at 50% -10%, rgba(118,185,0,.09), transparent 60%),
+    radial-gradient(800px 800px at 110% 120%, rgba(0,200,120,.06), transparent 55%),
+    var(--bg-0) !important;
+  color: var(--ink) !important;
+  font-family: var(--font) !important;
+}
+
+/* ── topbar ─────────────────────────────────────────────────────────────── */
+.topbar {
+  background: rgba(8,12,10,.72) !important; backdrop-filter: blur(18px) saturate(1.2);
+  border-bottom: 1px solid var(--line) !important; box-shadow: none !important;
+  padding: 12px 22px !important;
+}
+.brand-name { letter-spacing:.4px; }
+.brand-name b, .brand b { color: var(--nv) !important; }
+.brand-logo { filter: drop-shadow(0 0 10px rgba(118,185,0,.35)); }
+
+/* declutter: hide legacy badges + GitHub sign-in noise */
+#modeBadge, #heartbeatBadge, #ghSignInBtn, #ghUserBox, .brand-status { display:none !important; }
+
+/* tabs → pills */
+.tabs button {
+  background: transparent !important; border:1px solid transparent !important;
+  color: var(--ink-dim) !important; border-radius: 999px !important;
+  padding: 7px 16px !important; font-weight: 550 !important; transition: all .2s ease;
+}
+.tabs button:hover { color: var(--ink) !important; }
+.tabs button.active {
+  color:#08120a !important; background: var(--nv) !important; border-color: var(--nv) !important;
+}
+
+.back-to-orb {
+  margin-left: 14px; text-decoration:none; color: var(--ink-dim);
+  font-size: 13px; padding: 7px 14px; border-radius: 999px; border:1px solid var(--line);
+  transition: all .2s ease; white-space:nowrap;
+}
+.back-to-orb:hover { color: var(--nv); border-color: var(--glass-edge); background: rgba(118,185,0,.08); }
+
+/* user chip / sign out */
+.user-chip { background: rgba(255,255,255,.03) !important; border:1px solid var(--line) !important; border-radius:999px !important; }
+.avatar { background: var(--nv) !important; color:#08120a !important; }
+.logout { color: var(--ink-dim) !important; }
+.logout:hover { color: var(--nv) !important; }
+
+/* ── sidebar ────────────────────────────────────────────────────────────── */
+#sidebar, .sidebar, aside {
+  background: rgba(10,14,12,.55) !important; border-right:1px solid var(--line) !important;
+}
+.sb-list.sb-nav li, .sb-nav li {
+  color: var(--ink-dim) !important; border-radius: 10px !important; margin: 2px 6px !important;
+  padding: 9px 12px !important; transition: all .15s ease; border:1px solid transparent !important;
+}
+.sb-nav li:hover { color: var(--ink) !important; background: rgba(118,185,0,.06) !important; }
+.sb-nav li.active {
+  color: var(--nv) !important; background: rgba(118,185,0,.12) !important; border-color: var(--glass-edge) !important;
+}
+.sb-action, #sbRefreshBtn, #sbPinBtn { color: var(--ink-dim) !important; }
+
+/* ── content / cards / typography ───────────────────────────────────────── */
+main, #appMain { background: transparent !important; }
+section h2 { color: var(--ink) !important; font-weight: 640 !important; letter-spacing:.2px; }
+.muted { color: var(--ink-dim) !important; }
+.info-card, .card, .panel-card {
+  background: var(--glass) !important; border:1px solid var(--line) !important;
+  border-radius: 16px !important; box-shadow: none !important; backdrop-filter: blur(8px);
+}
+.info-card:hover { border-color: var(--glass-edge) !important; }
+.info-label { color: var(--nv) !important; letter-spacing:.4px; text-transform:uppercase; font-size:11px !important; }
+code { color: var(--nv-bright) !important; background: rgba(118,185,0,.08) !important; border-radius:5px; padding:1px 5px; }
+
+/* ── inputs / buttons ───────────────────────────────────────────────────── */
+input, select, textarea {
+  background: rgba(0,0,0,.30) !important; border:1px solid var(--line) !important;
+  color: var(--ink) !important; border-radius: 10px !important; outline:none;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--glass-edge) !important; box-shadow:0 0 0 3px rgba(118,185,0,.12) !important; }
+button:not(.tabs button):not(.back-to-orb) {
+  background: var(--nv); color:#08120a; border:0; border-radius:10px; font-weight:600;
+  padding:9px 16px; cursor:pointer; transition: background .2s ease, transform .12s ease;
+}
+button:not(.tabs button):not(.back-to-orb):hover { background: var(--nv-bright); transform: translateY(-1px); }
+button.subtle, button.ghost, button.secondary, .sb-action {
+  background: rgba(118,185,0,.10) !important; color: var(--nv) !important; border:1px solid var(--glass-edge) !important;
+}
+button.danger, .danger { background: rgba(255,93,93,.14) !important; color:#ff9b9b !important; border:1px solid rgba(255,93,93,.4) !important; }
+
+/* ── dashboard KPIs ─────────────────────────────────────────────────────── */
+.dash-section-h, section h3 { color: var(--ink-dim) !important; text-transform: uppercase; letter-spacing:.6px; font-size:12px !important; font-weight:600 !important; margin-top:22px !important; }
+.kpi, .kpi-card {
+  background: var(--glass) !important; border:1px solid var(--line) !important; border-radius:14px !important;
+}
+.kpi:hover { border-color: var(--glass-edge) !important; }
+.kpi-label { color: var(--ink-dim) !important; }
+.kpi-value { color: var(--ink) !important; }
+#accessCard #publicUrlLink { color: var(--nv) !important; }
+#accessCard #publicUrlLink:hover { color: var(--nv-bright) !important; }
+
+/* ── documentation pages ───────────────────────────────────────────────── */
+.docs-hero {
+  background: linear-gradient(135deg, rgba(118,185,0,.10), rgba(0,200,120,.04)) !important;
+  border:1px solid var(--glass-edge) !important; border-radius: 18px !important; padding: 26px !important;
+}
+.docs-hero h2 { color: var(--ink) !important; }
+.docs-hero h2 b { color: var(--nv) !important; }
+.docs-lede { color: var(--ink-dim) !important; }
+.docs-link-chip {
+  background: rgba(255,255,255,.03) !important; border:1px solid var(--line) !important; border-radius: 12px !important;
+  color: var(--ink) !important; transition: all .18s ease;
+}
+.docs-link-chip:hover { border-color: var(--nv) !important; background: rgba(118,185,0,.08) !important; }
+.docs-link-chip-icon { color: var(--nv) !important; }
+.docs-link-chip em { color: var(--ink-dim) !important; }
+
+/* rendered markdown */
+.docs-markdown { color: var(--ink) !important; line-height: 1.65; }
+.docs-markdown h1, .docs-markdown h2, .docs-markdown h3 { color: var(--ink) !important; border-bottom:1px solid var(--line); padding-bottom:.3em; }
+.docs-markdown h1 b, .docs-markdown h2 b { color: var(--nv) !important; }
+.docs-markdown a { color: var(--nv) !important; text-decoration: none; }
+.docs-markdown a:hover { text-decoration: underline; }
+.docs-markdown code { color: var(--nv-bright) !important; background: rgba(118,185,0,.08) !important; }
+.docs-markdown pre {
+  background: rgba(0,0,0,.4) !important; border:1px solid var(--line) !important; border-radius: 12px !important; padding:14px !important;
+}
+.docs-markdown pre code { background: transparent !important; color: var(--ink) !important; }
+.docs-markdown blockquote { border-left:3px solid var(--nv); color: var(--ink-dim); padding-left:14px; }
+.docs-markdown table { border-collapse: collapse; }
+.docs-markdown th, .docs-markdown td { border:1px solid var(--line) !important; padding:8px 12px; }
+.docs-markdown th { background: rgba(118,185,0,.08) !important; color: var(--ink) !important; }
+
+/* tables generally */
+table { color: var(--ink); }
+th { color: var(--ink-dim); }
+tr { border-color: var(--line) !important; }
+
+/* generic links */
+a { color: var(--nv); }
+
+/* scrollbars */
+*::-webkit-scrollbar { width:10px; height:10px; }
+*::-webkit-scrollbar-thumb { background: rgba(118,185,0,.18); border-radius:8px; }
+*::-webkit-scrollbar-track { background: transparent; }

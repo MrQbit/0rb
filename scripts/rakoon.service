@@ -1,0 +1,20 @@
+[Unit]
+Description=rak00n AI coding agent
+After=network.target
+
+[Service]
+Type=simple
+User=rakoon
+WorkingDirectory=/opt/rakoon
+ExecStart=/usr/bin/bun run /opt/rakoon/dist/api.mjs
+Restart=always
+RestartSec=5
+EnvironmentFile=/etc/rakoon/env
+StandardOutput=append:/var/log/rakoon/api.log
+StandardError=append:/var/log/rakoon/api.log
+
+# Give the process time to handle in-flight requests
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>rak00n — AI Coding Agent</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#F6F6FA;color:#2E2E38;line-height:1.6}
+  .header{background:#2E2E38;color:#fff;padding:3rem 0;border-bottom:4px solid #FFE600}
+  .header-inner{max-width:800px;margin:0 auto;padding:0 1.5rem;text-align:center}
+  .header h1{font-size:2.5rem;font-weight:700;letter-spacing:-0.02em}
+  .header h1 span{color:#FFE600}
+  .header p{margin-top:0.75rem;color:#C0C0C8;font-size:1.1rem}
+  .container{max-width:800px;margin:0 auto;padding:2.5rem 1.5rem}
+  .card{background:#fff;border-radius:8px;padding:2rem;margin-bottom:1.5rem;box-shadow:0 1px 3px rgba(0,0,0,0.08)}
+  .card h2{font-size:1.3rem;margin-bottom:1rem;color:#2E2E38;border-bottom:2px solid #FFE600;padding-bottom:0.5rem;display:inline-block}
+  .install-block{background:#1E1E24;border-radius:6px;padding:1.25rem 1.5rem;margin:1rem 0;position:relative;overflow-x:auto}
+  .install-block code{color:#E0E0E8;font-family:'SF Mono',SFMono-Regular,Consolas,'Liberation Mono',Menlo,monospace;font-size:0.95rem;white-space:pre;display:block}
+  .install-block .comment{color:#6B6B7B}
+  .copy-btn{position:absolute;top:0.75rem;right:0.75rem;background:#FFE600;color:#2E2E38;border:none;border-radius:4px;padding:0.35rem 0.75rem;font-size:0.8rem;font-weight:600;cursor:pointer;transition:opacity 0.2s}
+  .copy-btn:hover{opacity:0.85}
+  .copy-btn.copied{background:#4CAF50;color:#fff}
+  .platform-tabs{display:flex;gap:0;margin-bottom:0}
+  .platform-tab{padding:0.6rem 1.5rem;background:#E8E8EC;border:none;cursor:pointer;font-size:0.9rem;font-weight:600;color:#6B6B7B;border-radius:6px 6px 0 0;transition:all 0.2s}
+  .platform-tab.active{background:#1E1E24;color:#FFE600}
+  .platform-content{display:none}
+  .platform-content.active{display:block}
+  .platform-content .install-block{border-radius:0 6px 6px 6px;margin-top:0}
+  .features{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem}
+  .feature{background:#F6F6FA;border-radius:6px;padding:1rem}
+  .feature strong{display:block;margin-bottom:0.25rem;color:#2E2E38}
+  .feature span{color:#6B6B7B;font-size:0.9rem}
+  .prereq{background:#FFF9E0;border-left:3px solid #FFE600;padding:1rem 1.25rem;border-radius:0 6px 6px 0;margin:1rem 0;font-size:0.9rem}
+  .prereq strong{color:#2E2E38}
+  .footer{text-align:center;padding:2rem 1.5rem;color:#6B6B7B;font-size:0.85rem;border-top:1px solid #E0E0E4}
+  .dl-links{display:flex;gap:1rem;margin-top:1rem;flex-wrap:wrap}
+  .dl-link{display:inline-flex;align-items:center;gap:0.5rem;background:#2E2E38;color:#fff;padding:0.6rem 1.25rem;border-radius:6px;text-decoration:none;font-weight:600;font-size:0.9rem;transition:background 0.2s}
+  .dl-link:hover{background:#3E3E48}
+  .dl-link .icon{font-size:1.1rem}
+  @media(max-width:600px){.features{grid-template-columns:1fr}.header h1{font-size:1.75rem}.dl-links{flex-direction:column}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <h1><span>rak00n</span></h1>
+    <p>AI coding agent for any LLM — OpenAI, Gemini, DeepSeek, Ollama, and 200+ models</p>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="card">
+    <h2>Install</h2>
+
+    <div class="prereq">
+      <strong>Prerequisites:</strong> <a href="https://nodejs.org">Node.js 20+</a> and the <a href="https://cli.github.com">GitHub CLI</a> (run <code>gh auth login</code> first).
+    </div>
+
+    <div class="platform-tabs">
+      <button class="platform-tab active" onclick="switchPlatform('macos')">macOS / Linux</button>
+      <button class="platform-tab" onclick="switchPlatform('windows')">Windows</button>
+    </div>
+
+    <div id="platform-macos" class="platform-content active">
+      <div class="install-block">
+        <button class="copy-btn" onclick="copyCommand(this, 'cmd-macos')">Copy</button>
+        <code id="cmd-macos">gh release download -R MrQbit/rak00n -p "rak00n-installer-macos" -D /tmp --clobber && chmod +x /tmp/rak00n-installer-macos && /tmp/rak00n-installer-macos && rm /tmp/rak00n-installer-macos && source ~/.zshrc</code>
+      </div>
+    </div>
+
+    <div id="platform-windows" class="platform-content">
+      <div class="install-block">
+        <button class="copy-btn" onclick="copyCommand(this, 'cmd-windows')">Copy</button>
+        <code id="cmd-windows">gh release download -R MrQbit/rak00n -p "rak00n-installer-windows.exe" -D $env:TEMP --clobber; & "$env:TEMP\rak00n-installer-windows.exe"</code>
+      </div>
+    </div>
+
+    <p style="margin-top:1rem;font-size:0.9rem;color:#6B6B7B;">
+      The installer downloads the latest rak00n binary, installs it to <code>~/.rak00n</code>, and adds it to your PATH.
+      If no API key is configured, rak00n will automatically set up a local Ollama instance.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>Manual Download</h2>
+    <p style="font-size:0.9rem;color:#6B6B7B;margin-bottom:0.5rem;">Or download the installer binary directly from the latest release:</p>
+    <div class="dl-links">
+      <a class="dl-link" href="https://github.com/MrQbit/rak00n/releases/latest/download/rak00n-installer-macos">
+        <span class="icon">&#63743;</span> macOS Installer
+      </a>
+      <a class="dl-link" href="https://github.com/MrQbit/rak00n/releases/latest/download/rak00n-installer-windows.exe">
+        <span class="icon">&#8862;</span> Windows Installer
+      </a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>What It Does</h2>
+    <div class="features">
+      <div class="feature">
+        <strong>Zero-Config Setup</strong>
+        <span>Installs Ollama and pulls a model automatically if no API key is configured.</span>
+      </div>
+      <div class="feature">
+        <strong>200+ Models</strong>
+        <span>Works with OpenAI, Gemini, Azure, DeepSeek, Ollama, OpenRouter, and more.</span>
+      </div>
+      <div class="feature">
+        <strong>AI Coding Agent</strong>
+        <span>Reads, writes, and runs code in your terminal. Understands your full codebase.</span>
+      </div>
+      <div class="feature">
+        <strong>Cross-Platform</strong>
+        <span>macOS, Windows, and Linux. One command to install, one command to run.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>After Install</h2>
+    <div class="install-block">
+      <code><span class="comment"># Open a new terminal, then:</span>
+rak00n</code>
+    </div>
+    <p style="margin-top:1rem;font-size:0.9rem;color:#6B6B7B;">
+      rak00n will detect your environment and guide you through provider selection.
+      To use your own API key, set <code>OPENAI_API_KEY</code> or <code>ANTHROPIC_API_KEY</code> before running.
+    </p>
+  </div>
+
+</div>
+
+<div class="footer">
+  &copy; 2026 rak00n.
+</div>
+
+<script>
+function switchPlatform(platform) {
+  document.querySelectorAll('.platform-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.platform-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('platform-' + platform).classList.add('active');
+  event.target.classList.add('active');
+}
+
+function copyCommand(btn, id) {
+  const text = document.getElementById(id).textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+</script>
+
+</body>
+</html>

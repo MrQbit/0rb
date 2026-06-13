@@ -1,0 +1,39 @@
+{
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "hostRequirements": {
+    "cpus": 4,
+    "storage": "128gb"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "Equinusocio.vsc-community-material-theme",
+        "esbenp.prettier-vscode",
+        "GitHub.codespaces",
+        "GitHub.github-vscode-theme",
+        "GitHub.vscode-pull-request-github",
+        "naumovs.color-highlight",
+        "PKief.material-icon-theme",
+        "rvest.vs-code-prettier-eslint",
+        "github.copilot",
+        "JFrog.jfrog-vscode-extension",
+        "${containerWorkspaceFolder}/motif-vscode-snippets.vsix"
+      ]
+    },
+    "codespaces": {
+      "openFiles": ["README.md"]
+    }
+  },
+  "onCreateCommand": "chmod 0755 .devcontainer/copy_snip.sh; chmod 0755 .devcontainer/npm.sh",
+  "updateContentCommand": "sh .devcontainer/copy_snip.sh; sh .devcontainer/npm.sh",
+  "postCreateCommand": "npm install",
+  "postAttachCommand": "npm start",
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": {
+      "label": "Website",
+      "onAutoForward": "notify"
+    }
+  }
+}

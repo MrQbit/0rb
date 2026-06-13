@@ -1,0 +1,103 @@
+# rak00n local stack — vLLM + Redis + API
+#
+# Usage:
+#   docker compose up                  # full stack with local vLLM
+#   docker compose up redis rak00n-api # API only (vLLM running separately or on host)
+#
+# Environment:
+#   VLLM_MODEL           — HuggingFace model ID (default: Qwen/Qwen3-Coder-Next)
+#   HF_TOKEN             — HuggingFace token for gated models
+#   FOUNDRY_BASE_URL     — Anthropic Foundry URL (optional fallback)
+#   FOUNDRY_API_KEY      — Anthropic Foundry key (optional fallback)
+
+services:
+  # ── Local LLM inference via vLLM ──────────────────────────────────
+  vllm:
+    image: vllm/vllm-openai:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - ${HF_CACHE_DIR:-~/.cache/huggingface}:/root/.cache/huggingface
+    environment:
+      - HF_TOKEN=${HF_TOKEN:-}
+      - VLLM_ALLOW_LONG_MAX_MODEL_LEN=1
+    command:
+      - --model
+      - ${VLLM_MODEL:-Qwen/Qwen3-Coder-Next}
+      - --served-model-name
+      - ${VLLM_SERVED_NAME:-qwen3-coder-next}
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+      - --tensor-parallel-size
+      - "${VLLM_TP:-1}"
+      - --max-model-len
+      - "${VLLM_MAX_MODEL_LEN:-32768}"
+      - --gpu-memory-utilization
+      - "${VLLM_GPU_MEM:-0.90}"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 120s
+    restart: unless-stopped
+
+  # ── Redis ─────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - rak00n-redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # ── rak00n API ────────────────────────────────────────────────────
+  rak00n-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api.dev
+    ports:
+      - "9080:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_URL=redis://redis:6379
+      # Default: local vLLM (OpenAI-compatible)
+      - RAK00N_USE_OPENAI=1
+      - OPENAI_BASE_URL=http://vllm:8000/v1
+      - OPENAI_MODEL=${VLLM_SERVED_NAME:-qwen3-coder-next}
+      - RAK00N_DEFAULT_MODEL=${VLLM_SERVED_NAME:-qwen3-coder-next}
+      - RAK00N_HELPER_MODEL=${VLLM_SERVED_NAME:-qwen3-coder-next}
+      # Foundry fallback (optional — set via .env or export)
+      - ANTHROPIC_FOUNDRY_BASE_URL=${FOUNDRY_BASE_URL:-}
+      - ANTHROPIC_FOUNDRY_API_KEY=${FOUNDRY_API_KEY:-}
+      - ANTHROPIC_FOUNDRY_RESOURCE=${FOUNDRY_RESOURCE:-}
+      - ANTHROPIC_DEFAULT_SONNET_MODEL=${FOUNDRY_DEFAULT_MODEL:-claude-sonnet-4-6}
+      # Single user, no auth
+      - RAK00N_SECRET_SOURCE=env
+      - RAK00N_API_AUTH_REQUIRED=0
+      - RAK00N_API_SESSION_TTL=604800
+      - NODE_ENV=production
+    volumes:
+      - rak00n-files:/workspace/rak00n-files
+    restart: unless-stopped
+
+volumes:
+  rak00n-redis-data:
+  rak00n-files:

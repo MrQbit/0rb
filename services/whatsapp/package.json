@@ -1,0 +1,15 @@
+{
+  "name": "rak00n-whatsapp-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "OpenClaw-style WhatsApp Web bridge for rak00n — links the owner's WhatsApp account via QR, relays allowed numbers' messages to the agent, and sends replies back.",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.16",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0",
+    "pino": "^9.5.0"
+  }
+}

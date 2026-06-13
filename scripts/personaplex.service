@@ -1,0 +1,16 @@
+[Unit]
+Description=rak00n PersonaPlex voice server
+After=network.target
+
+[Service]
+Type=simple
+User=rakoon
+ExecStart=/bin/bash /opt/rakoon/scripts/start-personaplex.sh
+Restart=always
+RestartSec=10
+EnvironmentFile=/etc/rakoon/env
+StandardOutput=append:/var/log/rakoon/voice.log
+StandardError=append:/var/log/rakoon/voice.log
+
+[Install]
+WantedBy=multi-user.target

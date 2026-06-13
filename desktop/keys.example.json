@@ -1,0 +1,10 @@
+{
+  "_comment": "Owner-level, SAFE-TO-SHARE app keys baked into the build so widgets work out of the box. They return only PUBLIC data (no per-user leak). Copy to keys.json and fill in; keys.json is gitignored and injected at build time. Per-user data (a user's own Google/MS account, Vercel token) is connected by each user in Settings → Apps, not here.",
+  "RAK00N_YOUTUBE_API_KEY": "",
+  "RAK00N_SPOTIFY_CLIENT_ID": "",
+  "RAK00N_SPOTIFY_CLIENT_SECRET": "",
+  "RAK00N_GOOGLE_CLIENT_ID": "",
+  "RAK00N_GOOGLE_CLIENT_SECRET": "",
+  "RAK00N_MS_CLIENT_ID": "",
+  "RAK00N_MS_CLIENT_SECRET": ""
+}

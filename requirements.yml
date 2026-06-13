@@ -1,0 +1,23 @@
+requirements:
+  - name: Github
+    description: License to manage git repositories
+    type: GITHUB
+  - name: Sonarqube
+    description: License to manage code analysis
+    type: SONARQUBE
+  - name: Jfrog
+    description: License to manage builds and artifacts
+    type: ARTIFACTORY
+    repositories:
+      - packageType: docker
+        environments:
+          - PROD
+          - DEV
+      - packageType: helm
+        environments:
+          - PROD
+          - DEV
+      - packageType: generic
+        environments:
+          - PROD
+          - DEV

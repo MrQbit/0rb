@@ -1,0 +1,11 @@
+.idea/
+*.iml
+public/README.md
+node_modules
+installer/managed-endpoints.env
+installer/credentials.enc.ts
+installer/payload.generated.ts
+dist/installers/
+.env
+dist/*.mjs
+dist/*.mjs.map

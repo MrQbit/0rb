@@ -1,0 +1,30 @@
+# Override for running without vLLM container (vLLM on host or external).
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# Set OPENAI_BASE_URL to point to wherever vLLM is running:
+#   export OPENAI_BASE_URL=http://host.docker.internal:8000/v1
+
+services:
+  vllm:
+    profiles:
+      - disabled
+
+  rak00n-api:
+    image: ${RAK00N_API_IMAGE:-rak00n-api:dev}
+    build:
+      context: .
+      dockerfile: Dockerfile.api.dev
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - RAK00N_USE_OPENAI=1
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-http://host.docker.internal:8000/v1}
+      - OPENAI_MODEL=${OPENAI_MODEL:-qwen3-coder-next}
+      - RAK00N_DEFAULT_MODEL=${OPENAI_MODEL:-qwen3-coder-next}
+      - RAK00N_HELPER_MODEL=${OPENAI_MODEL:-qwen3-coder-next}
+      - ANTHROPIC_FOUNDRY_BASE_URL=${FOUNDRY_BASE_URL:-}
+      - ANTHROPIC_FOUNDRY_API_KEY=${FOUNDRY_API_KEY:-}
+      - RAK00N_SECRET_SOURCE=env
+      - RAK00N_API_AUTH_REQUIRED=0
+      - NODE_ENV=production

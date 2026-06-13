@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#06080a" />
+  <title>rak00n</title>
+  <link rel="icon" href="/web/assets/rak00n-logo.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/vendor/leaflet/leaflet.css" />
+  <link rel="stylesheet" href="/orb.css" />
+</head>
+<body>
+  <!-- ambient surface -->
+  <div id="surface"></div>
+
+  <!-- minimal chrome -->
+  <header id="topbar">
+    <div class="left">
+      <img class="brandlogo-r" src="/web/assets/rak00n-logo.svg" alt="rak00n" />
+      <span class="wordmark">rak<b>00</b>n</span>
+      <span id="liveDot" class="status-dot"></span>
+    </div>
+    <div class="right">
+      <div class="menu-wrap">
+        <button id="gearBtn" class="icon-btn" title="Menu" aria-label="Menu" aria-haspopup="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>
+        </button>
+        <div id="topMenu" class="top-menu">
+          <button class="tm-item" data-act="settings"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Settings</button>
+          <button class="tm-item" data-act="publish"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8h16v-8"/><path d="M12 3v13"/><path d="M8 7l4-4 4 4"/></svg> Publish &amp; share</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Settings — floating panel (gear toggles it open/closed) -->
+  <section id="settingsPanel" aria-label="settings">
+    <header class="set-head">
+      <span class="set-title">Settings</span>
+      <button id="setClose" class="icon-btn" aria-label="Close settings">✕</button>
+    </header>
+    <div class="set-body">
+      <nav class="set-nav">
+        <button class="set-navi active" data-sec="access">Access</button>
+        <button class="set-navi" data-sec="users">Allowed users</button>
+        <button class="set-navi" data-sec="channels">Channels</button>
+        <button class="set-navi" data-sec="voice">Voice &amp; vision</button>
+        <button class="set-navi" data-sec="apps">Apps</button>
+        <button class="set-navi" data-sec="files">Files</button>
+        <button class="set-navi" data-sec="integrations">Integrations</button>
+        <button class="set-navi" data-sec="system">System</button>
+      </nav>
+      <div class="set-content">
+        <!-- Access -->
+        <div class="set-sec active" data-sec="access">
+          <h3>Remote access</h3>
+          <p class="set-muted">Reach rak00n from any device on your tailnet — with camera &amp; mic.</p>
+          <div class="set-card">
+            <div class="set-kv"><span>Tailscale</span><span id="tsState" class="set-muted small">Checking…</span></div>
+            <div class="set-row" id="tsUrlRow" style="display:none;"><a id="setPublicUrl" target="_blank" rel="noopener" class="set-url">—</a><button id="setCopyUrl" class="set-btn ghost">Copy</button></div>
+            <!-- Connect (shown when not connected) -->
+            <div id="tsConnect" class="set-form" style="display:none;margin-top:8px;">
+              <input id="tsAuthKey" type="password" placeholder="Auth key (tskey-auth-…)" autocomplete="off" />
+              <button id="tsUpBtn" class="set-btn">Connect</button>
+            </div>
+            <p id="tsHelp" class="set-muted small" style="display:none;margin-top:6px;">Generate a key at <a href="https://login.tailscale.com/admin/settings/keys" target="_blank" rel="noopener">login.tailscale.com</a> → <em>Generate auth key</em>. The orb joins your tailnet and serves itself over HTTPS.</p>
+            <!-- Disconnect (shown when connected) -->
+            <button id="tsDownBtn" class="set-btn ghost" style="display:none;margin-top:8px;">Disconnect</button>
+            <div id="tsMsg" class="set-muted small" style="margin-top:6px;"></div>
+          </div>
+          <div class="set-card"><div class="set-kv"><span>Local HTTPS</span><code id="setLanUrl">—</code></div><p class="set-muted small">Self-signed — accept the cert once for camera/mic on the LAN.</p></div>
+        </div>
+        <!-- Users -->
+        <div class="set-sec" data-sec="users">
+          <h3>Allowed users</h3>
+          <p class="set-muted">Who can sign in. A code is sent by email, and by Telegram if a chat id is set.</p>
+          <div class="set-card">
+            <div class="set-form">
+              <input id="setUserEmail" type="email" placeholder="name@example.com" />
+              <input id="setUserTg" type="text" inputmode="numeric" placeholder="Telegram chat id (optional)" />
+              <input id="setUserLabel" type="text" placeholder="label (optional)" />
+              <button id="setUserAdd" class="set-btn">Add</button>
+            </div>
+            <div id="setUserMsg" class="set-muted small"></div>
+          </div>
+          <div id="setUsersList" class="set-list"><div class="set-muted">Loading…</div></div>
+        </div>
+        <!-- Channels -->
+        <div class="set-sec" data-sec="channels">
+          <h3>Channels</h3>
+          <p class="set-muted">How you reach the agent beyond the console.</p>
+          <div id="setChannels" class="set-list"><div class="set-muted">Loading…</div></div>
+        </div>
+        <!-- Voice & vision -->
+        <div class="set-sec" data-sec="voice">
+          <h3>Voice &amp; vision</h3>
+          <div id="setVoice" class="set-list"><div class="set-muted">Loading…</div></div>
+          <p class="set-muted small">The orb listens (Whisper), thinks (the model), and speaks (Orpheus — expressive). Vision is handled by the multimodal model from your camera frames.</p>
+        </div>
+        <!-- Apps: searchable widget registry -->
+        <div class="set-sec" data-sec="apps">
+          <h3>Apps &amp; widgets</h3>
+          <p class="set-muted">Everything the orb can show you. Turn widgets on or off; a few need a one-time key or your account.</p>
+          <div class="apps-bar">
+            <input id="appsSearch" class="set-input apps-search" placeholder="Search widgets…" autocomplete="off" />
+            <button id="addWidget" class="set-btn ghost">+ Add your own</button>
+          </div>
+          <div id="appsGrid" class="apps-grid"><div class="set-muted">Loading…</div></div>
+          <details class="apps-conn">
+            <summary>Connections &amp; keys</summary>
+          <div class="set-card">
+            <div class="set-row"><span class="pill-dot" id="ytDot"></span><div class="info-label" style="color:var(--ink);">YouTube</div><span id="ytState" class="set-muted small"></span></div>
+            <p class="set-muted small">Search + play videos. Get a YouTube Data API v3 key (Google Cloud console → enable the API → create a key).</p>
+            <div class="set-form">
+              <input id="ytKey" type="password" placeholder="YouTube API key" style="flex:2;" autocomplete="off" />
+              <button id="ytSave" class="set-btn">Save</button>
+            </div>
+          </div>
+          <div class="set-card">
+            <div class="set-row"><span class="pill-dot" id="spDot"></span><div class="info-label" style="color:var(--ink);">Spotify</div><span id="spState" class="set-muted small"></span></div>
+            <p class="set-muted small">Search + play music. Create an app at developer.spotify.com → copy the Client ID + Secret. Full ad-free tracks play when you're signed into Spotify (Premium) in this browser; otherwise a 30s preview.</p>
+            <div class="set-form">
+              <input id="spId" type="text" placeholder="Client ID" autocomplete="off" />
+              <input id="spSecret" type="password" placeholder="Client Secret" autocomplete="off" />
+              <button id="spSave" class="set-btn">Save</button>
+            </div>
+            <div class="set-row" style="margin-top:10px;">
+              <button id="spConnect" class="set-btn ghost">Connect account →</button>
+              <button id="spDisconnect" class="set-btn danger" style="display:none;">Disconnect</button>
+              <span id="spAcct" class="set-muted small"></span>
+            </div>
+            <p class="set-muted small" id="spRedirect" style="font-size:11px;word-break:break-all;"></p>
+          </div>
+          <div class="set-card">
+            <div class="set-row"><span class="pill-dot" id="nwDot"></span><div class="info-label" style="color:var(--ink);">News</div><span id="nwState" class="set-muted small"></span></div>
+            <p class="set-muted small">Search headlines + current events. Free key from newsapi.org.</p>
+            <div class="set-form">
+              <input id="nwKey" type="password" placeholder="NewsAPI key" autocomplete="off" />
+              <button id="nwSave" class="set-btn">Save</button>
+            </div>
+          </div>
+          <div class="set-card">
+            <div class="set-row"><span class="pill-dot" id="vcDot"></span><div class="info-label" style="color:var(--ink);">Vercel</div><span id="vcState" class="set-muted small"></span></div>
+            <p class="set-muted small">Publish shareable pages to a real public vercel.app URL (off-box). Token from vercel.com/account/tokens. Team ID optional.</p>
+            <div class="set-form">
+              <input id="vcToken" type="password" placeholder="Vercel token" autocomplete="off" style="flex:2;" />
+              <input id="vcTeam" type="text" placeholder="Team ID (optional)" autocomplete="off" />
+              <button id="vcSave" class="set-btn">Save</button>
+            </div>
+          </div>
+          <div class="set-card">
+            <div class="set-row"><span class="pill-dot" id="csDot"></span><div class="info-label" style="color:var(--ink);">Connected accounts</div><span id="csState" class="set-muted small"></span></div>
+            <p class="set-muted small">Connect Google or Microsoft once to light up your <strong>files, mail and calendar</strong> widgets. The simplest way is a one-time code — like signing in on a TV.</p>
+            <!-- Google -->
+            <div class="set-sub">
+              <div class="set-row"><span class="pill-dot" id="gdDot"></span><div class="info-label small" style="color:var(--ink);">Google</div><span id="gdAcct" class="set-muted small"></span></div>
+              <p class="set-muted small">Drive · Calendar · Gmail. Connect with a code:</p>
+              <div class="set-row" style="margin-top:6px;">
+                <button id="gdDevice" class="set-btn">Connect with code</button>
+                <button id="gdDisconnect" class="set-btn danger" style="display:none;">Disconnect</button>
+              </div>
+              <div id="gdCode" class="dev-code" style="display:none;"></div>
+              <details style="margin-top:8px;"><summary class="set-muted small">Advanced (redirect flow)</summary>
+                <div class="set-form" style="margin-top:8px;">
+                  <input id="gdId" type="text" placeholder="Google Client ID" autocomplete="off" />
+                  <input id="gdSecret" type="password" placeholder="Client Secret (redirect flow only)" autocomplete="off" />
+                  <button id="gdSave" class="set-btn">Save</button>
+                </div>
+                <div class="set-row" style="margin-top:8px;"><button id="gdConnect" class="set-btn ghost">Connect via browser →</button></div>
+                <p class="set-muted small" id="gdRedirect" style="font-size:11px;word-break:break-all;"></p>
+              </details>
+            </div>
+            <!-- Microsoft -->
+            <div class="set-sub" style="margin-top:12px;">
+              <div class="set-row"><span class="pill-dot" id="odDot"></span><div class="info-label small" style="color:var(--ink);">Microsoft</div><span id="odAcct" class="set-muted small"></span></div>
+              <p class="set-muted small">OneDrive · Outlook mail · Calendar. Connect with a code:</p>
+              <div class="set-row" style="margin-top:6px;">
+                <button id="odDevice" class="set-btn">Connect with code</button>
+                <button id="odDisconnect" class="set-btn danger" style="display:none;">Disconnect</button>
+              </div>
+              <div id="odCode" class="dev-code" style="display:none;"></div>
+              <details style="margin-top:8px;"><summary class="set-muted small">Advanced (redirect flow)</summary>
+                <div class="set-form" style="margin-top:8px;">
+                  <input id="odId" type="text" placeholder="Microsoft Client ID" autocomplete="off" />
+                  <input id="odSecret" type="password" placeholder="Client Secret (redirect flow only)" autocomplete="off" />
+                  <button id="odSave" class="set-btn">Save</button>
+                </div>
+                <div class="set-row" style="margin-top:8px;"><button id="odConnect" class="set-btn ghost">Connect via browser →</button></div>
+                <p class="set-muted small" id="odRedirect" style="font-size:11px;word-break:break-all;"></p>
+              </details>
+            </div>
+          </div>
+          </details>
+        </div>
+
+        <!-- Files -->
+        <div class="set-sec" data-sec="files">
+          <h3>Files</h3>
+          <p class="set-muted">Files you've shared with rak00n.</p>
+          <div id="setFilesSummary" class="set-muted small"></div>
+          <div id="setFiles" class="set-list"><div class="set-muted">Loading…</div></div>
+        </div>
+        <!-- Integrations (MCP servers) -->
+        <div class="set-sec" data-sec="integrations">
+          <h3>Integrations</h3>
+          <p class="set-muted">External MCP tool servers the agent can use.</p>
+          <div class="set-card">
+            <div class="set-form">
+              <input id="setMcpName" type="text" placeholder="name" />
+              <input id="setMcpUrl" type="text" placeholder="https://server/sse" style="flex:2;" />
+              <button id="setMcpAdd" class="set-btn">Add</button>
+            </div>
+            <div id="setMcpMsg" class="set-muted small"></div>
+          </div>
+          <div id="setMcps" class="set-list"><div class="set-muted">Loading…</div></div>
+        </div>
+        <!-- System -->
+        <div class="set-sec" data-sec="system">
+          <h3>System</h3>
+          <p class="set-muted">The brain + the services that power rak00n.</p>
+          <div id="setSystem" class="set-list"><div class="set-muted">Loading…</div></div>
+          <details class="apps-conn" style="margin-top:14px;"><summary>Brain endpoint (run in the cloud)</summary>
+            <div class="set-card" id="setBrainCfg"><div class="set-muted small">Loading…</div></div>
+          </details>
+          <details class="apps-conn"><summary>Capabilities — tools &amp; skills</summary>
+            <h4 class="set-h4">Tools</h4><div id="setTools" class="set-list"><div class="set-muted">Loading…</div></div>
+            <h4 class="set-h4">Skills</h4><div id="setSkills" class="set-list"><div class="set-muted">Loading…</div></div>
+          </details>
+          <details class="apps-conn" id="auditDisc"><summary>Audit log</summary>
+            <div id="setAudit" class="set-list"><div class="set-muted">Open to load recent events…</div></div>
+          </details>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- the agent -->
+  <div id="orbLayer">
+    <div id="orb" title="Tap to talk · drag to move">
+      <canvas width="440" height="440"></canvas>
+      <span id="orbHint">tap to chat · drag me</span>
+    </div>
+  </div>
+
+  <!-- chat panel (grows from the orb) -->
+  <section id="panel" aria-label="chat">
+    <div class="panel-head">
+      <div class="title"><b>rak00n</b> <span id="brandModel" style="color:var(--ink-dim);font-size:11px;"></span></div>
+      <button class="panel-x" id="panelClose" aria-label="Collapse">▾</button>
+    </div>
+    <div id="messages"><div class="empty-hint">Ask me anything — or tap the orb to talk.</div></div>
+    <div class="panel-input">
+      <textarea id="input" rows="1" placeholder="Message rak00n…" autocomplete="off"></textarea>
+      <button id="sendBtn" class="round-btn" title="Send" aria-label="Send">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/></svg>
+      </button>
+    </div>
+  </section>
+
+  <!-- dock: collapses to a green beating circle, expands to the pill on hover -->
+  <div id="dock" class="dock collapsed">
+    <span class="dock-pulse" aria-label="Show controls" title="Controls"></span>
+    <button id="audioToggle" class="dock-btn offline" aria-label="Live audio" title="Live audio — tap to go live / mute">
+      <span class="eq"><i></i><i></i><i></i><i></i><i></i></span>
+      <span class="dock-label" id="audioLabel">Go live</span>
+    </button>
+    <span class="dock-sep"></span>
+    <button id="camToggle" class="dock-btn cam-off" aria-label="Camera" title="Camera — let rak00n see (off by default)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+      <span class="dock-label">Camera</span>
+    </button>
+  </div>
+  <!-- camera self-view (shown when camera on) + offscreen capture canvas -->
+  <video id="selfView" playsinline muted autoplay></video>
+  <canvas id="capCanvas" width="640" height="480" hidden></canvas>
+
+  <!-- floating typed widgets spawn here -->
+  <div id="widgetLayer"></div>
+
+  <div id="toast"></div>
+  <script src="/vendor/chart.min.js"></script>
+  <script src="/vendor/leaflet/leaflet.js"></script>
+  <script type="module" src="/vendor/model-viewer.min.js"></script>
+  <script src="https://sdk.scdn.co/spotify-player.js" async></script>
+  <script src="/orb-shell.js"></script>
+</body>
+</html>

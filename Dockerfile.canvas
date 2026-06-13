@@ -1,0 +1,15 @@
+# Reuse the rak00n-api base (bun:slim) — already in registry, no network pull needed
+FROM rak00n-api:dev
+USER root
+WORKDIR /app
+COPY canvas-pod/server.js /app/server.js
+RUN mkdir -p /workspace && chown -R rak00n:rak00n /workspace /app
+USER rak00n
+WORKDIR /workspace
+ENV CANVAS_WORKSPACE=/workspace \
+    RPC_PORT=9090 \
+    STATIC_PORT=5173 \
+    NODE_ENV=production
+EXPOSE 9090 5173
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["bun", "run", "/app/server.js"]

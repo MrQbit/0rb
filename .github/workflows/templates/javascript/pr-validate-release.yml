@@ -1,0 +1,65 @@
+name: PR Validate
+on:
+  pull_request:
+    branches: ['main', 'master']
+
+  push:
+    branches: ['main', 'master']
+
+jobs:
+  not-configured:
+    if: vars.FABRIC_APPLICATION_ID == ''
+    name: Not configured
+    runs-on: ubuntu-latest
+
+    steps:
+      - run: echo "Fabric Application ID not found."
+
+  validate:
+    if: vars.FABRIC_APPLICATION_ID != ''
+    name: Build and test
+    uses: your-org/fabric-workflow-shared/.github/workflows/workflow_javascript-validate.yml@v3
+    with:
+      node_version: ${{ vars.NODE_VERSION }}
+      continue-on-sonar-error: true
+      sonarqube_host: ${{ vars.SONAR_HOST_URL }}
+      fabric_application_api_url: ${{ vars.FABRIC_APPLICATION_API_URL }}
+      fabric_application_id: ${{ vars.FABRIC_APPLICATION_ID }}
+      registry_url: ${{ vars.JFROG_DOCKER_REGISTRY_SERVER_NAME_DEV }}
+      apm-id: ${{ vars.APM_ID }}
+      spr-id: ${{ vars.SPR_ID }}
+      portfolio: ${{ vars.PROJECT_PORTFOLIO }}
+    secrets:
+      NULLPLATFORM_API_KEY: ${{ secrets.NULLPLATFORM_API_KEY }}
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      ARTIFACTORY_USERNAME: ${{ vars.JF_USER }}
+      ARTIFACTORY_TOKEN: ${{ secrets.JF_PASS }}
+      TENANT_ID: ${{ vars.TENANT_ID }}
+      CLIENT_ID: ${{ secrets.PUBLISH_CLIENT_ID }}
+      CLIENT_SECRET: ${{ secrets.PUBLISH_CLIENT_SECRET }}
+      SCOPE: ${{ secrets.PUBLISH_SCOPE }}
+      CHECKMARX_USERNAME: ${{ vars.CHECKMARX_USERNAME }}
+      CHECKMARX_PASSWORD: ${{ secrets.CHECKMARX_PASSWORD }}
+      MEND_ACTION_STS: ${{ secrets.MEND_ACTION_STS }}
+      ARCHER_SPR_API_TOKEN: ${{ secrets.ARCHER_SPR_API_TOKEN }}
+      INFOSEC_CONNECTIONKEY: ${{ secrets.INFOSEC_CONNECTIONKEY }}
+      GITHUB_APP_ID: ${{ secrets.GH_APP_ID }}
+      GITHUB_APP_PRIVATE_KEY: ${{ secrets.GH_PRIVATE_KEY }}
+
+  check:
+    name: Check
+    needs: validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check
+        run: echo "All checks passed"
+
+  release:
+    name: Release
+    needs: check
+    if: github.event_name == 'push'
+    uses: your-org/fabric-workflow-shared/.github/workflows/workflow_javascript-release.yml@v3
+    secrets:
+      GITHUB_APP_ID: ${{ secrets.GH_APP_ID }}
+      GITHUB_APP_PRIVATE_KEY: ${{ secrets.GH_PRIVATE_KEY }}
