@@ -123,6 +123,7 @@ import { tryHandleClusterRoute } from './cluster/routes.js'
 import { tryHandleHomeRoute } from './home/routes.js'
 import { tryHandleSetupRoute, setupRequired, isClaimedCached, announceSetupIfNeeded } from './setup/routes.js'
 import { tryHandlePushRoute } from './push/routes.js'
+import { tryHandleOAuthRelayRoute } from './oauth/relayRoutes.js'
 import { getFileMeta as filesGetMeta } from './files/storage.js'
 import { mintInstallationToken as mintGitHubAppToken } from './github/appAuth.js'
 import {
@@ -1622,6 +1623,9 @@ async function dispatch(
   // ─── Push registration for the 0rb apps ───
   const pushResp = await tryHandlePushRoute(method, pathname, req, ctx.store)
   if (pushResp) return pushResp
+  // ─── OAuth relay (one-tap Google/MS/Spotify via orb2.app) ───
+  const relayResp = await tryHandleOAuthRelayRoute(method, pathname, req, url, ctx.store)
+  if (relayResp) return relayResp
   // ─── Discovery (skills/MCPs/agents from configured EMU repos) ───
   const discResp = await tryHandleDiscoveryRoute(req, pathname, identity, isAdmin)
   if (discResp) return discResp
