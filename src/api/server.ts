@@ -2369,6 +2369,8 @@ const SETTINGS_KEYS = [
   'RAK00N_STT_URL', 'RAK00N_TTS_URL',
   // Home Assistant — the device backbone (lights/locks/climate/etc.)
   'RAK00N_HA_URL', 'RAK00N_HA_TOKEN',
+  // Home location — used for the concierge's "nearby stores" search
+  'RAK00N_HOME_LOCATION',
   // Access — who may sign in, and how OTP codes are emailed
   'RAK00N_AUTH_ALLOWED_EMAILS',
   'RAK00N_SMTP_HOST', 'RAK00N_SMTP_PORT', 'RAK00N_SMTP_USER', 'RAK00N_SMTP_PASS', 'RAK00N_SMTP_FROM',

@@ -40,6 +40,7 @@ import { cloudStorageEnabled, searchCloud, downloadCloudFile, connectedProviders
 import { geocode, route as geoRoute, weather } from '../connectors/geo.js'
 import { dockerEnabled, dockerList, dockerControl } from '../connectors/dockerc.js'
 import { haEnabled, haStates, haResolve, haCallService, HOME_DOMAINS, type HaEntity } from '../connectors/homeAssistant.js'
+import { onlineOptions, nearbyStores } from '../connectors/shopping.js'
 import type { CloudProvider } from '../connectors/cloudStorageOAuth.js'
 
 export type ApiToolContext = {
@@ -397,6 +398,16 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
       available: true,
     },
     {
+      name: 'Concierge',
+      description: "Help the user buy something — 'where can I get a new lamp?', 'I need a coffee maker'. Returns ways to order it online (Amazon, Google Shopping, Walmart, eBay) AND nearby stores that likely sell it (shown on the map). Pass `near` (a place/address, or leave blank to use the home location) to include local shops. Use this for any 'where can I buy / get / order …' request.",
+      input_schema: { type: 'object', properties: {
+        query: { type: 'string', description: 'What the user wants to buy, e.g. "lamp", "coffee maker", "drill".' },
+        near: { type: 'string', description: 'Place/address to search around for local stores (optional; defaults to the configured home location).' },
+        mode: { type: 'string', enum: ['online', 'local', 'both'], description: 'online links, local stores, or both (default both).' },
+      }, required: ['query'] },
+      available: true,
+    },
+    {
       name: 'Home',
       description: "Control and check the home's devices through Home Assistant — lights, switches/plugs, thermostats (climate), locks, window shades/blinds (cover), TVs & speakers (media_player), robot vacuums, fans, and door/window & motion sensors. This is how Orb acts as the house. Use op:'list' to see what's available (optionally a `type`), op:'status' to check a device by name, and op:'control' to change one: action on/off/toggle for lights/plugs/switches; lock/unlock for locks; open/close (or set with `value` 0-100) for shades; set with `value` for a thermostat's target temperature; play/pause/on/off (or set volume with `value` 0-100) for media; start/stop/dock for a vacuum. Always refer to devices by their friendly name (e.g. \"kitchen lights\", \"front door\").",
       input_schema: { type: 'object', properties: {
@@ -691,6 +702,50 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
   add('VaultRead', { readOnly: true }, async args => JSON.stringify(await executeVaultRead(args, ctx.store)))
   add('VaultWrite', {}, async args => JSON.stringify(await executeVaultWrite(args, ctx.store, ctx.sessionId)))
   add('VaultSearch', { readOnly: true }, async args => JSON.stringify(await executeVaultSearch(args, ctx.store)))
+
+  add('Concierge', { readOnly: true }, async args => {
+    const query = String(args?.query || '').trim()
+    if (!query) return 'What are you looking to buy?'
+    const mode = String(args?.mode || 'both')
+    const parts: string[] = []
+
+    // Online options — always cheap + useful.
+    if (mode !== 'local') {
+      const online = onlineOptions(query)
+      emitWidget(ctx.sessionId, {
+        id: 'shop-online', type: 'results', title: `Buy "${query}" online`,
+        items: online.map(o => ({ title: o.merchant, subtitle: 'Search & order online', action: { kind: 'link', url: o.url } })),
+      } as any)
+      parts.push(`Online: ${online.map(o => o.merchant).join(', ')} (shown with links).`)
+    }
+
+    // Local stores — needs a location.
+    if (mode !== 'online') {
+      const place = String(args?.near || process.env.RAK00N_HOME_LOCATION || '').trim()
+      if (!place) {
+        parts.push("For nearby stores, tell me roughly where you are (or set a home location).")
+      } else {
+        const geo = await geocode(place)
+        if (!geo) {
+          parts.push(`Couldn't locate "${place}" for nearby stores.`)
+        } else {
+          const stores = await nearbyStores(query, geo.lat, geo.lng)
+          if (!stores.length) {
+            parts.push(`No nearby stores found around ${place} for that — online is your best bet.`)
+          } else {
+            emitWidget(ctx.sessionId, {
+              id: 'shop-map', type: 'map', title: `Stores near ${place}`,
+              center: [geo.lat, geo.lng], zoom: 13,
+              markers: stores.map(s => ({ lat: s.lat, lng: s.lng, label: `${s.name} · ${s.distanceKm}km` })),
+            } as any)
+            const top = stores.slice(0, 5).map(s => `${s.name} (${s.distanceKm}km)`).join(', ')
+            parts.push(`Nearby: ${top}. ${stores.length} on the map — ask for directions to any of them.`)
+          }
+        }
+      }
+    }
+    return parts.join(' ')
+  })
 
   add('Home', {}, async args => {
     try {
