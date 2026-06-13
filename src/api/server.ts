@@ -473,6 +473,38 @@ function injectGitCredentials(url: string, login: string, secret: string): strin
   return url.replace(/^https:\/\//i, proto + credBlock + '@')
 }
 
+/**
+ * Bring up an HTTPS listener using this box's per-device cert (obtained from
+ * the central orb2.app broker via DNS-01). Reuses the HTTP server's handlers,
+ * so the same app is served over TLS at https://<id>.device.orb2.app. Renews
+ * daily and hot-reloads the cert. No-op unless device-cert env is configured.
+ */
+async function startDeviceTls(serveOpts: any, store: Store): Promise<void> {
+  try {
+    const { ensureDeviceCert } = await import('./devicecert/index.js')
+    const cert = await ensureDeviceCert(store)
+    if (!cert) return
+    const tlsPort = Number(process.env.ORB2_TLS_PORT || 9443)
+    const opts = () => ({ ...serveOpts, port: tlsPort, tls: { cert: cert.cert, key: cert.key } })
+    const tlsServer = Bun.serve(opts())
+    log.info('api_listening_https', { hostname: cert.hostname, port: tlsPort })
+    // Daily renewal check; hot-reload the cert if it changed.
+    setInterval(async () => {
+      try {
+        const fresh = await ensureDeviceCert(store)
+        if (fresh && fresh.cert !== cert.cert) {
+          cert.cert = fresh.cert
+          cert.key = fresh.key
+          tlsServer.reload(opts() as any)
+          log.info('devicecert_reloaded', { hostname: cert.hostname })
+        }
+      } catch { /* ignore */ }
+    }, 24 * 60 * 60 * 1000).unref?.()
+  } catch (err) {
+    log.warn('device_tls_failed', { error: (err as Error).message })
+  }
+}
+
 export async function startApiServer(config: ApiServerConfig) {
   const store = await getStore()
   const audit = createAuditEmitter(store)
@@ -504,7 +536,7 @@ export async function startApiServer(config: ApiServerConfig) {
 
   const maxBodyMb = Number(process.env.ORB2_API_MAX_BODY_MB ?? 4)
   const voiceWs = voiceWebSocketHandlers(store)
-  const server = Bun.serve({
+  const serveOpts: any = {
     hostname: config.host,
     port: config.port,
     // Bun's default is 10s, which prematurely closes long SSE streams
@@ -550,9 +582,15 @@ export async function startApiServer(config: ApiServerConfig) {
         },
       )
     },
-  })
+  }
+  const server = Bun.serve(serveOpts)
 
   log.info('api_listening', { url: `http://${config.host}:${config.port}` })
+
+  // ── HTTPS via a per-device Let's Encrypt cert (orb2.app broker) ──
+  // Best-effort, in the background; no-op unless ORB2_DEVICE_DOMAIN/BROKER_URL/
+  // ENROLL_SECRET are set. Serves the same app over TLS at <id>.device.orb2.app.
+  void startDeviceTls(serveOpts, store)
 
   // Load persisted settings from store (vault → redis → env)
   ;(async () => {
