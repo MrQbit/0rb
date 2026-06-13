@@ -78,6 +78,33 @@ export async function tailscaleUp(authKey: string, hostname?: string): Promise<{
   return { ok: true, message: status.url ? `Connected — ${status.url}` : 'Connected', status }
 }
 
+/**
+ * Free, zero-infra HTTPS for self-hosters. If this box is already on a tailnet,
+ * make sure the UI is exposed over HTTPS at https://<node>.<tailnet>.ts.net —
+ * Tailscale provisions and renews a real Let's Encrypt cert and terminates TLS,
+ * proxying to the local HTTP server. That gives a valid, warning-free secure
+ * context (browser mic/camera work) on the LAN and anywhere on the tailnet,
+ * with no orb2.app infrastructure.
+ *
+ * Best-effort and idempotent: no-op if Tailscale isn't running or serve is
+ * already active. Never changes the node's connection (no up/down). Additive
+ * only. Opt out with ORB2_TS_AUTO_HTTPS=0.
+ */
+export async function ensureTailscaleHttps(target?: string): Promise<{ ok: boolean; url?: string; message: string }> {
+  if (process.env.ORB2_TS_AUTO_HTTPS === '0') return { ok: false, message: 'disabled' }
+  const status = await tailscaleStatus()
+  if (!status.available || !status.running) return { ok: false, message: 'tailscale not running' }
+  if (status.serving) return { ok: true, url: status.url, message: 'already serving' }
+  const r = await run(['serve', '--bg', '--https=443', target || serveTarget()], 30000)
+  if (!r.ok) {
+    log.warn('tailscale_auto_https_failed', { err: r.err.trim() || r.out.trim() })
+    return { ok: false, message: r.err.trim() || r.out.trim() || 'serve failed' }
+  }
+  const after = await tailscaleStatus()
+  log.info('tailscale_auto_https', { url: after.url })
+  return { ok: true, url: after.url, message: after.url ? `HTTPS at ${after.url}` : 'HTTPS enabled' }
+}
+
 export async function tailscaleDown(): Promise<{ ok: boolean; message: string }> {
   await run(['serve', 'reset'], 15000)
   const r = await run(['down'], 15000)

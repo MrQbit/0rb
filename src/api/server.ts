@@ -556,6 +556,18 @@ export async function startApiServer(config: ApiServerConfig) {
 
   log.info('api_listening', { url: `http://${config.host}:${config.port}` })
 
+  // ── Free HTTPS via Tailscale (https://<node>.ts.net) ──
+  // Best-effort, in the background; no-op unless this box is already on a
+  // tailnet (opt out with ORB2_TS_AUTO_HTTPS=0). Tailscale provisions/renews a
+  // real cert and proxies to this HTTP port, so browser mic/camera work with no
+  // warning. No external infrastructure involved.
+  void (async () => {
+    try {
+      const { ensureTailscaleHttps } = await import('./connectors/tailscale.js')
+      await ensureTailscaleHttps(`http://127.0.0.1:${config.port}`)
+    } catch { /* ignore */ }
+  })()
+
   // Load persisted settings from store (vault → redis → env)
   ;(async () => {
     try {
