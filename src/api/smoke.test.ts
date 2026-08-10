@@ -82,19 +82,20 @@ describe('HTTP smoke tests', () => {
     expect(eyq).toBeUndefined()
   })
 
-  it('POST /v1/chat missing body → 400', async () => {
+  it('POST /v1/chat missing body → 400 (401 when auth-gated)', async () => {
     const res = await fetch(`${BASE}/v1/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: '',
     })
-    expect(res.status).toBe(400)
+    // 401 when ORB2_API_AUTH_REQUIRED=1 and no session — the gate runs first
+    expect([400, 401]).toContain(res.status)
   })
 
   it('POST /v1/sandbox/run python → stdout 1', async () => {
     const res = await post('/v1/sandbox/run', { language: 'python3', code: 'print(1)' })
-    if (res.status === 404 || res.status === 503) {
-      // Sandbox not enabled in this deployment — skip gracefully
+    if (res.status === 401 || res.status === 404 || res.status === 503) {
+      // Auth-gated or sandbox not enabled in this deployment — skip gracefully
       return
     }
     expect(res.status).toBe(200)
