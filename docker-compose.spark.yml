@@ -50,14 +50,24 @@ services:
       - vllm
       - serve
       - unsloth/Qwen3.6-35B-A3B-NVFP4
+      # Pin the checkpoint revision. Upstream re-uploaded the repo (2026-08)
+      # with a quantized lm_head (lm_head.weight_scale) that this vLLM build
+      # can't load — the engine crash-loops with "no module or parameter named
+      # 'lm_head.weight_scale'". This is the 2026-06-03 revision the stack was
+      # benchmarked on; bump it together with the vllm image, not alone.
+      - --revision
+      - 612d523c58522734a1f6dc995bdeebe216647fef
       - --served-model-name
       - qwen3.6
       - qwen3-coder-next
       - --enable-auto-tool-choice
       - --tool-call-parser
       - qwen3_coder
-      - --speculative-config
-      - '{"method":"mtp","num_speculative_tokens":3}'
+      # MTP speculative decoding is OFF: the checkpoint's MTP draft weights
+      # carry a quantized lm_head (lm_head.weight_scale) that this vLLM
+      # build's Qwen3_5MoeMTP class can't map, so the engine crash-loops.
+      # Re-enable together with a vllm image upgrade that loads it:
+      #   --speculative-config '{"method":"mtp","num_speculative_tokens":3}'
       # Qwen3.6 natively supports 262144; 131072 gives huge headroom so input +
       # output never collide with the window (KV pool is set by mem-util, so a
       # higher ceiling is essentially free). Was 65536, which 400'd on big prompts.
