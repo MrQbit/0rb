@@ -30,18 +30,37 @@ fi
 command -v bun >/dev/null 2>&1 || { say "Installing Bun"; curl -fsSL https://bun.sh/install | bash; export PATH="$HOME/.bun/bin:$PATH"; }
 
 # ── 2. local image registry on :5001 (compose pulls localhost:5001/* here) ──
-if ! dk ps --format '{{.Names}}' | grep -qx orb2-registry; then
+# registry:2 listens on 5000 inside the container. If something already serves
+# :5001 (e.g. a registry from an earlier install), reuse it instead of failing.
+if curl -sf http://localhost:5001/v2/ >/dev/null 2>&1; then
+  say "A registry is already serving localhost:5001 — reusing it"
+elif ! dk ps --format '{{.Names}}' | grep -qx orb2-registry; then
   say "Starting a local image registry on :5001"
-  dk run -d --restart=always -p 5001:5001 --name orb2-registry registry:2
+  dk run -d --restart=always -p 5001:5000 --name orb2-registry registry:2
 fi
 
 # ── 3. .env from template ──────────────────────────────────────────────────
 if [ ! -f .env ]; then
   say "Creating .env from .env.example"
   cp .env.example .env
-  sed -i "s|REPLACE_WITH_RANDOM_SECRET|$(openssl rand -hex 32)|" .env
+  # Each secret gets its own random value (a single global sed would give the
+  # auth secret and the WhatsApp bridge secret the same value).
+  while grep -q REPLACE_WITH_RANDOM_SECRET .env; do
+    sed -i "0,/REPLACE_WITH_RANDOM_SECRET/s//$(openssl rand -hex 32)/" .env
+  done
   sed -i "s|/home/youruser/orb2|$REPO|" .env
   warn "Edit .env to set ORB2_AUTH_ALLOWED_EMAILS, SMTP, and (optionally) Telegram/WhatsApp."
+fi
+
+# ── 3b. model cache dir (pre-create so Docker doesn't make it root-owned) ──
+mkdir -p "$HOME/.cache/orb2-models"
+# Migrate models from a pre-rebrand install (hardlinks: same filesystem, no copy).
+if [ -d "$HOME/.cache/rak00n-models" ]; then
+  for f in "$HOME"/.cache/rak00n-models/*; do
+    [ -f "$f" ] && [ ! -e "$HOME/.cache/orb2-models/$(basename "$f")" ] && \
+      { ln "$f" "$HOME/.cache/orb2-models/" 2>/dev/null || cp "$f" "$HOME/.cache/orb2-models/"; } && \
+      say "Migrated model $(basename "$f") from rak00n-models"
+  done
 fi
 
 # ── 4. build the images we own (api, ui, whatsapp) ────────────────────────
@@ -53,6 +72,16 @@ dk build -t $REG/orb2-ui:dev  -f web/Dockerfile web/    && dk push $REG/orb2-ui:
 dk build -t $REG/orb2-whatsapp:dev services/whatsapp/   && dk push $REG/orb2-whatsapp:dev
 
 # ── 5. GPU service images (need the personaplex:cuda base) ────────────────
+# Pre-rebrand boxes already have these built as rak00n-* — retag, don't rebuild.
+for s in tts stt vision embed orpheus; do
+  if ! dk image inspect orb2-$s:cuda >/dev/null 2>&1 && dk image inspect rak00n-$s:cuda >/dev/null 2>&1; then
+    say "Reusing pre-rebrand image rak00n-$s:cuda as orb2-$s:cuda"
+    dk tag rak00n-$s:cuda orb2-$s:cuda
+  fi
+done
+if ! dk image inspect orb2-av-webrtc:latest >/dev/null 2>&1 && dk image inspect rak00n-av-webrtc:latest >/dev/null 2>&1; then
+  dk tag rak00n-av-webrtc:latest orb2-av-webrtc:latest
+fi
 if dk image inspect personaplex:cuda >/dev/null 2>&1; then
   say "Building GPU service images (tts/stt/vision/embed) from personaplex:cuda"
   for s in tts stt vision embed; do dk build -t orb2-$s:cuda services/$s/ || warn "build of $s failed"; done
