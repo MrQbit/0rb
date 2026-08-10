@@ -79,7 +79,7 @@ On a fresh DGX Spark (aarch64 + NVIDIA), with Docker + the NVIDIA Container
 Toolkit installed:
 
 ```bash
-git clone https://github.com/MrQbit/0rb.git && cd orb2
+git clone https://github.com/MrQbit/0rb.git && cd 0rb
 bash scripts/install.sh        # registry, .env, build, up
 # then edit .env (allowed email, SMTP, Telegram/WhatsApp) and:
 ./scripts/orb2-stack.sh restart

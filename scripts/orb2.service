@@ -6,7 +6,8 @@
 # `docker compose up -d`, which also (re)creates anything that was removed
 # or is missing — guaranteeing the FULL stack is present after any outage.
 #
-# Install (run once, needs sudo):
+# Install (run once, needs sudo) — first edit User/Group/WorkingDirectory
+# below to match your user and where you cloned the repo:
 #   sudo cp scripts/orb2.service /etc/systemd/system/orb2.service
 #   sudo systemctl daemon-reload
 #   sudo systemctl enable --now orb2.service
@@ -23,7 +24,7 @@ Type=oneshot
 RemainAfterExit=yes
 User=mrqbit
 Group=docker
-WorkingDirectory=/home/mrqbit/Downloads/orb2
+WorkingDirectory=/home/mrqbit/Downloads/0rb
 ExecStart=/usr/bin/docker compose -f docker-compose.spark.yml up -d --remove-orphans
 ExecStop=/usr/bin/docker compose -f docker-compose.spark.yml stop
 TimeoutStartSec=600
