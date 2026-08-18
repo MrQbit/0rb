@@ -285,6 +285,30 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # ── Smart home: Home Assistant (device backbone for the Home tool) ──
+  # Host networking per HA's own recommendation: it needs mDNS/SSDP to
+  # discover devices (HomeKit, ESPHome, casts, …) on the LAN. The console
+  # for HA itself is http://<host>:8123 — first run shows its onboarding
+  # wizard; then mint a long-lived token (profile → Security) and put it in
+  # .env as ORB2_HA_TOKEN (or POST /v1/setup/home) to enable orb's Home tool.
+  # For USB radios (Zigbee/Z-Wave sticks) add a `devices:` mapping here.
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: orb2-homeassistant
+    network_mode: host
+    environment:
+      TZ: "${TZ:-America/Chicago}"
+    volumes:
+      - ${HOME}/.orb2/homeassistant:/config
+      - /etc/localtime:/etc/localtime:ro
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8123/',timeout=5).status < 500 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+    restart: unless-stopped
+
   # ── Agent API (orb2 is the brain) ───────────────────────────────
   orb2-api:
     image: localhost:5001/orb2-api:dev
@@ -292,6 +316,10 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    # Home Assistant runs with host networking (see above), so the api
+    # reaches it through the host gateway rather than a service name.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       # Local vLLM (OpenAI-compatible) — orb2's brain
       ORB2_USE_OPENAI: "1"
@@ -327,6 +355,11 @@ services:
       # service was retired. ORB2_VISION_URL is left unset; to fall back, re-add
       # the vision service and set ORB2_VISION_BACKEND=moondream + ORB2_VISION_URL.
       ORB2_VISION_BACKEND: "${ORB2_VISION_BACKEND:-llm}"
+      # Smart home — Home Assistant (Home tool + dashboard + watcher).
+      # URL defaults to the compose homeassistant service via the host
+      # gateway; the token comes from .env after HA's first-run onboarding.
+      ORB2_HA_URL: "${ORB2_HA_URL:-http://host.docker.internal:8123}"
+      ORB2_HA_TOKEN: "${ORB2_HA_TOKEN:-}"
       # Semantic memory (embeddings)
       ORB2_EMBED_URL: http://embed:8994
       # Web search backend for the WebSearch tool (DDG is blocked server-side)
