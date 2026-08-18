@@ -78,14 +78,39 @@ export async function buildToolRegistry(extraTools: AnyTool[] = []): Promise<Too
   })))
   const byName = new Map(entries.map(e => [e.name, e]))
 
+  // Some models emit method-style tool names ("Home.op", "Home.control")
+  // instead of the registered name. Resolve tolerantly: strip the dotted
+  // suffix when the prefix is a registered tool, and if the suffix is a
+  // valid value of an enum property the input doesn't already set (e.g.
+  // "Home.control" → Home with op:"control"), fold it into the input.
+  function resolve(n: string, input: any): { entry?: (typeof entries)[number]; input: any } {
+    const direct = byName.get(n)
+    if (direct) return { entry: direct, input }
+    const dot = n.indexOf('.')
+    if (dot <= 0) return { input }
+    const entry = byName.get(n.slice(0, dot))
+    if (!entry) return { input }
+    const suffix = n.slice(dot + 1)
+    const props: Record<string, any> = (entry.input_schema as any)?.properties ?? {}
+    if (!(suffix in props)) {
+      for (const [key, prop] of Object.entries(props)) {
+        if (Array.isArray((prop as any)?.enum) && (prop as any).enum.includes(suffix) && (input == null || input[key] === undefined)) {
+          input = { ...(input ?? {}), [key]: suffix }
+          break
+        }
+      }
+    }
+    return { entry, input }
+  }
+
   return {
     list: () => entries.map(e => ({ name: e.name, description: e.description, input_schema: e.input_schema })),
     get: (n: string) => byName.get(n)?.tool,
     has: (n: string) => byName.has(n),
     call: async (n: string, input: any) => {
-      const e = byName.get(n)
-      if (!e) return `Unknown tool: ${n}`
-      try { return normalizeResult(await e.tool.call(input ?? {}, `tu-${Date.now().toString(36)}`)) }
+      const { entry, input: args } = resolve(n, input)
+      if (!entry) return `Unknown tool: ${n}`
+      try { return normalizeResult(await entry.tool.call(args ?? {}, `tu-${Date.now().toString(36)}`)) }
       catch (err) { return `Tool error: ${(err as Error).message}` }
     },
   }
