@@ -22,9 +22,9 @@ anything that goes unhealthy, so the system self-heals and survives reboots.
                  └───────────────────────────────────────────────────────────────┘
 ```
 
-- **vllm** — **Qwen3.6-35B-A3B-NVFP4** (MoE, multimodal) on the GPU, OpenAI-
-  compatible, with MTP speculative decoding. The brain. Vision is native: camera
-  frames are sent here as image blocks (no separate vision service).
+- **vllm** — **Meta Muse Glimmer 30B** (dense, multimodal, NVFP4 quant) on the
+  GPU, OpenAI-compatible. The brain. Vision is native: camera frames are sent
+  here as image blocks (no separate vision service).
 - **stt** / **tts** — GPU voice (faster-whisper, Kokoro). The agent does
   endpointing + barge-in and is itself what answers.
 - **embed** — GPU embeddings (bge) for semantic memory.
