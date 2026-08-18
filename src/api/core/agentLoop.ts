@@ -66,7 +66,13 @@ function endpoint(): string {
 }
 
 function buildBody(state: LoopState, toolDefs: any[], stream: boolean): any {
-  const messages = [{ role: 'system', content: state.systemPrompt }, ...state.messages]
+  // Reasoning-in-system-prompt models (Meta Muse Glimmer: low|medium|high|xhigh);
+  // inert plain text for models that don't recognize the directive.
+  const strength = process.env.ORB2_REASONING_STRENGTH
+  const systemPrompt = strength
+    ? `Reasoning strength: ${strength}\n\n${state.systemPrompt}`
+    : state.systemPrompt
+  const messages = [{ role: 'system', content: systemPrompt }, ...state.messages]
   return {
     model: state.model,
     messages,

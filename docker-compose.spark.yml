@@ -6,7 +6,7 @@
 # IPs). The UI (nginx) is the single front door and already proxies
 # /v1, /a2a, /docs, /healthz and the voice WebSocket to `orb2-api:8080`.
 #
-#   Brain:   vllm  (Qwen3.6-35B-A3B-NVFP4 MoE + MTP on the GPU, :8888)
+#   Brain:   vllm  (Meta Muse Glimmer 30B NVFP4 on the GPU, :8888)
 #   Voice:   tts (Kokoro, GPU) + stt (faster-whisper)
 #   State:   redis
 #   Agent:   orb2-api (Bun)        ← orb2 is the brain
@@ -25,10 +25,12 @@ x-gpu: &gpu
     NVIDIA_DRIVER_CAPABILITIES: compute,utility
 
 services:
-  # ── Brain: local Qwen3.6-35B-A3B-NVFP4 vLLM (MoE, multimodal) ──────
+  # ── Brain: Meta Muse Glimmer 30B NVFP4 on vLLM (dense, multimodal) ──
   vllm:
-    image: vllm-node:latest
+    # Official vLLM image with muse_glimmer arch + parsers (needs vLLM 0.27+).
+    image: vllm/vllm-openai:muse-glimmer
     container_name: vllm
+    entrypoint: []
     <<: *gpu
     ipc: host
     shm_size: "16gb"
@@ -41,36 +43,35 @@ services:
     environment:
       <<: *gpu-env
       NCCL_IGNORE_CPU_AFFINITY: "1"
-    # Brain = Qwen3.6-35B-A3B-NVFP4 (MoE, multimodal/vision, NVFP4 on Blackwell)
-    # with MTP speculative decoding. Benchmarked at ~62 tok/s vs ~46 for the old
-    # Qwen3-Coder-Next-FP8 and ~29 for Gemma-4-26B-A4B-NVFP4 (2026-06-04).
+    # Brain = Meta Muse Glimmer 30B (dense, multimodal/vision, Apache 2.0),
+    # NVFP4 W4A4 quant — Blackwell-only kernels, ~25GB weights, per the
+    # official vLLM recipe (recipes.vllm.ai/meta-models/Muse-Glimmer-30B).
     # Served ALSO under the legacy alias `qwen3-coder-next` so orb2-api
     # (OPENAI_MODEL=qwen3-coder-next) keeps working without any change.
+    # Reasoning effort is set per-request via system prompt:
+    #   "Reasoning strength: low|medium|high|xhigh".
     command:
       - vllm
       - serve
-      - unsloth/Qwen3.6-35B-A3B-NVFP4
-      # Pin the checkpoint revision. Upstream re-uploaded the repo (2026-08)
-      # with a quantized lm_head (lm_head.weight_scale) that this vLLM build
-      # can't load — the engine crash-loops with "no module or parameter named
-      # 'lm_head.weight_scale'". This is the 2026-06-03 revision the stack was
-      # benchmarked on; bump it together with the vllm image, not alone.
+      - Inferact/Muse-Glimmer-30B-NVFP4-W4A4
+      # Pinned so an upstream re-upload can't silently change the weights
+      # (that's how the old Qwen brain broke). Bump deliberately.
       - --revision
-      - 612d523c58522734a1f6dc995bdeebe216647fef
+      - d35cb79050f419c457611b1cee5c5d15b176f285
       - --served-model-name
-      - qwen3.6
+      - muse-glimmer
       - qwen3-coder-next
       - --enable-auto-tool-choice
+      # muse_glimmer parsers: tool-call + reasoning must run together (the
+      # reasoning parser preserves the channel markers the tool parser needs).
       - --tool-call-parser
-      - qwen3_coder
-      # MTP speculative decoding is OFF: the checkpoint's MTP draft weights
-      # carry a quantized lm_head (lm_head.weight_scale) that this vLLM
-      # build's Qwen3_5MoeMTP class can't map, so the engine crash-loops.
-      # Re-enable together with a vllm image upgrade that loads it:
-      #   --speculative-config '{"method":"mtp","num_speculative_tokens":3}'
-      # Qwen3.6 natively supports 262144; 131072 gives huge headroom so input +
-      # output never collide with the window (KV pool is set by mem-util, so a
-      # higher ceiling is essentially free). Was 65536, which 400'd on big prompts.
+      - muse_glimmer
+      - --reasoning-parser
+      - muse_glimmer
+      - --generation-config
+      - auto
+      # DFlash speculative decoding (optional, faster, costs GPU memory):
+      #   --speculative-config '{"method":"dflash","model":"meta-models/Muse-Glimmer-30B-assistant","num_speculative_tokens":15}'
       - --max-model-len
       - "131072"
       # Trimmed from 0.8 to leave clear headroom for the voice models that run
@@ -162,7 +163,7 @@ services:
       start_period: 120s
     restart: unless-stopped
 
-  # ── Vision: now handled natively by the multimodal brain (Qwen3.6) via
+  # ── Vision: now handled natively by the multimodal brain via
   # ORB2_VISION_BACKEND=llm. The old moondream2 `vision` service was retired
   # 2026-06-04; its image (orb2-vision:cuda) is kept locally so it can be
   # re-added here if ever needed (paste back a service on :8992 +
@@ -300,10 +301,13 @@ services:
       LLM_ENDPOINT: http://vllm:8888/v1
       LLM_KEY: local
       LLM_MODEL: qwen3-coder-next
-      # Qwen3.6 is a thinking model; for the snappy conversational orb we turn
-      # reasoning OFF (no <think> leakage, faster replies = parity with the old
-      # coder model). Sends chat_template_kwargs.enable_thinking=false to vLLM.
+      # Keep the conversational orb snappy. Two mechanisms, both harmless where
+      # not understood: ORB2_DISABLE_THINKING sends the Qwen-style
+      # chat_template_kwargs.enable_thinking=false; ORB2_REASONING_STRENGTH
+      # prepends "Reasoning strength: <v>" to the system prompt, which is how
+      # Muse Glimmer (the current brain) is steered (low|medium|high|xhigh).
       ORB2_DISABLE_THINKING: "1"
+      ORB2_REASONING_STRENGTH: "low"
       # Generous output ceiling — with the 131072 window there's no truncation
       # tradeoff; this is just a sane upper bound (16384 ≈ a very long reply).
       ORB2_MAX_OUTPUT_TOKENS: "16384"
@@ -319,7 +323,7 @@ services:
       ORB2_STT_URL: http://stt:8990
       ORB2_TTS_URL: http://tts:8991
       ORB2_TTS_VOICE: af_heart
-      # Vision: routed to the multimodal brain (Qwen3.6) itself — the moondream2
+      # Vision: routed to the multimodal brain itself — the moondream2
       # service was retired. ORB2_VISION_URL is left unset; to fall back, re-add
       # the vision service and set ORB2_VISION_BACKEND=moondream + ORB2_VISION_URL.
       ORB2_VISION_BACKEND: "${ORB2_VISION_BACKEND:-llm}"

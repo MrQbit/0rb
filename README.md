@@ -19,8 +19,8 @@ machines (see **[DEPLOYMENT.md](DEPLOYMENT.md)** for Linux / Windows / macOS).
 - **The orb** — the whole console is a living green orb that *is* the agent.
   Tap it to chat, tap while it's talking to interrupt, drag it anywhere; the
   page behind it is the agent's canvas. Audio-reactive, minimal chrome.
-- **Local brain** — **Qwen3.6-35B-A3B-NVFP4** (MoE, multimodal) on vLLM with MTP
-  speculative decoding (~60 tok/s on a Spark). OpenAI-compatible — point it at a
+- **Local brain** — **Meta Muse Glimmer 30B** (dense, multimodal, Apache 2.0)
+  as an NVFP4 quant on vLLM. OpenAI-compatible — point it at a
   cloud endpoint instead if you have no GPU.
 - **Voice** — continuous speech with barge-in and **streaming TTS** (it starts
   speaking the first sentence while still thinking): GPU STT (faster-whisper)
@@ -53,7 +53,7 @@ all services on one network, each with a healthcheck + restart policy:
 
 | Service | Role | GPU |
 |---|---|---|
-| `vllm` | Qwen3.6 brain (OpenAI-compatible, :8888) — text + vision | ● |
+| `vllm` | Muse Glimmer brain (OpenAI-compatible, :8888) — text + vision | ● |
 | `tts` | Kokoro neural TTS (:8991) | ● |
 | `stt` | faster-whisper STT (:8990) | ● |
 | `embed` | bge embeddings for semantic memory (:8994) | ● |

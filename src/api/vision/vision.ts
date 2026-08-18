@@ -40,13 +40,20 @@ async function captionViaLLM(frame: Frame, question: string): Promise<string> {
     headers,
     body: JSON.stringify({
       model,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'text', text: prompt },
-          { type: 'image_url', image_url: { url: dataUri } },
-        ],
-      }],
+      messages: [
+        // Same reasoning control as the agent loop — keeps captions snappy on
+        // models that reason by default (inert text elsewhere).
+        ...(process.env.ORB2_REASONING_STRENGTH
+          ? [{ role: 'system', content: `Reasoning strength: ${process.env.ORB2_REASONING_STRENGTH}` }]
+          : []),
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            { type: 'image_url', image_url: { url: dataUri } },
+          ],
+        },
+      ],
       max_tokens: 300,
       temperature: 0.2,
       // Hybrid-thinking model: turn off the reasoning trace for a clean caption.
