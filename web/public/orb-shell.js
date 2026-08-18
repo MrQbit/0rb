@@ -1023,7 +1023,51 @@
       const q=sb.value.toLowerCase().trim();
       grid.querySelectorAll('.app-card').forEach(c=>{ c.style.display=(!q||c.dataset.search.includes(q))?'':'none'; }); }; }
     const aw=$('#addWidget'); if(aw && !aw.dataset.wired){ aw.dataset.wired='1';
-      aw.onclick=()=>toast('Custom widgets: drop a plugin in /workspace/.widgets — developer docs coming.'); }
+      aw.onclick=()=>togglePluginPanel(aw); }
+  }
+
+  // ── "Add your own" widget plugin: inline install panel ──
+  const PLUGIN_TEMPLATE = [
+    '// Custom widget: export render(el, spec, api).',
+    '// The agent shows it with: Widget { type: "<your id>", title, ...anything }',
+    'export function render(el, spec, api){',
+    "  el.innerHTML = '<div style=\"padding:10px\">'+api.esc(spec.title||'My widget')+'</div>';",
+    '}',
+  ].join('\n');
+  function togglePluginPanel(anchor){
+    let p=$('#pluginPanel');
+    if(p){ p.remove(); return; }
+    p=document.createElement('div'); p.id='pluginPanel'; p.className='set-item'; p.style.flexDirection='column'; p.style.alignItems='stretch';
+    p.innerHTML =
+      `<div class="t" style="margin-bottom:6px;">Add a custom widget</div>`+
+      `<div class="s" style="margin-bottom:8px;">Installs into the plugins folder (<code>.widgets/&lt;id&gt;/</code>) — manifest.json + render.js, no rebuild. Or paste an existing render.js.</div>`+
+      `<div class="set-form"><input id="plgId" type="text" placeholder="id (e.g. dice)" style="flex:1;" /><input id="plgName" type="text" placeholder="Name" style="flex:1;" /><input id="plgIcon" type="text" placeholder="🧩" style="width:52px;" /></div>`+
+      `<textarea id="plgJs" spellcheck="false" style="width:100%;min-height:140px;margin-top:8px;font-family:monospace;font-size:12px;background:rgba(0,0,0,.25);color:inherit;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px;">${esc(PLUGIN_TEMPLATE)}</textarea>`+
+      `<div class="set-row" style="margin-top:8px;"><button id="plgInstall" class="set-btn">Install</button><label class="set-btn ghost" style="cursor:pointer;">Load render.js<input id="plgFile" type="file" accept=".js" style="display:none;" /></label><span id="plgMsg" class="set-muted small"></span></div>`+
+      `<div id="plgList" style="margin-top:8px;"></div>`;
+    anchor.insertAdjacentElement('afterend', p);
+    $('#plgFile').onchange=async e=>{ const f=e.target.files[0]; if(f){ $('#plgJs').value=await f.text(); if(!$('#plgId').value) $('#plgId').value=f.name.replace(/\.js$/,'').replace(/[^A-Za-z0-9._-]/g,'-'); } };
+    $('#plgInstall').onclick=async()=>{
+      const id=$('#plgId').value.trim(), msg=$('#plgMsg');
+      if(!id){ msg.textContent='id required'; return; }
+      msg.textContent='Installing…';
+      try{
+        const r=await fetch('/v1/widgets/plugins',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},
+          body:JSON.stringify({id, name:$('#plgName').value.trim()||id, icon:$('#plgIcon').value.trim()||'🧩', render_js:$('#plgJs').value})});
+        const d=await r.json();
+        if(r.ok){ msg.textContent='Installed.'; toast('Widget "'+id+'" installed'); loadPlugins(); loadAppsRegistry(); renderPluginList(); }
+        else msg.textContent=d.error||'Failed.';
+      }catch{ msg.textContent='Failed.'; }
+    };
+    renderPluginList();
+  }
+  async function renderPluginList(){
+    const el=$('#plgList'); if(!el) return;
+    let d={}; try{ d=await (await fetch('/v1/widgets/plugins',{credentials:'same-origin'})).json(); }catch{}
+    const ps=d.plugins||[];
+    el.innerHTML = ps.length ? ps.map(x=>`<div class="set-row" style="justify-content:space-between;"><span>${esc(x.icon||'🧩')} ${esc(x.name)} <span class="set-muted small">${esc(x.id)}</span></span><button class="set-btn ghost plg-rm" data-id="${esc(x.id)}">Remove</button></div>`).join('') : '<div class="set-muted small">No custom widgets installed yet.</div>';
+    el.querySelectorAll('.plg-rm').forEach(b=>{ b.onclick=async()=>{
+      try{ await fetch('/v1/widgets/plugins/'+encodeURIComponent(b.dataset.id),{method:'DELETE',credentials:'same-origin'}); toast('Removed'); loadPlugins(); loadAppsRegistry(); renderPluginList(); }catch{ toast('Failed'); } }; });
   }
 
   async function loadApps(){

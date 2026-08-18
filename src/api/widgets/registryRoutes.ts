@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs'
 import type { Store } from '../store/store.js'
 import { authEnabled, verifySession, parseCookies, SESSION_COOKIE } from '../auth/session.js'
 import { getWidgetRegistry, toggleWidgetDisabled, WIDGET_CATALOG } from './registry.js'
-import { listPlugins, pluginFile } from './plugins.js'
+import { listPlugins, pluginFile, installPlugin, removePlugin } from './plugins.js'
 
 const SETTINGS_KV_PREFIX = 'setting:'
 
@@ -34,6 +34,15 @@ export async function tryWidgetRegistryRoute(req: Request, method: string, pathn
   // Custom widget plugins (runtime, no recompile).
   if (method === 'GET' && pathname === '/v1/widgets/plugins') {
     return json(200, { plugins: listPlugins() })
+  }
+  if (method === 'POST' && pathname === '/v1/widgets/plugins') {
+    const b = (await req.json().catch(() => ({}))) as any
+    try { return json(200, { installed: installPlugin(b) }) }
+    catch (e) { return json(400, { error: (e as Error).message }) }
+  }
+  const pd = pathname.match(/^\/v1\/widgets\/plugins\/([A-Za-z0-9._-]+)$/)
+  if (method === 'DELETE' && pd) {
+    return removePlugin(pd[1]!) ? json(200, { removed: pd[1] }) : json(404, { error: 'not found' })
   }
   const pf = pathname.match(/^\/v1\/widgets\/plugins\/([A-Za-z0-9._-]+)\/(.+)$/)
   if (method === 'GET' && pf) {

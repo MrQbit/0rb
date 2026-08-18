@@ -2081,6 +2081,26 @@ async function getFallbackChainForModel(primaryModel: string): Promise<string[]>
   return buildFallbackChain(primaryModel, models)
 }
 
+// Probe the OpenAI-compatible backend's /models (30s cache, 3s timeout).
+let _openAiModelsCache: { ids: string[]; at: number } | null = null
+async function listOpenAiCompatModels(): Promise<string[]> {
+  const base = (process.env.OPENAI_BASE_URL || '').replace(/\/+$/, '')
+  if (!base) return []
+  if (_openAiModelsCache && Date.now() - _openAiModelsCache.at < 30_000) return _openAiModelsCache.ids
+  try {
+    const headers: Record<string, string> = {}
+    if (process.env.OPENAI_API_KEY) headers.authorization = `Bearer ${process.env.OPENAI_API_KEY}`
+    const res = await fetch(`${base}/models`, { headers, signal: AbortSignal.timeout(3000) })
+    if (!res.ok) return _openAiModelsCache?.ids ?? []
+    const data = (await res.json()) as { data?: Array<{ id?: string }> }
+    const ids = (data.data ?? []).map(m => String(m.id || '')).filter(Boolean)
+    _openAiModelsCache = { ids, at: Date.now() }
+    return ids
+  } catch {
+    return _openAiModelsCache?.ids ?? []
+  }
+}
+
 async function handleListModels(identity: CallerIdentity | null): Promise<Response> {
   const defaultModel = process.env.ANTHROPIC_DEFAULT_SONNET_MODEL || ''
   const allowed =
@@ -2104,14 +2124,22 @@ async function handleListModels(identity: CallerIdentity | null): Promise<Respon
   } else {
     const deployment = process.env.OPENAI_MODEL || 'gpt-4o'
     const provider = process.env.LLM_PROVIDER || 'azure_openai'
-    models = [{
-      id: deployment,
+    // Ask the OpenAI-compatible backend what it actually serves (vLLM lists
+    // every --served-model-name, incl. aliases) so the Settings dropdown shows
+    // real choices, not just the env default. Falls back to the env entry.
+    const served = await listOpenAiCompatModels()
+    const ids = served.length ? served : [deployment]
+    models = ids.map(id => ({
+      id,
       provider,
-      label: deployment,
+      label: id,
       tier: 'default',
-      isDefault: true,
+      isDefault: id === deployment,
       status: 'available',
-    }]
+    }))
+    if (!models.some(m => m.isDefault)) models.unshift({
+      id: deployment, provider, label: deployment, tier: 'default', isDefault: true, status: 'available',
+    })
   }
 
   const filtered = models.filter(
