@@ -358,6 +358,8 @@
       const ex = widgets.get(spec.id);
       const ttl = ex.querySelector('.wg-title'); if(ttl) ttl.textContent = spec.title || titleFor(spec);
       if(ex._chart){ try{ ex._chart.destroy(); }catch{} ex._chart=null; }
+      if(ex._map){ try{ ex._map.remove(); }catch{} ex._map=null; }
+      if(ex._mapRo){ try{ ex._mapRo.disconnect(); }catch{} ex._mapRo=null; }
       const exBody = ex.querySelector('.wg-body'); exBody.innerHTML='';
       try { renderWidget(exBody, spec, ex); } catch(e){ exBody.textContent='widget render error'; }
       ex._spec=spec; bringIntoView(ex);
@@ -382,6 +384,7 @@
     else if(spec.type==='docker'){ wg.style.width='460px'; wg.style.height='400px'; }
     else if(spec.type==='chart') wg.style.height='340px';   // give charts room (resizable)
     else if(spec.type==='todo'){ wg.style.width='380px'; wg.style.height='360px'; }
+    else if(spec.type==='home'){ wg.style.width='560px'; wg.style.height='480px'; }
     else if(_plugins[spec.type]){ const p=_plugins[spec.type]; if(p.width)wg.style.width=p.width+'px'; if(p.height)wg.style.height=p.height+'px'; }
     wgCount++;
     const w = wide?(fill?640:spec.type==='model'?460:480):380;
@@ -391,12 +394,20 @@
     wg.style.left=wpos.x+'px'; wg.style.top=wpos.y+'px';
     const head=document.createElement('div'); head.className='wg-head';
     const ttl=document.createElement('span'); ttl.className='wg-title'; ttl.textContent = spec.title || titleFor(spec);
-    const x=document.createElement('button'); x.className='wg-x'; x.textContent='✕'; x.onclick=()=>{ widgets.delete(wid); if(wg._chart){try{wg._chart.destroy();}catch{}} wg.remove(); growWidgetCanvas(); };
+    const x=document.createElement('button'); x.className='wg-x'; x.textContent='✕'; x.onclick=()=>{ widgets.delete(wid);
+      if(wg._chart){try{wg._chart.destroy();}catch{}}
+      if(wg._map){try{wg._map.remove();}catch{}}
+      if(wg._mapRo){try{wg._mapRo.disconnect();}catch{}}
+      if(wg._ro){try{wg._ro.disconnect();}catch{}}
+      wg.remove(); growWidgetCanvas(); };
     head.append(ttl, x); wg.appendChild(head);
     const body=document.createElement('div'); body.className='wg-body'; wg.appendChild(body);
-    try { renderWidget(body, spec, wg); } catch(e){ body.textContent='widget render error'; }
+    // Attach BEFORE rendering: size-aware renderers (Leaflet maps, charts)
+    // measure their container at init — a detached element measures 0x0,
+    // which for maps meant zoom-0 "all ocean" and a half-viewport pan.
     widgets.set(wid, wg);
     widgetLayer.appendChild(wg);
+    try { renderWidget(body, spec, wg); } catch(e){ body.textContent='widget render error'; }
     growWidgetCanvas();
     presentWidget(wpos, w, hGuess, place.scroll);
     // drag the widget by its header
@@ -560,33 +571,75 @@
   }
 
   // ── Home (live device dashboard; user taps a tile, agent drives it too) ──
+  // Stroked SVG icons per HA domain — same visual language as the shell's
+  // chrome (the emoji set read as off-brand and grayscaled to mud).
+  const HOME_ICONS={
+    light:'<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.6.5 1 1.5 1 2.5h6c0-1 .4-2 1-2.5A6 6 0 0 0 12 3z"/>',
+    switch:'<path d="M12 3v9"/><path d="M6.6 6.6a8 8 0 1 0 10.8 0"/>',
+    fan:'<circle cx="12" cy="12" r="2"/><path d="M12 10c0-3 1.5-6 4-6 2 0 3 1.5 3 3 0 2.5-3 3-7 3zM12 14c0 3-1.5 6-4 6-2 0-3-1.5-3-3 0-2.5 3-3 7-3zM10 12c-3 0-6-1.5-6-4 0-2 1.5-3 3-3 2.5 0 3 3 3 7zM14 12c3 0 6 1.5 6 4 0 2-1.5 3-3 3-2.5 0-3-3-3-7z"/>',
+    lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+    cover:'<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9h16M4 13h16"/>',
+    media_player:'<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M9 21h6"/><path d="m10 9 4 2-4 2z"/>',
+    vacuum:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 4v2"/>',
+    climate:'<path d="M14 14.8V5a2 2 0 1 0-4 0v9.8a4 4 0 1 0 4 0z"/>',
+    sensor:'<path d="M3 12h4l2-6 4 12 2-6h6"/>',
+    binary_sensor:'<circle cx="12" cy="12" r="2"/><path d="M8 8a6 6 0 0 0 0 8M16 8a6 6 0 0 1 0 8"/>',
+    camera:'<rect x="3" y="7" width="13" height="10" rx="2"/><path d="m16 11 5-3v8l-5-3z"/>',
+    scene:'<path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>',
+  };
+  function homeIcon(domain){
+    const p=HOME_ICONS[domain]||'<circle cx="12" cy="12" r="3"/>';
+    return `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+  }
   function renderHome(body, spec, wg){
     const wrap=document.createElement('div'); wrap.className='wg-home';
-    const grid=document.createElement('div'); grid.className='wg-home-grid';
     const devices=spec.devices||[];
-    if(!devices.length){ const e=document.createElement('div'); e.className='wg-note'; e.textContent='No devices yet — connect Home Assistant in Settings.'; body.appendChild(e); return; }
-    devices.forEach(d=>{
+    if(!devices.length){ const e=document.createElement('div'); e.className='wg-empty'; e.textContent='No devices yet — connect Home Assistant in Settings.'; body.appendChild(e); return; }
+    // Actionable things first; passive sensors last so a house full of
+    // sensors doesn't bury the lights and locks.
+    const rank=d=>d.controllable?0:(d.domain==='media_player'||d.domain==='vacuum'||d.domain==='climate'?1:2);
+    const sorted=[...devices].sort((a,b)=>rank(a)-rank(b)||String(a.name).localeCompare(String(b.name)));
+    const grid=document.createElement('div'); grid.className='wg-home-grid';
+    sorted.forEach(d=>{
       const card=document.createElement('div');
-      card.className='wg-home-card'+(d.on===true?' on':'')+(d.controllable?' ctl':'');
-      const ic=document.createElement('div'); ic.className='ic'; ic.textContent=d.icon||'•';
-      const nm=document.createElement('div'); nm.className='nm'; nm.textContent=d.name||'';
+      card.className='wg-home-card'+(d.on===true?' on':'')+(d.controllable?' ctl':'')+(d.on===undefined?' passive':'');
+      if(d.controllable){ card.tabIndex=0; card.setAttribute('role','button'); }
+      const ic=document.createElement('div'); ic.className='ic'; ic.innerHTML=homeIcon(d.domain);
+      const nm=document.createElement('div'); nm.className='nm'; nm.textContent=d.name||''; nm.title=d.name||'';
       const st=document.createElement('div'); st.className='st'; st.textContent=d.sub||d.state||'';
       card.appendChild(ic); card.appendChild(nm); card.appendChild(st);
       if(d.controllable && d.entity_id){
         card.title='Tap to toggle';
-        card.onclick=async()=>{
+        const toggle=async()=>{
           if(card.classList.contains('busy')) return;
           card.classList.add('busy');
           try{
             const r=await fetch('/v1/home/control',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({entity_id:d.entity_id,action:'toggle'})});
-            if(r.ok){ d.on=(d.on===true)?false:true; card.classList.toggle('on', d.on===true); }
-          }catch{}
+            if(r.ok){ d.on=(d.on===true)?false:true; card.classList.toggle('on', d.on===true);
+              st.textContent = d.domain==='lock' ? (d.on?'locked':'unlocked') : d.domain==='cover' ? (d.on?'open':'closed') : (d.on?'on':'off'); }
+            else toast('Couldn’t control '+(d.name||'device'));
+          }catch{ toast('Couldn’t reach the server'); }
           card.classList.remove('busy');
         };
+        card.onclick=toggle;
+        card.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); toggle(); } };
       }
       grid.appendChild(card);
     });
     wrap.appendChild(grid); body.appendChild(wrap);
+    // Live refresh while the widget is active — device state changes from
+    // anywhere (HA app, physical switch) show up within 30s.
+    if(wg){
+      if(wg._homeTimer) clearInterval(wg._homeTimer);
+      wg._homeTimer=setInterval(async()=>{
+        if(!document.contains(wg)){ clearInterval(wg._homeTimer); wg._homeTimer=null; return; }
+        if(wg._state!=='active') return;
+        try{
+          const d=await (await fetch('/v1/home/devices',{credentials:'same-origin'})).json();
+          if(Array.isArray(d.devices)&&d.devices.length){ const b=wg.querySelector('.wg-body'); if(b){ b.innerHTML=''; renderHome(b,{...wg._spec,devices:d.devices},wg); } }
+        }catch{}
+      }, 30000);
+    }
   }
 
   // ── Custom widget plugins (runtime, no recompile) ──
@@ -623,14 +676,31 @@
       fig.onclick=()=>spawnWidget({type:'image',title:im.caption||'Image',url:im.url,caption:im.caption}); g.appendChild(fig); });
     body.appendChild(g);
   }
+  // Only http(s) URLs from specs may reach iframes/window.open — an empty or
+  // relative src loads the whole console into the widget; other schemes are
+  // worse. Relative /v1/workspace paths (the agent's own canvas) are allowed.
+  function safeUrl(u){
+    const s=String(u||'');
+    if(/^https?:\/\//i.test(s)) return s;
+    if(s.startsWith('/v1/workspace/')||s.startsWith('/pub/')) return s;
+    return null;
+  }
+  function safeHost(u, hosts){
+    try{ const h=new URL(u).hostname; return hosts.some(x=>h===x||h.endsWith('.'+x)); }catch{ return false; }
+  }
   function renderImage(body, spec){
-    const i=document.createElement('img'); i.className='wg-image'; i.src=spec.url||''; body.appendChild(i);
+    const src=safeUrl(spec.url);
+    if(!src){ const e=document.createElement('div'); e.className='wg-empty'; e.textContent='No image.'; body.appendChild(e); return; }
+    const i=document.createElement('img'); i.className='wg-image'; i.src=src; i.alt=spec.caption||spec.title||'';
+    i.onerror=()=>{ i.replaceWith(Object.assign(document.createElement('div'),{className:'wg-empty',textContent:'Image failed to load.'})); };
+    body.appendChild(i);
     if(spec.caption){ const c=document.createElement('div'); c.className='wg-it-sub'; c.style.marginTop='6px'; c.textContent=spec.caption; body.appendChild(c); }
   }
   function renderEmbed(body, spec){
-    const url=spec.url||'';
-    const ok=/(sketchfab\.com|openstreetmap\.org|youtube(-nocookie)?\.com|player\.vimeo\.com|codesandbox\.io)/.test(url);
-    if(ok){ const f=document.createElement('iframe'); f.className='wg-app'; f.src=url; f.setAttribute('allow','autoplay; fullscreen; xr-spatial-tracking; encrypted-media'); f.setAttribute('allowfullscreen',''); body.appendChild(f); }
+    const url=safeUrl(spec.url);
+    if(!url){ const e=document.createElement('div'); e.className='wg-empty'; e.textContent='Nothing to embed.'; body.appendChild(e); return; }
+    const ok=safeHost(url, ['sketchfab.com','openstreetmap.org','youtube.com','youtube-nocookie.com','player.vimeo.com','codesandbox.io']) || url.startsWith('/');
+    if(ok){ const f=document.createElement('iframe'); f.className='wg-app'; f.setAttribute('sandbox','allow-scripts allow-same-origin allow-forms allow-popups'); f.src=url; f.setAttribute('allow','autoplay; fullscreen; xr-spatial-tracking; encrypted-media'); f.setAttribute('allowfullscreen',''); body.appendChild(f); }
     else { const a=document.createElement('a'); a.href=url; a.target='_blank'; a.rel='noopener'; a.className='set-url'; a.textContent='Open ↗ '+url; body.appendChild(a); }
   }
   function renderModel(body, spec){
@@ -779,17 +849,27 @@
   function renderMap(body, spec, wg){
     if(typeof L==='undefined'){ body.textContent='map library not loaded'; return; }
     const el=document.createElement('div'); el.className='wg-map'; body.appendChild(el);
-    const mk=(spec.markers||[]).filter(m=>m&&m.lat!=null);
-    const center = spec.center || (mk[0]&&[mk[0].lat,mk[0].lng]) || (spec.route&&spec.route[0]) || [40.4168,-3.7038];
-    const map = L.map(el, { zoomControl:true, attributionControl:false }).setView(center, spec.zoom||12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19 }).addTo(map);
+    // Tolerate the coordinate shapes models actually emit: lng / lon / longitude.
+    const num=v=>{ const n=Number(v); return Number.isFinite(n)?n:null; };
+    const pt=m=>{ if(!m) return null; const lat=num(m.lat!=null?m.lat:m.latitude), lng=num(m.lng!=null?m.lng:(m.lon!=null?m.lon:m.longitude)); return (lat==null||lng==null)?null:[lat,lng]; };
+    const mk=(spec.markers||[]).map(m=>({p:pt(m), label:m&&m.label})).filter(m=>m.p);
+    const route=(Array.isArray(spec.route)?spec.route:[]).map(p=>Array.isArray(p)?[num(p[0]),num(p[1])]:null).filter(p=>p&&p[0]!=null&&p[1]!=null);
+    if(!mk.length && !route.length && !spec.center){ const e=document.createElement('div'); e.className='wg-note'; e.textContent='Nothing to map yet.'; body.appendChild(e); el.remove(); return; }
+    const center = (Array.isArray(spec.center)&&pt({lat:spec.center[0],lng:spec.center[1]})) || (mk[0]&&mk[0].p) || route[0] || [40.4168,-3.7038];
+    const map = L.map(el, { zoomControl:true }).setView(center, spec.zoom||12);
+    map.attributionControl.setPrefix(false);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'© OpenStreetMap' }).addTo(map);
     const bounds=[];
-    mk.forEach(m=>{ const k=L.marker([m.lat,m.lng]).addTo(map); if(m.label) k.bindPopup(esc2(m.label)); bounds.push([m.lat,m.lng]); });
-    if(Array.isArray(spec.route)&&spec.route.length>1){ L.polyline(spec.route,{color:'#76b900',weight:5,opacity:.9}).addTo(map); spec.route.forEach(p=>bounds.push(p)); }
+    mk.forEach(m=>{ const k=L.marker(m.p).addTo(map); if(m.label) k.bindPopup(esc2(m.label)); bounds.push(m.p); });
+    if(route.length>1){ L.polyline(route,{color:'#76b900',weight:5,opacity:.9}).addTo(map); route.forEach(p=>bounds.push(p)); }
+    // The widget is attached before render, so sizes are real — but the card's
+    // entrance animation can still settle; sync once now and once next frame.
+    try{ map.invalidateSize(); }catch{}
     if(bounds.length>1){ try{ map.fitBounds(bounds,{padding:[28,28]}); }catch{} }
+    requestAnimationFrame(()=>{ try{ map.invalidateSize(); if(bounds.length>1) map.fitBounds(bounds,{padding:[28,28]}); }catch{} });
     if(wg){ if(wg._map){ try{wg._map.remove();}catch{} } wg._map=map;
-      setTimeout(()=>{ try{ map.invalidateSize(); }catch{} }, 60);
-      if(window.ResizeObserver && !wg._mapRo){ wg._mapRo=new ResizeObserver(()=>{ try{ wg._map&&wg._map.invalidateSize(); }catch{} }); wg._mapRo.observe(el); }
+      if(wg._mapRo){ try{wg._mapRo.disconnect();}catch{} wg._mapRo=null; }
+      if(window.ResizeObserver){ wg._mapRo=new ResizeObserver(()=>{ try{ wg._map&&wg._map.invalidateSize(); }catch{} }); wg._mapRo.observe(el); }
     }
   }
 
@@ -799,7 +879,7 @@
     (spec.messages||[]).forEach(m=>{ const r=document.createElement('div'); r.className='wg-mail-row'+(m.unread?' unread':'');
       r.innerHTML=`<div class="wg-mail-top"><span class="from">${esc2(m.from||'')}</span><span class="date">${esc2(m.date||'')}</span></div>
         <div class="subj">${esc2(m.subject||'')}</div><div class="snip">${esc2(m.snippet||m.preview||'')}</div>`;
-      if(m.url){ r.style.cursor='pointer'; r.onclick=()=>window.open(m.url,'_blank','noopener'); }
+      const mu=safeUrl(m.url); if(mu){ r.style.cursor='pointer'; r.onclick=()=>window.open(mu,'_blank','noopener'); }
       list.appendChild(r); });
     if(!(spec.messages||[]).length){ list.innerHTML='<div class="set-muted small" style="padding:10px;">No messages.</div>'; }
     body.appendChild(list);
@@ -813,16 +893,18 @@
       const cls=/ready|success/.test(st)?'ok':/build|queu|pending/.test(st)?'warn':/error|fail|cancel/.test(st)?'err':'';
       const r=document.createElement('div'); r.className='wg-vc-row';
       r.innerHTML=`<span class="dot ${cls}"></span><div class="grow"><div class="nm">${esc2(d.name||d.url||'deploy')}</div><div class="mt">${esc2(d.branch||'')}${d.created?' · '+esc2(d.created):''}</div></div><span class="st ${cls}">${esc2(d.state||d.readyState||'')}</span>`;
-      if(d.url){ r.style.cursor='pointer'; r.onclick=()=>window.open((d.url.startsWith('http')?'':'https://')+d.url,'_blank','noopener'); }
+      const du=safeUrl(/^https?:\/\//i.test(d.url||'')?d.url:'https://'+d.url); if(du){ r.style.cursor='pointer'; r.onclick=()=>window.open(du,'_blank','noopener'); }
       list.appendChild(r); });
     if(!deps.length){ list.innerHTML='<div class="set-muted small" style="padding:10px;">No deployments.</div>'; }
     body.appendChild(list);
   }
 
   function renderApp(body, spec){
+    const src=safeUrl(spec.url);
+    if(!src){ const e=document.createElement('div'); e.className='wg-empty'; e.textContent='Nothing to show.'; body.appendChild(e); return; }
     const f=document.createElement('iframe'); f.className='wg-app';
     f.setAttribute('sandbox','allow-scripts allow-same-origin allow-forms allow-popups allow-modals');
-    f.src=spec.url||''; body.appendChild(f);
+    f.src=src; body.appendChild(f);
     f.addEventListener('load',()=>{ try{ const t=f.contentDocument&&f.contentDocument.title; if(t&&!spec.title){ const tt=body.parentElement&&body.parentElement.querySelector('.wg-title'); if(tt) tt.textContent=t; } }catch{} });
   }
   function renderChart(body, spec, wg){
@@ -853,14 +935,17 @@
       if(it.action){ row.addEventListener('click',()=>{
         if(it.action.kind==='video') spawnWidget({ type:'video', title:it.title, url:it.action.url, provider:it.action.provider });
         else if(it.action.kind==='music') spawnWidget({ type:'music', title:it.title, url:it.action.url });
-        else if(it.action.kind==='link' && it.action.url) window.open(it.action.url,'_blank','noopener');
+        else if(it.action.kind==='link' && safeUrl(it.action.url)) window.open(safeUrl(it.action.url),'_blank','noopener');
       }); } else { row.style.cursor='default'; }
       body.appendChild(row);
     });
   }
   function renderMusic(body, spec){
-    const f=document.createElement('iframe'); f.className='wg-music'; f.src=spec.url||'';
-    f.setAttribute('allow','autoplay; encrypted-media; clipboard-write; fullscreen; picture-in-picture');
+    const src=safeUrl(spec.url);
+    if(!src){ const e=document.createElement('div'); e.className='wg-empty'; e.textContent='Nothing to play.'; body.appendChild(e); return; }
+    const f=document.createElement('iframe'); f.className='wg-music'; f.src=src;
+    f.setAttribute('sandbox','allow-scripts allow-same-origin allow-popups');
+    f.setAttribute('allow','autoplay; encrypted-media; fullscreen; picture-in-picture');
     f.setAttribute('allowfullscreen',''); body.appendChild(f);
   }
   function renderVideo(body, spec){
@@ -919,6 +1004,32 @@
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
   function openSettings(){ settingsPanel.classList.add('open'); if(!settingsLoaded){ loadSettings(); settingsLoaded=true; } }
   $('#setClose').addEventListener('click', ()=> settingsPanel.classList.remove('open'));
+  // Widget-like behavior: drag by the header, Escape or click-outside to close.
+  (function(){
+    const head=settingsPanel.querySelector('.set-head'); if(!head) return;
+    let d=null;
+    head.addEventListener('pointerdown',e=>{
+      if(e.target.closest('button')) return;
+      const r=settingsPanel.getBoundingClientRect();
+      settingsPanel.style.left=r.left+'px'; settingsPanel.style.top=r.top+'px'; settingsPanel.style.right='auto';
+      d={sx:e.clientX,sy:e.clientY,ox:r.left,oy:r.top};
+      settingsPanel.classList.add('dragging');
+      head.setPointerCapture(e.pointerId);
+    });
+    head.addEventListener('pointermove',e=>{ if(!d)return;
+      const x=Math.max(-40,Math.min(innerWidth-80, d.ox+(e.clientX-d.sx)));
+      const y=Math.max(0,Math.min(innerHeight-48, d.oy+(e.clientY-d.sy)));
+      settingsPanel.style.left=x+'px'; settingsPanel.style.top=y+'px';
+    });
+    head.addEventListener('pointerup',()=>{ d=null; settingsPanel.classList.remove('dragging'); });
+    document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&settingsPanel.classList.contains('open')) settingsPanel.classList.remove('open'); });
+    document.addEventListener('pointerdown',e=>{
+      if(!settingsPanel.classList.contains('open')) return;
+      if(settingsPanel.contains(e.target)) return;
+      if(e.target.closest('#gearBtn,#topMenu,.top-menu')) return;
+      settingsPanel.classList.remove('open');
+    });
+  })();
   // Topbar menu: the wheel/⋯ opens a small menu (Settings · Publish).
   const topMenu = $('#topMenu');
   $('#gearBtn').addEventListener('click', (e)=>{ e.stopPropagation(); topMenu.classList.toggle('open'); });
