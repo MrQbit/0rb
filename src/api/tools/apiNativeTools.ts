@@ -37,7 +37,9 @@ import { spotifyApi, getUserToken } from '../connectors/spotifyOAuth.js'
 import { newsEnabled, newsSearch } from '../connectors/news.js'
 import { vercelEnabled, deployToVercel } from '../connectors/vercel.js'
 import { cloudStorageEnabled, searchCloud, downloadCloudFile, connectedProviders } from '../connectors/cloudStorage.js'
-import { geocode, route as geoRoute, weather } from '../connectors/geo.js'
+import { geocode, route as geoRoute, weather, reverseGeocode } from '../connectors/geo.js'
+import { webSearch, webSearchEnabled } from '../connectors/websearch.js'
+import { haConfig } from '../connectors/homeAssistant.js'
 import { dockerEnabled, dockerList, dockerControl } from '../connectors/dockerc.js'
 import { haEnabled, haStates, haResolve, haCallService, HOME_DOMAINS, type HaEntity } from '../connectors/homeAssistant.js'
 import { onlineOptions, nearbyStores } from '../connectors/shopping.js'
@@ -194,6 +196,15 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
       available: spotifyEnabled(),
     },
     {
+      name: 'WebSearch',
+      description: "Search the live web (private SearXNG). Use for ANY question about current events, prices, versions, releases, weather-adjacent news, or facts that may have changed since training — instead of saying you can't browse. Returns the top results (title, URL, snippet) and shows them in a results widget.",
+      input_schema: { type: 'object', properties: {
+        query: { type: 'string', description: 'What to search for.' },
+        count: { type: 'number', description: 'Max results (default 8).' },
+      }, required: ['query'] },
+      available: webSearchEnabled(),
+    },
+    {
       name: 'NewsSearch',
       description: "Search the news (connected app). PREFER this over generic web search when the user wants news, headlines, or current events. Shows a results widget; clicking an article opens it. Pass a topic/query, or empty for top headlines.",
       input_schema: { type: 'object', properties: { query: { type: 'string', description: 'Topic or query (empty = top headlines).' } } },
@@ -227,8 +238,8 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
     },
     {
       name: 'Weather',
-      description: "Get CURRENT conditions + a 5-day forecast for a place and SHOW it in the weather widget. Just pass a `location` (city/place) — it fetches REAL data (Open-Meteo, no key needed) and renders the card. ALWAYS use this for any weather/temperature/forecast question instead of telling the user to check a website. Reuses the one weather widget.",
-      input_schema: { type: 'object', properties: { location: { type: 'string', description: 'City or place, e.g. "Austin" or "Austin, TX".' } }, required: ['location'] },
+      description: "Get CURRENT conditions + a 5-day forecast for a place and SHOW it in the weather widget. Pass a `location` (city/place), or omit it for the user's home. It fetches REAL data (Open-Meteo, no key needed) and renders the card. ALWAYS use this for any weather/temperature/forecast question instead of telling the user to check a website. Reuses the one weather widget.",
+      input_schema: { type: 'object', properties: { location: { type: 'string', description: 'City or place, e.g. "Austin, TX". Omit for the user\'s home location.' } } },
       available: true,
     },
     {
@@ -528,6 +539,19 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
       return `Done (${action}).`
     } catch (e) { return `[ERROR] ${(e as Error).message}` }
   })
+  add('WebSearch', { readOnly: true }, async args => {
+    const q = String(args?.query || '').trim()
+    if (!q) return 'Provide a search query.'
+    try {
+      const hits = await webSearch(q, Math.min(Number(args?.count) || 8, 20))
+      if (!hits.length) return `No results for "${q}".`
+      emitWidget(ctx.sessionId, {
+        id: `search-${Date.now().toString(36)}`, type: 'results', title: `Web · ${q}`,
+        items: hits.map(h => ({ title: h.title, subtitle: h.snippet.slice(0, 120), action: { kind: 'link', url: h.url } })),
+      } as any)
+      return `Top results for "${q}":\n` + hits.map((h, i) => `${i + 1}. ${h.title} — ${h.url}\n   ${h.snippet.slice(0, 200)}`).join('\n')
+    } catch (e) { return `[ERROR] Web search failed: ${(e as Error).message}` }
+  })
   add('NewsSearch', { readOnly: true }, async args => {
     const q = String(args?.query || '').trim()
     try {
@@ -564,8 +588,11 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
     catch (e) { return `[ERROR] ${(e as Error).message}` }
   })
   add('Weather', { readOnly: true }, async args => {
-    const loc = String(args?.location || '').trim()
-    if (!loc) return 'Provide a location.'
+    let loc = String(args?.location || '').trim()
+    if (!loc || /^(here|home|my (house|home|location)|current location)$/i.test(loc)) {
+      loc = (await homeLocation()) || ''
+    }
+    if (!loc) return "No location given and no home location set — ask the user where, or set one via Settings / Home Assistant."
     try {
       const w = await weather(loc)
       if (!w) return `Couldn't find weather for "${loc}".`
@@ -721,7 +748,7 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
 
     // Local stores — needs a location.
     if (mode !== 'online') {
-      const place = String(args?.near || process.env.ORB2_HOME_LOCATION || '').trim()
+      const place = String(args?.near || (await homeLocation()) || '').trim()
       if (!place) {
         parts.push("For nearby stores, tell me roughly where you are (or set a home location).")
       } else {
@@ -797,6 +824,24 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
   })
 
   return tools
+}
+
+/**
+ * The user's home location as a short label. Prefers the ORB2_HOME_LOCATION
+ * setting; falls back to Home Assistant's configured coordinates (set during
+ * HA onboarding), reverse-geocoded once and cached in the process env so the
+ * whole stack agrees on where "home" is.
+ */
+async function homeLocation(): Promise<string | null> {
+  const set = (process.env.ORB2_HOME_LOCATION || '').trim()
+  if (set) return set
+  const cfg = await haConfig()
+  if (cfg?.latitude == null || cfg?.longitude == null) return null
+  try {
+    const label = await reverseGeocode(cfg.latitude, cfg.longitude)
+    if (label) { process.env.ORB2_HOME_LOCATION = label; return label }
+  } catch { /* fall through */ }
+  return null
 }
 
 /** Map an HA entity to a device card for the `home` dashboard widget. */

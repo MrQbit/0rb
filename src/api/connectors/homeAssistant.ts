@@ -29,6 +29,19 @@ function haHeaders(): Record<string, string> {
   }
 }
 
+export interface HaConfig {
+  latitude?: number
+  longitude?: number
+  location_name?: string
+  time_zone?: string
+}
+
+/** HA instance config (home coordinates, name, tz). null when unreachable. */
+export async function haConfig(): Promise<HaConfig | null> {
+  if (!haEnabled()) return null
+  try { return (await haFetch('/config')) as HaConfig } catch { return null }
+}
+
 export interface HaEntity {
   entity_id: string
   domain: string

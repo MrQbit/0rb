@@ -20,6 +20,17 @@ export async function geocode(query: string): Promise<GeoPoint | null> {
   return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon), name: d[0].display_name }
 }
 
+/** Coordinates → a short place label ("Austin, Texas"). null if not found. */
+export async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
+  const url = `https://nominatim.openstreetmap.org/reverse?format=json&zoom=10&lat=${lat}&lon=${lng}`
+  const r = await fetch(url, { headers: { 'user-agent': UA, accept: 'application/json' } })
+  if (!r.ok) return null
+  const d = (await r.json()) as any
+  const a = d?.address
+  const label = [a?.city || a?.town || a?.village || a?.county, a?.state].filter(Boolean).join(', ')
+  return label || d?.display_name?.split(',').slice(0, 2).join(',').trim() || null
+}
+
 export interface RouteResult { coords: [number, number][]; distanceKm: number; durationMin: number }
 
 /** Driving route through 2+ points → polyline (lat,lng) + distance/duration. */
