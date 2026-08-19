@@ -4,7 +4,7 @@ Directive: alternate loops until 3 consecutive clean checks EACH.
 Commit locally, DO NOT push. One change at a time, tested, deployed.
 
 ## Loop A — feature research (house-AI gaps → build with widgets)
-Clean checks: 0/3
+Clean checks: 1/3 (remaining ideas need hardware or unconnected accounts)
 Done:
 - A1 morning briefing (buildBriefing + Today widget + ORB2_BRIEFING_TIME) e20deef
 - A2 staple auto-reorder (every_days recurrence + revive sweep + nudge + ↻ badge) dfd9775
@@ -27,6 +27,7 @@ Done:
 - B4 media remote emoji → stroked SVGs, flex-centered buttons 83f67db
 - B5 calendar month navigation (SVG chevrons, title=jump to today) c502edb
 - B6 docker/model widget empty + error states 62c01a9
+- B7 console-wide reduced-motion support
 Hunt list: toasts styling/stacking, widget spawn overlap edge cases, pill
 telemetry truthfulness, focus rings everywhere interactive, scrollbar
 styling consistency across widgets, orb mic/camera button states, login
