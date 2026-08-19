@@ -874,3 +874,17 @@ body {
 .wg-todo-empty { font-family:var(--mono); color:var(--ink-dim); font-size:12px; opacity:.8; }
 
 .wg-cal-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+
+/* ── reduced motion: quiet the whole console for users who ask for it ──
+   Infinite ambience (grid drift, orb float, pulses) stops; entrances become
+   simple fades; the audio-reactive orb still changes state, just statically. */
+@media (prefers-reduced-motion: reduce) {
+  #surface::before { animation: none; }
+  #orb.orb-float, .status-dot.ok, .round-btn.live, .voice-chip { animation: none !important; }
+  .wg { animation: wgfade .2s ease; }
+  .msg, .set-sec { animation: none; }
+  .wg.pill { transition: none; }
+  .toast-chip { transition: opacity .2s; transform: none; }
+  .wg-printer .pfill, .wg-timer .fill { transition: none; }
+}
+@keyframes wgfade { from { opacity: 0; } to { opacity: 1; } }
