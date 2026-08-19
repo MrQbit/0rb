@@ -474,6 +474,12 @@
   }
   function pillInfo(wg){
     const s=wg._spec||{};
+    // Live-computable telemetry beats emit-time snapshots.
+    if(s.type==='timers'){ const n=(s.timers||[]).filter(t=>t.at>Date.now()).length; return n?n+' running':'done'; }
+    if(s.type==='climate'&&s.current!=null) return Math.round(s.current)+'°'+(s.target!=null?' → '+s.target+'°':'');
+    if(s.type==='media') return s.media_title?('♪ '+s.media_title):(s.state||'media');
+    if(s.type==='printer3d') return (s.progress!=null?s.progress+'% · ':'')+(s.state||'printer');
+    if(s.type==='housemode') return 'mode: '+(s.mode||'home');
     if(s.pill) return String(s.pill);                                  // agent-supplied telemetry
     switch(s.type){
       case 'music': return '♪ '+(s.title||'music');
