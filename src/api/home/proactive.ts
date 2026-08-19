@@ -37,8 +37,20 @@ function thresholdMs(): number {
   return Math.max(0, Number(process.env.ORB2_HOME_OPEN_ALERT_MIN ?? 10)) * 60_000
 }
 
+/** Safety classes: alert IMMEDIATELY in every mode — even guest. */
+export function safetyState(e: HaEntity): string | null {
+  if (e.domain !== 'binary_sensor') return null
+  const cls = e.attributes?.device_class
+  if (e.state !== 'on') return null
+  if (cls === 'smoke') return 'SMOKE detected'
+  if (cls === 'carbon_monoxide') return 'CARBON MONOXIDE detected'
+  if (cls === 'gas') return 'GAS detected'
+  if (cls === 'moisture') return 'WATER LEAK detected'
+  return null
+}
+
 /** Is this entity in a state Orb should keep an eye on? Returns a label or null. */
-function watchState(e: HaEntity, motion = false): string | null {
+export function watchState(e: HaEntity, motion = false): string | null {
   if (e.domain === 'lock' && e.state === 'unlocked') return 'unlocked'
   if (e.domain === 'binary_sensor') {
     const cls = e.attributes?.device_class
@@ -206,6 +218,15 @@ async function tick(): Promise<void> {
       effThreshold = thresholdForMode(mode, thresholdMs())
       motion = motionAlerts(mode)
     } catch { /* default posture */ }
+  }
+  // Safety first: smoke/CO/gas/leak alert instantly, regardless of mode.
+  for (const e of entities) {
+    const safety = safetyState(e)
+    if (safety && !alerted.has('safety:' + e.entity_id)) {
+      alerted.add('safety:' + e.entity_id)
+      await notifyOwner(`🚨 ${safety} — ${e.name}. Please check immediately.`)
+    }
+    if (!safety) alerted.delete('safety:' + e.entity_id)
   }
   if (effThreshold === null) return
 

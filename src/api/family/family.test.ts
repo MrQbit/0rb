@@ -255,3 +255,18 @@ describe('care routines (loop A4)', () => {
     expect('error' in (await addRoutine(store, { label: 'x', at: '08:00', to: 'a@x.co' }))).toBe(false)
   })
 })
+
+describe('safety-class alerts (loop A8)', () => {
+  test('smoke/CO/gas/moisture trigger; doors and off-states do not', async () => {
+    const { safetyState } = await import('../home/proactive.ts')
+    const mk = (device_class: string, state: string) =>
+      ({ entity_id: 'binary_sensor.x', domain: 'binary_sensor', name: 'x', state, attributes: { device_class } }) as any
+    expect(safetyState(mk('smoke', 'on'))).toContain('SMOKE')
+    expect(safetyState(mk('carbon_monoxide', 'on'))).toContain('CARBON')
+    expect(safetyState(mk('gas', 'on'))).toContain('GAS')
+    expect(safetyState(mk('moisture', 'on'))).toContain('LEAK')
+    expect(safetyState(mk('smoke', 'off'))).toBeNull()
+    expect(safetyState(mk('door', 'on'))).toBeNull()
+    expect(safetyState({ entity_id: 'lock.a', domain: 'lock', name: 'a', state: 'unlocked', attributes: {} } as any)).toBeNull()
+  })
+})

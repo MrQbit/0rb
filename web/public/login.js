@@ -61,4 +61,9 @@
   // Enter-key convenience.
   emailEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') sendCode('email'); });
   codeEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') document.getElementById('verifyBtn').click(); });
+  // Digits only; auto-verify the moment the 6th digit lands (paste included).
+  codeEl.addEventListener('input', function () {
+    codeEl.value = codeEl.value.replace(/\D/g, '').slice(0, 6);
+    if (codeEl.value.length === 6) document.getElementById('verifyBtn').click();
+  });
 })();
