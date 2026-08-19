@@ -422,7 +422,7 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
       name: 'Home',
       description: "Control and check the home's devices through Home Assistant — lights, switches/plugs, thermostats (climate), locks, window shades/blinds (cover), TVs & speakers (media_player), robot vacuums, fans, and door/window & motion sensors. This is how Orb acts as the house. Use op:'list' to see what's available (optionally a `type`), op:'status' to check a device by name, and op:'control' to change one: action on/off/toggle for lights/plugs/switches; lock/unlock for locks; open/close (or set with `value` 0-100) for shades; set with `value` for a thermostat's target temperature; play/pause/on/off (or set volume with `value` 0-100) for media; start/stop/dock for a vacuum. Always refer to devices by their friendly name (e.g. \"kitchen lights\", \"front door\").",
       input_schema: { type: 'object', properties: {
-        op: { type: 'string', enum: ['list', 'status', 'control', 'media', 'lights', 'climate', 'vacuum', 'covers', 'security', 'plugs', 'scenes', 'sensors', 'camera', 'presence', 'automations'], description: "list = overview dashboard; status/control = one device; each FUNCTION op shows a focused widget: media (TV/speaker remote), lights (room-grouped), climate (thermostats), vacuum, covers (shades/blinds), security (locks + door/window/motion sensors), plugs (switches/outlets), scenes, sensors (readings: temperature/humidity/battery), camera (snapshots), presence (who's home/away), automations (list HA automations with on/off + run). ALWAYS prefer the function widget matching what the user is focused on — the overview dashboard (list) is for 'show me everything'." },
+        op: { type: 'string', enum: ['list', 'status', 'control', 'media', 'lights', 'climate', 'vacuum', 'covers', 'security', 'plugs', 'scenes', 'sensors', 'camera', 'presence', 'automations', 'printer'], description: "list = overview dashboard; status/control = one device; each FUNCTION op shows a focused widget: media (TV/speaker remote), lights (room-grouped), climate (thermostats), vacuum, covers (shades/blinds), security (locks + door/window/motion sensors), plugs (switches/outlets), scenes, sensors (readings: temperature/humidity/battery), camera (snapshots), presence (who's home/away), automations (list HA automations with on/off + run), printer (3D printer: live camera, progress, temps, pause/stop). ALWAYS prefer the function widget matching what the user is focused on — the overview dashboard (list) is for 'show me everything'." },
         query: { type: 'string', description: "Device name for status/control (e.g. 'living room lights', 'front door', 'bedroom thermostat')." },
         type: { type: 'string', enum: ['light', 'switch', 'climate', 'lock', 'cover', 'media_player', 'vacuum', 'fan', 'sensor', 'camera'], description: 'Optional device type filter for list.' },
         action: { type: 'string', enum: ['on', 'off', 'toggle', 'lock', 'unlock', 'open', 'close', 'play', 'pause', 'start', 'stop', 'dock', 'set'], description: 'What to do for op:control.' },
@@ -1004,6 +1004,59 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
           snapshot: `/v1/home/ha-image?path=${encodeURIComponent(`/api/camera_proxy/${c.entity_id}`)}`,
         } as any)
         return `Showed camera widget${cams.length > 1 ? 's' : ''}: ${cams.slice(0, 4).map(c => c.name).join(', ')}.`
+      }
+      if (op === 'printer') {
+        // 3D printers (Bambu Lab via the bambu_lab integration; the shape
+        // generalizes to other printer integrations exposing the same kinds
+        // of entities). Group that platform's entities by physical device.
+        const [states, reg] = await Promise.all([haStates(), haEntityRegistry()])
+        const regById = new Map(reg.map(r => [r.entity_id, r] as const))
+        const printers = new Map<string, HaEntity[]>()
+        for (const e of states) {
+          const r = regById.get(e.entity_id)
+          if (r?.platform !== 'bambu_lab' || !r.device_id) continue
+          const arr = printers.get(r.device_id) ?? []
+          arr.push(e)
+          printers.set(r.device_id, arr)
+        }
+        if (!printers.size) return "No 3D printer paired yet. The bambu_lab integration is installed — say 'set up the bambu printer' (the flow asks for the printer's IP / serial / LAN access code from its screen)."
+        const pick = (es: HaEntity[], dom: string, suffix: RegExp) => es.find(e => e.domain === dom && suffix.test(e.entity_id))
+        for (const [devId, es] of [...printers.entries()].slice(0, 2)) {
+          const stage = pick(es, 'sensor', /(current_stage|print_status|stage)$/)
+          const progress = pick(es, 'sensor', /(print_progress|progress)$/)
+          const layer = pick(es, 'sensor', /current_layer$/)
+          const layers = pick(es, 'sensor', /total_layer_count$/)
+          const remaining = pick(es, 'sensor', /remaining_time$/)
+          const nozzle = pick(es, 'sensor', /nozzle_temperature$/)
+          const nozzleT = pick(es, 'sensor', /nozzle_target_temperature$/)
+          const bed = pick(es, 'sensor', /bed_temperature$/)
+          const bedT = pick(es, 'sensor', /(bed_target_temperature|target_bed_temperature)$/)
+          const cam = es.find(e => e.domain === 'camera')
+          const name = (cam?.name || es[0]!.name).replace(/ (camera|chamber.*)$/i, '')
+          emitWidget(ctx.sessionId, {
+            id: `printer3d-${devId}`, type: 'printer3d', title: name,
+            name, state: stage?.state || 'unknown',
+            progress: progress ? Number(progress.state) : undefined,
+            layer: layer ? Number(layer.state) : undefined,
+            total_layers: layers ? Number(layers.state) : undefined,
+            remaining_min: remaining ? Number(remaining.state) : undefined,
+            nozzle: nozzle ? Number(nozzle.state) : undefined,
+            nozzle_target: nozzleT ? Number(nozzleT.state) : undefined,
+            bed: bed ? Number(bed.state) : undefined,
+            bed_target: bedT ? Number(bedT.state) : undefined,
+            stream: cam ? `/v1/home/ha-image?path=${encodeURIComponent(`/api/camera_proxy_stream/${cam.entity_id}`)}` : undefined,
+            snapshot: cam ? `/v1/home/ha-image?path=${encodeURIComponent(`/api/camera_proxy/${cam.entity_id}`)}` : undefined,
+            controls: {
+              pause: pick(es, 'button', /pause$/)?.entity_id,
+              resume: pick(es, 'button', /resume$/)?.entity_id,
+              stop: pick(es, 'button', /stop$/)?.entity_id,
+            },
+          } as any)
+        }
+        const first = [...printers.values()][0]!
+        const st = pick(first, 'sensor', /(current_stage|print_status|stage)$/)
+        const pg = pick(first, 'sensor', /(print_progress|progress)$/)
+        return `Showed the printer widget${printers.size > 1 ? 's' : ''}. Status: ${st?.state || 'unknown'}${pg ? `, ${pg.state}%` : ''}.`
       }
       if (op === 'presence') {
         const people = (await haStates(['person'])).map(p => ({

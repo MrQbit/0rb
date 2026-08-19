@@ -406,6 +406,7 @@
     else if(spec.type==='timers'){ wg.style.width='340px'; wg.style.height='340px'; }
     else if(spec.type==='presence'){ wg.style.width='340px'; wg.style.height='260px'; }
     else if(spec.type==='automations'){ wg.style.width='420px'; wg.style.height='400px'; }
+    else if(spec.type==='printer3d'){ wg.style.width='480px'; wg.style.height='560px'; }
     else if(spec.type==='document'){ wg.style.width='560px'; wg.style.height='520px'; }
     else if(spec.type==='wallet'){ wg.style.width='380px'; wg.style.height='400px'; }
     else if(spec.type==='lights'){ wg.style.width='400px'; wg.style.height='440px'; }
@@ -521,7 +522,7 @@
     }
   }, 15000);
 
-  function titleFor(s){ return ({chart:'Chart',results:'Results',video:'Video',music:'Music',table:'Table',stats:'Stats',gallery:'Gallery',image:'Image',embed:'Embed',model:'3D model',calculator:'Calculator',weather:'Weather',calendar:'Calendar',code:'Code',mail:'Mail',vercel:'Vercel',map:'Map',docker:'Docker',app:'App',html:'HTML',note:'Note',vacuum:'Vacuum',covers:'Shades',security:'Security',plugs:'Plugs',scenes:'Scenes',sensors:'Readings',camera:'Camera',timers:'Timers',presence:"Who's home",automations:'Automations',document:'Document',wallet:'Wallet',lights:'Lights',media:'Media',climate:'Climate',todo:'Tasks',home:'Home'})[s.type]||(s.type?String(s.type):'Note'); }
+  function titleFor(s){ return ({chart:'Chart',results:'Results',video:'Video',music:'Music',table:'Table',stats:'Stats',gallery:'Gallery',image:'Image',embed:'Embed',model:'3D model',calculator:'Calculator',weather:'Weather',calendar:'Calendar',code:'Code',mail:'Mail',vercel:'Vercel',map:'Map',docker:'Docker',app:'App',html:'HTML',note:'Note',vacuum:'Vacuum',covers:'Shades',security:'Security',plugs:'Plugs',scenes:'Scenes',sensors:'Readings',camera:'Camera',timers:'Timers',presence:"Who's home",automations:'Automations',printer3d:'Printer',document:'Document',wallet:'Wallet',lights:'Lights',media:'Media',climate:'Climate',todo:'Tasks',home:'Home'})[s.type]||(s.type?String(s.type):'Note'); }
 
   // ── widget placement: free-floating, but flow without >15% overlap; when the
   //    visible band is full, drop below + scroll there (the orb follows). ──
@@ -594,6 +595,7 @@
     else if(spec.type==='timers') renderTimers(body, spec, wg);
     else if(spec.type==='presence') renderPresence(body, spec);
     else if(spec.type==='automations') renderAutomations(body, spec);
+    else if(spec.type==='printer3d') renderPrinter3d(body, spec, wg);
     else if(_plugins[spec.type]) renderPlugin(body, spec, _plugins[spec.type]);
     else {
       // Freshly-minted custom widget? (CreateWidget installs plugins at
@@ -921,6 +923,49 @@
     bust(); body.appendChild(img);
     if(wg){ if(wg._camTimer) clearInterval(wg._camTimer);
       wg._camTimer=setInterval(()=>{ if(!document.contains(wg)){ clearInterval(wg._camTimer); return; } if(wg._state==='active') bust(); },10000); }
+  }
+
+  // ── printer3d: live chamber view + job progress + controls ──
+  function renderPrinter3d(body, spec, wg){
+    const wrap=document.createElement('div'); wrap.className='wg-printer'; body.appendChild(wrap);
+    // Live view: MJPEG stream through the authed proxy; if the stream dies,
+    // fall back to snapshot polling so there is always a picture.
+    const cam=document.createElement('div'); cam.className='cam';
+    const stream=safeUrl(spec.stream), snap=safeUrl(spec.snapshot);
+    if(stream||snap){
+      const img=document.createElement('img'); img.alt=spec.name||'printer';
+      let mode='stream';
+      const useSnap=()=>{ if(mode==='snap')return; mode='snap';
+        if(!snap){ img.replaceWith(Object.assign(document.createElement('div'),{className:'wg-empty',textContent:'Camera unavailable.'})); return; }
+        const tick=()=>{ img.src=snap+(snap.includes('?')?'&':'?')+'t='+Date.now(); };
+        tick(); if(wg){ if(wg._p3dTimer) clearInterval(wg._p3dTimer);
+          wg._p3dTimer=setInterval(()=>{ if(!document.contains(wg)){ clearInterval(wg._p3dTimer); return; } if(wg._state==='active') tick(); },4000); } };
+      img.onerror=useSnap;
+      img.src=stream||''; if(!stream) useSnap();
+      cam.appendChild(img);
+      const live=document.createElement('span'); live.className='live'; live.textContent='LIVE'; cam.appendChild(live);
+    } else cam.innerHTML='<div class="wg-empty">No camera.</div>';
+    wrap.appendChild(cam);
+    // Job status
+    const st=document.createElement('div'); st.className='job';
+    const pct=spec.progress!=null?Math.max(0,Math.min(100,Number(spec.progress))):null;
+    const rem=spec.remaining_min!=null?(spec.remaining_min>=90?Math.round(spec.remaining_min/60*10)/10+'h':Math.round(spec.remaining_min)+' min'):null;
+    st.innerHTML=`<div class="row1"><span class="state">${esc2(String(spec.state||'idle'))}</span>${rem?`<span class="rem">${esc2(rem)} left</span>`:''}</div>`+
+      (pct!=null?`<div class="pbar"><div class="pfill" style="width:${pct}%"></div></div><div class="row2"><span>${pct}%</span>${spec.layer!=null?`<span>layer ${esc2(String(spec.layer))}${spec.total_layers?' / '+esc2(String(spec.total_layers)):''}</span>`:''}</div>`:'');
+    wrap.appendChild(st);
+    // Temperatures
+    const temps=document.createElement('div'); temps.className='temps';
+    const t=(label,v,target)=>v!=null?`<div class="t"><span class="l">${label}</span><span class="v">${esc2(String(Math.round(v)))}°${target!=null?`<span class="tg">/${esc2(String(Math.round(target)))}°</span>`:''}</span></div>`:'';
+    temps.innerHTML=t('nozzle',spec.nozzle,spec.nozzle_target)+t('bed',spec.bed,spec.bed_target);
+    if(temps.innerHTML) wrap.appendChild(temps);
+    // Controls (button entities — press)
+    const c=spec.controls||{};
+    const ctl=document.createElement('div'); ctl.className='ctl';
+    const mk=(label,eid,danger)=>{ if(!eid)return; const b=document.createElement('button'); b.className='wg-med-btn'+(danger?' danger':''); b.style.width='auto'; b.style.padding='0 16px'; b.textContent=label;
+      b.onclick=async()=>{ if(danger&&!confirm(label+' the print?'))return; if(await haCtl(eid,'press')) toast(label+' sent'); };
+      ctl.appendChild(b); };
+    mk('Pause',c.pause); mk('Resume',c.resume); mk('Stop',c.stop,true);
+    if(ctl.children.length) wrap.appendChild(ctl);
   }
 
   // ── timers: live countdowns ──

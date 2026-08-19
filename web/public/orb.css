@@ -667,6 +667,28 @@ body {
 .wg-read .v .u { font-size:11px; color:var(--ink-dim); margin-left:2px; }
 .wg-read .n { font-size:10.5px; color:var(--ink-dim); margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
+/* ── 3D printer ── */
+.wg-printer { flex:1; min-height:0; display:flex; flex-direction:column; gap:10px; }
+.wg-printer .cam { position:relative; flex:1; min-height:180px; border-radius:12px; overflow:hidden;
+  background:#000; border:1px solid var(--line); display:flex; }
+.wg-printer .cam img { width:100%; height:100%; object-fit:cover; }
+.wg-printer .cam .live { position:absolute; top:8px; left:8px; font-size:9px; font-weight:700; letter-spacing:.8px;
+  color:#fff; background:rgba(255,60,60,.85); border-radius:5px; padding:2px 6px; }
+.wg-printer .job .row1 { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; }
+.wg-printer .job .state { font-size:13.5px; color:var(--ink); text-transform:capitalize; }
+.wg-printer .job .rem { font-size:11px; color:var(--ink-dim); font-family:var(--mono); }
+.wg-printer .pbar { height:6px; border-radius:4px; background:rgba(255,255,255,.06); overflow:hidden; }
+.wg-printer .pfill { height:100%; background:linear-gradient(90deg, var(--nv-deep), var(--nv-bright)); transition:width .6s var(--ease); }
+.wg-printer .job .row2 { display:flex; justify-content:space-between; font-size:10.5px; color:var(--ink-dim); font-family:var(--mono); margin-top:4px; }
+.wg-printer .temps { display:flex; gap:8px; }
+.wg-printer .t { flex:1; display:flex; justify-content:space-between; align-items:baseline; padding:8px 11px;
+  border-radius:10px; background:rgba(255,255,255,.03); border:1px solid var(--line); }
+.wg-printer .t .l { font-size:10px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.6px; }
+.wg-printer .t .v { font-size:15px; color:var(--ink); font-family:var(--mono); }
+.wg-printer .t .tg { font-size:10px; color:var(--ink-dim); }
+.wg-printer .ctl { display:flex; gap:8px; justify-content:center; }
+.wg-med-btn.danger:hover { background:rgba(255,93,93,.18); border-color:rgba(255,93,93,.5); color:var(--danger); }
+
 /* ── timers ── */
 .wg-timer { position:relative; display:flex; align-items:center; gap:10px; padding:11px 12px; border-radius:11px;
   background:rgba(255,255,255,.03); border:1px solid var(--line); overflow:hidden; }
