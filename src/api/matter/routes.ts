@@ -46,13 +46,18 @@ export async function tryHandleMatterRoute(method: string, pathname: string, req
   if (!sidecarAuthed(req)) return json(401, { error: 'bad matter token' })
 
   if (method === 'GET' && pathname === '/v1/matter/snapshot') {
-    if (!haEnabled()) return json(200, { devices: [], mode: 'home', people: [] })
+    const { listPresence } = await import('../presence/presence.js')
+    const { getMode } = await import('../home/mode.js')
+    const people = (await listPresence(store).catch(() => [])).map(p => ({ name: p.name, home: p.home }))
+    const mode = await getMode(store)
+    if (!haEnabled()) return json(200, { devices: [], locks: [], sensors: [], mode, people })
     try {
-      const [ents, people] = await Promise.all([
+      const [ents, locks, sensors, contacts] = await Promise.all([
         haJoinAreas(await haStates(['light', 'switch'])),
-        haStates(['person']).catch(() => []),
+        haJoinAreas(await haStates(['lock'])).catch(() => []),
+        haJoinAreas(await haStates(['sensor'])).catch(() => []),
+        haJoinAreas(await haStates(['binary_sensor'])).catch(() => []),
       ])
-      const { getMode } = await import('../home/mode.js')
       return json(200, {
         devices: ents.map(e => ({
           entity_id: e.entity_id,
@@ -62,8 +67,17 @@ export async function tryHandleMatterRoute(method: string, pathname: string, req
           on: e.state === 'on',
           brightness: e.domain === 'light' && typeof e.attributes.brightness === 'number' ? e.attributes.brightness : null,
         })),
-        mode: await getMode(store),
-        people: people.map(p => ({ name: p.name, home: p.state === 'home' })),
+        locks: locks.map(e => ({ entity_id: e.entity_id, name: e.name, locked: e.state === 'locked' })),
+        sensors: [
+          ...sensors
+            .filter(e => ['temperature', 'humidity'].includes(String(e.attributes.device_class)) && Number.isFinite(Number(e.state)))
+            .map(e => ({ entity_id: e.entity_id, name: e.name, kind: String(e.attributes.device_class), value: Number(e.state) })),
+          ...contacts
+            .filter(e => ['door', 'window', 'opening', 'garage_door'].includes(String(e.attributes.device_class)))
+            .map(e => ({ entity_id: e.entity_id, name: e.name, kind: 'contact', value: e.state === 'on' ? 1 : 0 })),
+        ],
+        mode,
+        people,
       })
     } catch (e) {
       return json(502, { error: (e as Error).message })

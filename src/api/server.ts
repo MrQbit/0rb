@@ -1638,6 +1638,24 @@ async function dispatch(
     const { setRemoteMode } = await import('./devicecert/remote.js')
     return jsonResponse(200, await setRemoteMode(ctx.store, mode))
   }
+  // ─── Presence: the phones report home/away directly (geofence) ───
+  if (pathname === '/v1/presence/config' && method === 'GET') {
+    const { haConfig } = await import('./connectors/homeAssistant.js')
+    const cfg = await haConfig().catch(() => null)
+    return jsonResponse(200, { lat: cfg?.latitude ?? null, lon: cfg?.longitude ?? null, radius_m: 150 })
+  }
+  if (pathname === '/v1/presence' && method === 'GET') {
+    const { listPresence } = await import('./presence/presence.js')
+    return jsonResponse(200, { people: await listPresence(ctx.store) })
+  }
+  if (pathname === '/v1/presence' && method === 'POST') {
+    const b = await req.json().catch(() => ({})) as any
+    const oid = attributionFor(identity).oid || ''
+    if (!oid.startsWith('user:')) return jsonResponse(400, { error: 'user session required' })
+    const { reportPresence } = await import('./presence/presence.js')
+    const r = await reportPresence(ctx.store, oid.slice(5), b?.home === true, String(b?.source || 'geofence'))
+    return jsonResponse(200, { ok: true, ...r })
+  }
   // ─── Matter pairing state (Settings → Smart home → Apple Home card) ───
   if (method === 'GET' && pathname === '/v1/matter/pairing') {
     const { tryHandleMatterRoute } = await import('./matter/routes.js')

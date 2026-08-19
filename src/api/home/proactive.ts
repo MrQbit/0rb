@@ -157,44 +157,57 @@ async function checkArrivals(): Promise<void> {
     const prev = personState.get(p.entity_id)
     personState.set(p.entity_id, p.state)
     if (prev === undefined || prev === p.state || p.state !== 'home') continue
-    // Someone just arrived.
-    // 1. Auto-disarm: if the house was set to away/vacation, a member coming
-    //    home flips it back and says so (no more alarm-mode nagging).
+    // Someone just arrived (HA-tracked). Route to the shared arrival flow
+    // via their linked user account; unlinked persons still auto-disarm.
     try {
-      const { getMode, setMode } = await import('./mode.js')
-      const mode = await getMode(pushStore)
-      if (mode === 'away' || mode === 'vacation') {
-        await setMode(pushStore, 'home')
-        await notifyOwner(`🏠 ${p.name} arrived — house mode back to home (was ${mode}).`)
-      }
-    } catch { /* mode optional */ }
-    // 2. Their arrival scene (personal pref 'arrival_scene' = HA scene name).
-    // 3. Waiting arrives-home notes.
-    try {
-      const fam = await import('../family/family.js')
       const { getUsers } = await import('../auth/otp.js')
-      const users = await getUsers(pushStore)
-      const who = users.filter(u => u.person_entity === p.entity_id)
-      for (const u of who) {
-        try {
-          const prefs = await fam.getPrefs(pushStore, u.email)
-          const sceneName = (prefs['arrival_scene'] || '').trim()
-          if (sceneName) {
-            const { haStates: hs, haResolve: hr, haCallService: hc } = await import('../connectors/homeAssistant.js')
-            const scenes = await hs(['scene'])
-            const target = hr(scenes, sceneName, 'scene')[0]
-            if (target) { await hc('scene', 'turn_on', target.entity_id); log.info('arrival_scene', { user: u.email, scene: target.name }) }
-          }
-        } catch { /* scene optional */ }
-        const due = await fam.takePendingNotes(pushStore, u.email, 'home')
-        for (const n of due) {
-          const from = await fam.memberName(pushStore, n.from)
-          const text = `🏠 Welcome home! Note from ${from}: ${n.text}`
-          if (!(await fam.notifyUser(pushStore, u.email, text))) await notifyOwner(text)
-        }
+      const who = (await getUsers(pushStore)).filter(u => u.person_entity === p.entity_id)
+      if (who.length) {
+        for (const u of who) await handleArrivalForUser(pushStore, u.email, p.name)
+      } else {
+        await arrivalDisarm(pushStore, p.name)
       }
-    } catch (err) { log.warn('arrival_notes_failed', { error: (err as Error).message }) }
+    } catch (err) { log.warn('arrival_failed', { error: (err as Error).message }) }
   }
+}
+
+async function arrivalDisarm(store: import('../store/store.js').Store, name: string): Promise<void> {
+  // Auto-disarm: if the house was away/vacation, a member coming home flips
+  // it back and says so (no more alarm-mode nagging).
+  try {
+    const { getMode, setMode } = await import('./mode.js')
+    const mode = await getMode(store)
+    if (mode === 'away' || mode === 'vacation') {
+      await setMode(store, 'home')
+      await notifyOwner(`🏠 ${name} arrived — house mode back to home (was ${mode}).`)
+    }
+  } catch { /* mode optional */ }
+}
+
+/** The full arrival flow for one member — shared by HA person tracking and
+ *  the phones' native geofence reports: auto-disarm, personal arrival scene,
+ *  waiting welcome-home notes. */
+export async function handleArrivalForUser(store: import('../store/store.js').Store, email: string, name: string): Promise<void> {
+  await arrivalDisarm(store, name)
+  try {
+    const fam = await import('../family/family.js')
+    try {
+      const prefs = await fam.getPrefs(store, email)
+      const sceneName = (prefs['arrival_scene'] || '').trim()
+      if (sceneName) {
+        const { haStates: hs, haResolve: hr, haCallService: hc } = await import('../connectors/homeAssistant.js')
+        const scenes = await hs(['scene'])
+        const target = hr(scenes, sceneName, 'scene')[0]
+        if (target) { await hc('scene', 'turn_on', target.entity_id); log.info('arrival_scene', { user: email, scene: target.name }) }
+      }
+    } catch { /* scene optional */ }
+    const due = await fam.takePendingNotes(store, email, 'home')
+    for (const n of due) {
+      const from = await fam.memberName(store, n.from)
+      const text = `🏠 Welcome home! Note from ${from}: ${n.text}`
+      if (!(await fam.notifyUser(store, email, text))) await notifyOwner(text)
+    }
+  } catch (err) { log.warn('arrival_notes_failed', { error: (err as Error).message }) }
 }
 
 /** Pure: devices needing a health nudge — low battery or long-unavailable. */

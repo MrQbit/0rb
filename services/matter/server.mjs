@@ -15,6 +15,7 @@ import { Endpoint, Environment, ServerNode } from "@matter/main";
 import { AggregatorEndpoint } from "@matter/main/endpoints";
 import {
   DimmableLightDevice, OnOffLightDevice, OnOffPlugInUnitDevice, OccupancySensorDevice,
+  TemperatureSensorDevice, HumiditySensorDevice, ContactSensorDevice, DoorLockDevice,
 } from "@matter/main/devices";
 import { BridgedDeviceBasicInformationServer } from "@matter/main/behaviors";
 
@@ -111,6 +112,51 @@ async function addAwaySwitch() {
   });
 }
 
+// Locks — Siri: "lock the front door" (Home asks for confirmation to unlock).
+const lockEps = new Map();   // entity_id -> { ep, lastLocked }
+async function addLock(l) {
+  const ep = new Endpoint(DoorLockDevice.with(BridgedDeviceBasicInformationServer), {
+    id: safeId(l.entity_id),
+    bridgedDeviceBasicInformation: { nodeLabel: label(l.name), reachable: true },
+    doorLock: { lockState: l.locked ? 1 : 2, lockType: 2, actuatorEnabled: true },
+  });
+  await aggregator.add(ep);
+  const entry = { ep, lastLocked: l.locked };
+  lockEps.set(l.entity_id, entry);
+  ep.events.doorLock.lockState$Changed.on((state) => {
+    const locked = state === 1;
+    if (locked === entry.lastLocked) return;   // our own push
+    entry.lastLocked = locked;
+    api("/v1/matter/control", { entity_id: l.entity_id, action: locked ? "lock" : "unlock" })
+      .catch((e) => console.warn("lock control failed:", l.entity_id, e.message));
+  });
+  console.log(`bridged lock: ${l.name}`);
+}
+
+// Read-only environment sensors: temperature, humidity, door/window contact.
+const sensorEps = new Map(); // entity_id -> { ep, kind, last }
+async function addSensor(s) {
+  const Dev = s.kind === "temperature" ? TemperatureSensorDevice
+    : s.kind === "humidity" ? HumiditySensorDevice : ContactSensorDevice;
+  const init = { id: safeId(s.entity_id), bridgedDeviceBasicInformation: { nodeLabel: label(s.name), reachable: true } };
+  if (s.kind === "temperature") init.temperatureMeasurement = { measuredValue: Math.round(s.value * 100) };
+  else if (s.kind === "humidity") init.relativeHumidityMeasurement = { measuredValue: Math.round(s.value * 100) };
+  else init.booleanState = { stateValue: s.value === 0 };   // Matter: true = closed
+  const ep = new Endpoint(Dev.with(BridgedDeviceBasicInformationServer), init);
+  await aggregator.add(ep);
+  sensorEps.set(s.entity_id, { ep, kind: s.kind, last: s.value });
+  console.log(`bridged sensor: ${s.name} (${s.kind})`);
+}
+
+async function setSensor(entry, value) {
+  if (value === entry.last) return;
+  entry.last = value;
+  const patch = entry.kind === "temperature" ? { temperatureMeasurement: { measuredValue: Math.round(value * 100) } }
+    : entry.kind === "humidity" ? { relativeHumidityMeasurement: { measuredValue: Math.round(value * 100) } }
+    : { booleanState: { stateValue: value === 0 } };
+  await entry.ep.set(patch).catch(() => {});
+}
+
 const peopleEps = new Map();
 async function addPerson(name, home) {
   const ep = new Endpoint(OccupancySensorDevice.with(BridgedDeviceBasicInformationServer), {
@@ -145,6 +191,25 @@ async function sync() {
       const lvl = Math.max(1, Math.min(254, Math.round((d.brightness / 255) * 254)));
       await entry.ep.set({ levelControl: { currentLevel: lvl } }).catch(() => {});
     }
+  }
+  for (const l of snap.locks || []) {
+    const entry = lockEps.get(l.entity_id);
+    if (!entry) {
+      try { await addLock(l); } catch (e) { console.warn("lock add failed:", e.message) }
+      continue;
+    }
+    if (l.locked !== entry.lastLocked) {
+      entry.lastLocked = l.locked;
+      await entry.ep.set({ doorLock: { lockState: l.locked ? 1 : 2 } }).catch(() => {});
+    }
+  }
+  for (const s of snap.sensors || []) {
+    const entry = sensorEps.get(s.entity_id);
+    if (!entry) {
+      try { await addSensor(s); } catch (e) { console.warn("sensor add failed:", e.message) }
+      continue;
+    }
+    await setSensor(entry, s.value);
   }
   const away = snap.mode === "away" || snap.mode === "vacation";
   if (awayEp && away !== lastAway) {

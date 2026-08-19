@@ -102,6 +102,23 @@ await page.waitForTimeout(1200);
   await shot('04-smarthome');
 }
 
+// ── 4b. Apple Home (Matter) card + remote-mode chooser ──
+{
+  const matterVisible = await page.locator('#matterCard').isVisible().catch(() => false);
+  if (matterVisible) {
+    const txt = await page.locator('#matterCard').innerText();
+    check('smarthome: Apple Home card meaningful', /paired|ready to pair|setup code/i.test(txt), txt.slice(0, 60));
+  } else {
+    check('smarthome: Apple Home card absent (bridge down?)', false, 'card not visible');
+  }
+  await page.locator('.set-navi[data-sec="system"]').click();
+  await page.waitForTimeout(1500);
+  const lanBtn = await page.locator('#rmLan').isVisible().catch(() => false);
+  const dirBtn = await page.locator('#rmDirect').isVisible().catch(() => false);
+  check('system: remote-mode chooser present', lanBtn && dirBtn);
+  await shot('04b-system-remote');
+}
+
 // ── 5. Chat flow: send a message, get streamed text back ──
 {
   await page.keyboard.press('Escape');

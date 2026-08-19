@@ -17,9 +17,10 @@ async function readJson(req: Request): Promise<any> { try { return await req.jso
 export async function tryHandlePushRoute(method: string, pathname: string, req: Request, store: Store): Promise<Response | null> {
   if (!pathname.startsWith('/v1/push')) return null
 
-  // Owner session required (the app holds one after login).
+  // Owner session required — cookie (web) or Bearer (the native apps).
   const cookies = parseCookies(req.headers.get('cookie'))
-  if (!verifySession(cookies[SESSION_COOKIE])) {
+  const bearer = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '')
+  if (!verifySession(cookies[SESSION_COOKIE]) && !(bearer && verifySession(bearer))) {
     return jsonResponse(401, { error: 'Sign in first', code: 'UNAUTHENTICATED' })
   }
 

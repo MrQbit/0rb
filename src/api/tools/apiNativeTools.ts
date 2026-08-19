@@ -1131,13 +1131,15 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
         return `House mode → ${want} (${postures[want]}).${did.length ? ` Secured: ${did.join(', ')}.` : ''}`
       }
       if (op === 'presence') {
-        const people = (await haStates(['person'])).map(p => ({
-          entity_id: p.entity_id, name: p.name, home: p.state === 'home', state: p.state,
+        // Merged: the phones' geofence reports first, HA persons fill gaps.
+        const { listPresence } = await import('../presence/presence.js')
+        const people = (await listPresence(ctx.store)).map(p => ({
+          name: p.name, home: p.home, state: p.home ? 'home' : 'away', source: p.source,
         }))
-        if (!people.length) return 'No people configured in Home Assistant yet (Settings → People there, or ask me to add one).'
+        if (!people.length) return 'No presence yet — the phone apps report it automatically (Settings → Report presence), or configure People in Home Assistant.'
         emitWidget(ctx.sessionId, { id: 'presence', type: 'presence', title: "Who's home",
           pill: `${people.filter(p => p.home).length}/${people.length} home`, people } as any)
-        return `Presence: ${people.map(p => `${p.name} is ${p.home ? 'home' : p.state}`).join(' · ')}.`
+        return `Presence: ${people.map(p => `${p.name} is ${p.home ? 'home' : 'away'}`).join(' · ')}.`
       }
       if (op === 'automations') {
         const autos = (await haStates(['automation'])).map(a => ({
