@@ -665,7 +665,7 @@ body {
 .wg-shop-it .rec { margin-left:6px; font-size:9.5px; color:var(--nv-bright); font-family:var(--mono); opacity:.85; }
 .wg-shop-it .buy { flex:none; font-size:11px; color:var(--nv-bright); text-decoration:none; }
 .wg-shop-it .buy:hover { text-decoration:underline; }
-.wg-shop-it .rm { flex:none; background:none; border:0; color:var(--ink-dim); cursor:pointer; font-size:12px; }
+.wg-shop-it .rm { flex:none; background:none; border:0; color:var(--ink-dim); cursor:pointer; line-height:0; padding:3px; border-radius:6px; }
 .wg-shop-it .rm:hover { color:var(--danger); }
 .wg-shop-opts { display:flex; flex-wrap:wrap; gap:6px; }
 .wg-shop-merchant { font-size:11.5px; color:var(--ink); text-decoration:none; padding:6px 11px;

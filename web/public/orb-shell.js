@@ -788,7 +788,8 @@
       if(it.recur_days){ const rc=document.createElement('span'); rc.className='rec'; rc.textContent='↻'+it.recur_days+'d'; rc.title='Staple — re-adds itself '+it.recur_days+' days after checkoff'; nm.appendChild(rc); }
       const buy=document.createElement('a'); buy.className='buy'; buy.textContent='buy ↗'; buy.target='_blank'; buy.rel='noopener';
       buy.href='https://www.amazon.com/s?k='+encodeURIComponent(it.name);
-      const rm=document.createElement('button'); rm.className='rm'; rm.textContent='✕'; rm.setAttribute('aria-label','remove');
+      const rm=document.createElement('button'); rm.className='rm'; rm.setAttribute('aria-label','Remove '+it.name);
+      rm.innerHTML='<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
       rm.onclick=async()=>{ try{ const r=await fetch('/v1/shopping/'+encodeURIComponent(it.id),{method:'DELETE',credentials:'same-origin'});
         if(r.ok) row.remove(); else toast('Failed'); }catch{ toast('Failed'); } };
       row.append(cb,nm,buy,rm); list.appendChild(row);
