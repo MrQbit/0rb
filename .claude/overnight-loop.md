@@ -39,3 +39,8 @@ page polish, empty states for docker/model widgets, calendar widget nav,
 media widget artwork fallback aesthetics, keyboard nav for panel tabs,
 reduced-motion audit, contrast audit (ink-dim on glass), settings brain
 card layout, publish flow UX.
+
+## Interruption (owner returned, ~01:50)
+Owner queued: site overhaul (pushed to MrQbit/orb — allowed: site ships via
+push) + connectors smart-paste QoL (committed locally 36761f7 + whitelist
+fix). Loop resumes on next wakeup at clean-check verification pass 2.
