@@ -47,7 +47,7 @@ export interface VoiceBackend {
   isReady(): Promise<boolean>
   getStatus(): Promise<VoiceBackendStatus>
   /** Create a per-socket session bound to the browser sink. */
-  createSession(send: VoiceSend, store: Store, sessionId: string): VoiceSession
+  createSession(send: VoiceSend, store: Store, sessionId: string, email?: string): VoiceSession
 }
 
 let cached: VoiceBackend | null = null

@@ -529,15 +529,18 @@ export async function startApiServer(config: ApiServerConfig) {
           // Gate the voice socket behind the session when auth is on — the
           // browser sends the cookie on the upgrade; the iOS app sends a
           // Bearer session token. Without this, voice would bypass auth.
+          let voiceUser = ''
           if (authEnabled()) {
             const a = req.headers.get('authorization') ?? ''
             let token = /^Bearer\s+/i.test(a) ? a.replace(/^Bearer\s+/i, '').trim() : ''
             if (!token) token = parseCookies(req.headers.get('cookie'))[SESSION_COOKIE] ?? ''
-            if (!verifySession(token)) return new Response('unauthorized', { status: 401 })
+            const sess = verifySession(token)
+            if (!sess) return new Response('unauthorized', { status: 401 })
+            voiceUser = (sess as any).u || (sess as any).username || ''
           }
           // Share the caller's chat session (?session=) so voice + text have
           // one unified memory; fall back to a fresh voice session.
-          if (srv.upgrade(req, { data: makeVoiceWsData(reqUrl.searchParams.get('session')) })) return undefined
+          if (srv.upgrade(req, { data: makeVoiceWsData(reqUrl.searchParams.get('session'), voiceUser) })) return undefined
           return new Response('expected websocket', { status: 426 })
         }
       }

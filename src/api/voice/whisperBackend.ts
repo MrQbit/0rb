@@ -143,8 +143,8 @@ export class WhisperBackend implements VoiceBackend {
     }
   }
 
-  createSession(send: VoiceSend, store: Store, sessionId: string): VoiceSession {
-    return new WhisperSession(send, store, sessionId)
+  createSession(send: VoiceSend, store: Store, sessionId: string, email?: string): VoiceSession {
+    return new WhisperSession(send, store, sessionId, email)
   }
 }
 
@@ -152,6 +152,7 @@ class WhisperSession implements VoiceSession {
   private send: VoiceSend
   private store: Store
   private sessionId: string
+  private email?: string
 
   private capturing = false
   private speechMs = 0
@@ -169,10 +170,11 @@ class WhisperSession implements VoiceSession {
   private ttsCancelled = false
   private sentenceQueue: string[] = []
 
-  constructor(send: VoiceSend, store: Store, sessionId: string) {
+  constructor(send: VoiceSend, store: Store, sessionId: string, email?: string) {
     this.send = send
     this.store = store
     this.sessionId = sessionId
+    this.email = email
   }
 
   onControl(msg: any): void {
@@ -261,13 +263,25 @@ class WhisperSession implements VoiceSession {
     const wavPath = join(tmpdir(), `orb2-voice-${stamp}.wav`)
     try {
       writeFileSync(wavPath, wavFromPcm16(pcm, SAMPLE_RATE))
+      // Speaker ID runs in parallel with transcription (same GPU service);
+      // it self-enrolls this member's voice and flags mismatches.
+      const speakerP = this.email
+        ? import('./speakerid.js').then(m => m.observeUtterance(this.store, this.email!, pcm)).catch(() => null)
+        : Promise.resolve(null)
       const heard = await this.transcribe(wavPath)
       const transcript = (heard.text || '').trim()
       if (!transcript) return
       // The user only ever sees the clean transcript; the paralinguistic
       // cues ride in a separate channel into the prompt.
       this.send.json({ type: 'transcript', text: transcript, final: true, emotion: heard.emotion || undefined })
-      const vocalContext = buildVocalContext(heard)
+      let vocalContext = buildVocalContext(heard)
+      // Give the voice check a short grace window — never stall the reply.
+      const check = await Promise.race([speakerP, new Promise<null>(r => setTimeout(() => r(null), 350))])
+      if (check && this.email) {
+        const { speakerContextLine } = await import('./speakerid.js')
+        const line = speakerContextLine(check, this.email)
+        if (line) vocalContext = (vocalContext || '') + line
+      }
 
       // ── Streaming TTS: speak sentences as the model writes them ──
       // Reset the streaming pipeline for this turn.

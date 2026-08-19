@@ -13,6 +13,7 @@ import { log } from '../log.js'
 export type VoiceWsData = {
   kind: 'voice'
   sessionId: string
+  email?: string
   session?: VoiceSession
 }
 
@@ -23,11 +24,11 @@ export function isVoiceWsRequest(pathname: string): boolean {
 
 /** Build the per-socket data passed to server.upgrade(). A client-supplied
  * session id (the chat session) unifies voice + text memory. */
-export function makeVoiceWsData(sessionId?: string | null): VoiceWsData {
+export function makeVoiceWsData(sessionId?: string | null, email?: string): VoiceWsData {
   const sid = sessionId && /^[A-Za-z0-9:_-]{6,80}$/.test(sessionId)
     ? sessionId
     : `voice:${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-  return { kind: 'voice', sessionId: sid }
+  return { kind: 'voice', sessionId: sid, email: email || undefined }
 }
 
 /** Bun websocket handlers for voice sockets. */
@@ -45,7 +46,7 @@ export function voiceWebSocketHandlers(store: Store) {
         if (!ready) {
           send.json({ type: 'error', message: `voice backend '${backend.id}' not ready` })
         }
-        data.session = backend.createSession(send, store, data.sessionId)
+        data.session = backend.createSession(send, store, data.sessionId, data.email)
         // Forward typed widgets emitted during voice turns (same bus as chat).
         try {
           const { onWidget } = await import('../widgets/bus.js')

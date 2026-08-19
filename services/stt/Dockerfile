@@ -8,7 +8,8 @@ FROM personaplex:cuda
 # torch 2.12 / torchaudio 2.11, so it won't drag in a conflicting build.
 RUN uv pip install --python /app/moshi/.venv/bin/python \
     "funasr>=1.1.0" "faster-whisper>=1.0.3" \
-    "fastapi>=0.110" "uvicorn>=0.29" "python-multipart>=0.0.9" "numpy>=1.26"
+    "fastapi>=0.110" "uvicorn>=0.29" "python-multipart>=0.0.9" "numpy>=1.26" \
+    "speechbrain>=1.0.0"
 
 WORKDIR /srv
 COPY server.py /srv/server.py

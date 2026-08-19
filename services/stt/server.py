@@ -219,6 +219,45 @@ def _transcribe(samples: np.ndarray):
     return text, "", [], (getattr(info, "language", "") or "")
 
 
+# ── Speaker embeddings (who is talking) ─────────────────────────────────
+# ECAPA-TDNN (SpeechBrain, VoxCeleb) — a 192-d voice fingerprint per
+# utterance. Orb enrolls each member from their own authenticated voice
+# sessions and matches future utterances by cosine similarity.
+_spk_model = None
+
+def _load_speaker():
+    global _spk_model
+    if _spk_model is None:
+        from speechbrain.inference.speaker import EncoderClassifier
+        _spk_model = EncoderClassifier.from_hparams(
+            source="speechbrain/spkrec-ecapa-voxceleb",
+            run_opts={"device": _device},
+        )
+        log.info("speaker embedding model loaded (ecapa-voxceleb, %s)", _device)
+    return _spk_model
+
+
+@app.post("/embed")
+async def embed(request: Request, file: UploadFile | None = File(default=None)):
+    import torch
+    if file is not None:
+        data = await file.read()
+    else:
+        data = await request.body()
+    samples = _wav_to_float(data) if data[:4] == b"RIFF" else _pcm16_to_float(data)
+    if samples.shape[0] < SAMPLE_RATE // 2:   # <0.5s of audio → unreliable
+        return JSONResponse({"error": "utterance too short"}, status_code=422)
+    try:
+        model = _load_speaker()
+        wav = torch.from_numpy(samples).unsqueeze(0)
+        with torch.no_grad():
+            emb = model.encode_batch(wav).squeeze().detach().cpu().numpy()
+        return JSONResponse({"embedding": [float(x) for x in emb.tolist()], "dim": int(emb.shape[-1])})
+    except Exception as e:
+        log.exception("embed failed: %s", e)
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 @app.get("/health")
 def health():
     eng = "sensevoice" if _engine == "sensevoice" else "faster-whisper"
