@@ -7,6 +7,7 @@ Commit locally, DO NOT push. One change at a time, tested, deployed.
 Clean checks: 0/3
 Done:
 - A1 morning briefing (buildBriefing + Today widget + ORB2_BRIEFING_TIME) e20deef
+- A2 staple auto-reorder (every_days recurrence + revive sweep + nudge + ↻ badge) dfd9775
 Ideas queue: auto grocery reorder (recurring shopping items), smart
 scheduling suggestions (learn routines → propose automations), energy
 insights, arrival/leave routines (welcome-home scene, away mode),
@@ -17,6 +18,7 @@ guest mode, vacation mode, plant care, pet feeding, laundry timer flow.
 Clean checks: 0/3
 Done:
 - B1 SVG close buttons + resize grip cue b400e78
+- B2 stacking toasts (no more lost messages) dfd9775
 Hunt list: toasts styling/stacking, widget spawn overlap edge cases, pill
 telemetry truthfulness, focus rings everywhere interactive, scrollbar
 styling consistency across widgets, orb mic/camera button states, login
