@@ -323,7 +323,7 @@ body {
 }
 .panel-head .title { font-size:13px; letter-spacing:.4px; color:var(--ink-dim); display:flex; align-items:center; gap:8px; }
 .panel-head .title b { color: var(--nv); font-weight:600; }
-.panel-x { background:none; border:0; color:var(--ink-dim); font-size:18px; cursor:pointer; line-height:1; }
+.panel-x { background:none; border:0; color:var(--ink-dim); font-size:18px; cursor:pointer; line-height:1; ; line-height:0 }
 .panel-x:hover { color: var(--ink); }
 
 #messages { flex:1; overflow-y:auto; padding: 14px 16px; display:flex; flex-direction:column; gap:12px; scroll-behavior:smooth; }
