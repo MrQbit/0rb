@@ -423,7 +423,8 @@
     wg.style.left=wpos.x+'px'; wg.style.top=wpos.y+'px';
     const head=document.createElement('div'); head.className='wg-head';
     const ttl=document.createElement('span'); ttl.className='wg-title'; ttl.textContent = spec.title || titleFor(spec);
-    const x=document.createElement('button'); x.className='wg-x'; x.textContent='✕'; x.onclick=()=>{ widgets.delete(wid);
+    const x=document.createElement('button'); x.className='wg-x'; x.setAttribute('aria-label','Close');
+    x.innerHTML='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>'; x.onclick=()=>{ widgets.delete(wid);
       if(wg._chart){try{wg._chart.destroy();}catch{}}
       if(wg._map){try{wg._map.remove();}catch{}}
       if(wg._mapRo){try{wg._mapRo.disconnect();}catch{}}
