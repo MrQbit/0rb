@@ -232,3 +232,26 @@ describe('house modes (loop A3)', () => {
     expect(await getMode(store)).toBe('home')
   })
 })
+
+describe('care routines (loop A4)', () => {
+  test('dueRoutines: time gating, weekday filter, once per day', async () => {
+    const { dueRoutines } = await import('./family.ts')
+    const now = new Date('2031-03-03T08:30:00') // a Monday
+    const today = now.toISOString().slice(0, 10)
+    const rs: any[] = [
+      { id: '1', label: 'meds', at: '08:00', to: 'a@x.co' },                      // due (time passed)
+      { id: '2', label: 'evening pills', at: '20:00', to: 'a@x.co' },             // not yet
+      { id: '3', label: 'water plants', at: '08:00', days: [0], to: 'a@x.co' },   // Sunday only
+      { id: '4', label: 'feed cat', at: '07:00', to: 'a@x.co', last_fired: today }, // already fired
+      { id: '5', label: 'mon-only', at: '06:00', days: [1], to: 'a@x.co' },       // due (Monday)
+    ]
+    expect(dueRoutines(rs, now).map(r => r.label)).toEqual(['meds', 'mon-only'])
+  })
+
+  test('addRoutine validates time and days', async () => {
+    const { addRoutine } = await import('./family.ts')
+    expect('error' in (await addRoutine(store, { label: 'x', at: 'morning', to: 'a@x.co' }))).toBe(true)
+    expect('error' in (await addRoutine(store, { label: 'x', at: '08:00', days: [9], to: 'a@x.co' }))).toBe(true)
+    expect('error' in (await addRoutine(store, { label: 'x', at: '08:00', to: 'a@x.co' }))).toBe(false)
+  })
+})

@@ -639,7 +639,8 @@ body {
 .wg-media .src { font-size:11px; color:var(--ink-dim); margin-top:2px; }
 .wg-media .ctl { display:flex; gap:8px; }
 .wg-med-btn { border:1px solid var(--line); background:rgba(255,255,255,.05); color:var(--ink);
-  border-radius:10px; width:42px; height:36px; font-size:15px; cursor:pointer; transition:background .15s, border-color .15s; }
+  border-radius:10px; width:42px; height:36px; font-size:15px; cursor:pointer; transition:background .15s, border-color .15s;
+  display:inline-flex; align-items:center; justify-content:center; line-height:0; }
 .wg-med-btn:hover { background:rgba(118,185,0,.14); border-color:rgba(118,185,0,.4); color:var(--nv-bright); }
 .wg-media .vol { display:flex; align-items:center; gap:8px; width:80%; }
 .wg-media .vol .vlbl { font-size:10px; color:var(--ink-dim); font-family:var(--mono); }

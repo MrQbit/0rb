@@ -226,3 +226,69 @@ export async function completeChore(store: Store, query: string): Promise<Chore 
   await store.putKv(CHORES_KEY, JSON.stringify(chores.filter(x => x.day !== undefined || !x.done || Date.now() - x.done! < 7 * 24 * 3600_000)), 0)
   return c
 }
+
+// ── care routines: recurring time-of-day reminders ─────────────────────
+// Meds at 08:00 daily, feed the cat 07:00+19:00, water plants Sundays.
+// The proactive tick fires them; delivery goes to the assigned member.
+const ROUTINES_KEY = 'family:routines'
+
+export interface Routine {
+  id: string
+  label: string
+  /** HH:MM 24h */
+  at: string
+  /** weekdays 0-6 (Sun-Sat); absent = every day */
+  days?: number[]
+  to: string
+  last_fired?: string  // YYYY-MM-DD of last delivery
+}
+
+export async function listRoutines(store: Store): Promise<Routine[]> {
+  try { return JSON.parse((await store.getKv(ROUTINES_KEY)) || '[]') } catch { return [] }
+}
+export async function addRoutine(store: Store, r: { label: string; at: string; days?: number[]; to: string }): Promise<Routine | { error: string }> {
+  if (!/^\d{1,2}:\d{2}$/.test(r.at)) return { error: "at must be 'HH:MM'" }
+  if (r.days && (!Array.isArray(r.days) || r.days.some(d => d < 0 || d > 6))) return { error: 'days must be 0-6' }
+  const routines = await listRoutines(store)
+  const routine: Routine = { id: rid('rt'), label: r.label.slice(0, 120), at: r.at, days: r.days?.length ? r.days : undefined, to: normalizeEmail(r.to) }
+  routines.push(routine)
+  await store.putKv(ROUTINES_KEY, JSON.stringify(routines), 0)
+  return routine
+}
+export async function removeRoutine(store: Store, query: string): Promise<Routine | null> {
+  const routines = await listRoutines(store)
+  const q = query.toLowerCase()
+  const idx = routines.findIndex(r => r.id === query || r.label.toLowerCase().includes(q))
+  if (idx < 0) return null
+  const [gone] = routines.splice(idx, 1)
+  await store.putKv(ROUTINES_KEY, JSON.stringify(routines), 0)
+  return gone!
+}
+
+/** Pure: which routines are due at `now` (and not yet fired today). */
+export function dueRoutines(routines: Routine[], now: Date): Routine[] {
+  const today = now.toISOString().slice(0, 10)
+  const day = now.getDay()
+  const mins = now.getHours() * 60 + now.getMinutes()
+  return routines.filter(r => {
+    if (r.last_fired === today) return false
+    if (r.days && !r.days.includes(day)) return false
+    const [h, m] = r.at.split(':').map(Number)
+    return mins >= h! * 60 + m!
+  })
+}
+
+/** Fire due routines: notify each assignee, mark fired. Returns fired list. */
+export async function fireDueRoutines(store: Store, fallbackNotify: (t: string) => Promise<void>): Promise<Routine[]> {
+  const routines = await listRoutines(store)
+  const due = dueRoutines(routines, new Date())
+  if (!due.length) return []
+  const today = new Date().toISOString().slice(0, 10)
+  for (const r of due) {
+    r.last_fired = today
+    const text = `🔔 ${r.label}`
+    if (!(await notifyUser(store, r.to, text))) await fallbackNotify(`${text} (for ${await memberName(store, r.to)})`)
+  }
+  await store.putKv(ROUTINES_KEY, JSON.stringify(routines), 0)
+  return due
+}

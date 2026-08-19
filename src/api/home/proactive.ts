@@ -162,6 +162,7 @@ async function tick(): Promise<void> {
   if (discoveryTicks++ % 5 === 0) await checkDiscoveries().catch(() => { /* best effort */ })
   await checkArrivals().catch(() => { /* best effort */ })
   if (pushStore) { import('./briefing.js').then(m => m.maybeSendBriefing(pushStore!, notifyOwner)).catch(() => { /* optional */ }) }
+  if (pushStore) { import('../family/family.js').then(m => m.fireDueRoutines(pushStore!, notifyOwner)).catch(() => { /* optional */ }) }
   let entities: HaEntity[]
   try {
     entities = await haStates(['lock', 'binary_sensor', 'cover'])

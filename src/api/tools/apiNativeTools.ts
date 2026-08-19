@@ -461,9 +461,9 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
     },
     {
       name: 'Family',
-      description: "The household: notes between members, a shared family calendar, reminders for each other, and announcements over the speakers. op:'note' {to, text, when:'next'|'home'} leaves a note delivered on their next chat ('next') or when they arrive home ('home'). op:'board' shows the family board widget. op:'remind' {to, label, minutes|at} sets a reminder that notifies THAT member on their channel. op:'calendar_add' {title, date:'YYYY-MM-DD', time?, who?} and op:'calendar' (show) manage the shared household calendar (no external account). op:'calendar_remove' {query}. op:'announce' {message} speaks a message on the home's speakers ('dinner is ready!'). op:'members' lists the household. op:'pref' {key, value} saves a personal preference for the CURRENT user (nickname, style, tastes — honoured in their future chats; empty value deletes); op:'prefs' lists theirs. Chores: op:'chore_add' {title, to, day?(0-6 weekly)}, op:'chore_done' {query}, op:'chores' shows the rota. op:'briefing' shows the day-at-a-glance widget (weather, today's events, chores, security, who's home) — use for 'good morning', 'what's my day', 'morning briefing'. Resolve people by first name.",
+      description: "The household: notes between members, a shared family calendar, reminders for each other, and announcements over the speakers. op:'note' {to, text, when:'next'|'home'} leaves a note delivered on their next chat ('next') or when they arrive home ('home'). op:'board' shows the family board widget. op:'remind' {to, label, minutes|at} sets a reminder that notifies THAT member on their channel. op:'calendar_add' {title, date:'YYYY-MM-DD', time?, who?} and op:'calendar' (show) manage the shared household calendar (no external account). op:'calendar_remove' {query}. op:'announce' {message} speaks a message on the home's speakers ('dinner is ready!'). op:'members' lists the household. op:'pref' {key, value} saves a personal preference for the CURRENT user (nickname, style, tastes — honoured in their future chats; empty value deletes); op:'prefs' lists theirs. Chores: op:'chore_add' {title, to, day?(0-6 weekly)}, op:'chore_done' {query}, op:'chores' shows the rota. ROUTINES (recurring care reminders — medication, pet feeding, plant watering): op:'routine_add' {label, at:'HH:MM', to, days?:[0-6]} fires EVERY day (or listed weekdays) at that time to that member's channel; op:'routines' lists; op:'routine_remove' {query}. op:'briefing' shows the day-at-a-glance widget (weather, today's events, chores, security, who's home) — use for 'good morning', 'what's my day', 'morning briefing'. Resolve people by first name.",
       input_schema: { type: 'object', properties: {
-        op: { type: 'string', enum: ['note', 'board', 'remind', 'calendar_add', 'calendar', 'calendar_remove', 'announce', 'members', 'pref', 'prefs', 'chore_add', 'chore_done', 'chores', 'briefing'] },
+        op: { type: 'string', enum: ['note', 'board', 'remind', 'calendar_add', 'calendar', 'calendar_remove', 'announce', 'members', 'pref', 'prefs', 'chore_add', 'chore_done', 'chores', 'briefing', 'routine_add', 'routines', 'routine_remove'] },
         to: { type: 'string', description: 'Member (name or email) for note/remind.' },
         text: { type: 'string', description: 'Note text.' },
         when: { type: 'string', enum: ['next', 'home'], description: "note delivery: next chat (default) or arrives-home." },
@@ -1382,6 +1382,23 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
       if (op === 'members') {
         const users = await getUsers(ctx.store)
         return 'Household: ' + users.map((u, i) => `${u.label || u.email.split('@')[0]} <${u.email}> (${u.role ?? (i === 0 ? 'owner' : 'member')}${u.telegram_chat_id ? ', telegram' : ''})`).join(' · ')
+      }
+      if (op === 'routine_add') {
+        const rec = await fam.resolveMember(ctx.store, String(args?.to || '')) || (await fam.resolveMember(ctx.store, me))
+        if (!rec) return 'Who is this reminder for?'
+        const r = await fam.addRoutine(ctx.store, { label: String(args?.label || args?.text || '').trim(), at: String(args?.at || ''), days: Array.isArray(args?.day) ? args.day : (Array.isArray((args as any)?.days) ? (args as any).days : undefined), to: rec.email })
+        if ('error' in r) return `[Family] ${r.error}`
+        return `Routine set: "${r.label}" at ${r.at}${r.days ? ' on ' + r.days.map(d => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d]).join('/') : ' every day'} → ${rec.label || rec.email.split('@')[0]}.`
+      }
+      if (op === 'routines') {
+        const rs = await fam.listRoutines(ctx.store)
+        if (!rs.length) return 'No routines yet — e.g. routine_add {label:"Morning meds", at:"08:00", to:"me"}.'
+        const named = await Promise.all(rs.map(async r => `${r.at} ${r.label} → ${await fam.memberName(ctx.store, r.to)}${r.days ? ' (' + r.days.map(d => ['Su','Mo','Tu','We','Th','Fr','Sa'][d]).join(',') + ')' : ''}`))
+        return 'Routines: ' + named.join(' · ')
+      }
+      if (op === 'routine_remove') {
+        const gone = await fam.removeRoutine(ctx.store, String(args?.query || ''))
+        return gone ? `Removed routine "${gone.label}".` : 'No routine matching that.'
       }
       if (op === 'briefing') {
         const { buildBriefing, briefingText, briefingWidgetSpec } = await import('../home/briefing.js')

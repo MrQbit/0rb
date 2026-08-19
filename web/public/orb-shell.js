@@ -757,10 +757,11 @@
       b.onclick=async()=>{ try{ const r=await fetch('/v1/home/control',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({entity_id:spec.entity_id,action})});
         if(!r.ok) toast('Failed'); }catch{ toast('Failed'); } };
       return b; };
-    ctl.appendChild(btn('⏮','prev','Previous'));
-    ctl.appendChild(btn('⏯','toggle','Play/Pause'));
-    ctl.appendChild(btn('⏭','next','Next'));
-    ctl.appendChild(btn('⏻','off','Off'));
+    const svg=p=>`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+    ctl.appendChild(btn(svg('<path d="M19 20 9 12l10-8zM7 4v16"/>'),'prev','Previous'));
+    ctl.appendChild(btn(svg('<path d="m5 4 8 8-8 8z"/><path d="M17 5v14"/>'),'toggle','Play/Pause'));
+    ctl.appendChild(btn(svg('<path d="m5 4 10 8-10 8zM17 4v16"/>'),'next','Next'));
+    ctl.appendChild(btn(svg('<path d="M12 3v9"/><path d="M6.6 6.6a8 8 0 1 0 10.8 0"/>'),'off','Off'));
     wrap.appendChild(ctl);
     const volRow=document.createElement('div'); volRow.className='vol';
     volRow.innerHTML='<span class="vlbl">vol</span>';
