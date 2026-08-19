@@ -10,6 +10,7 @@ Done:
 - A2 staple auto-reorder (every_days recurrence + revive sweep + nudge + ↻ badge) dfd9775
 - A3 house modes home/away/vacation/guest (mode-aware watcher, motion alerts when away, secure:true lock-up macro) 9f94824
 - A4 care routines (recurring HH:MM reminders w/ weekday filter, per-member delivery — meds/pets/plants) 83f67db
+- A5 usage-pattern automation suggestions (haPatternDigest 7d history → suggest op, confirm-before-create) c502edb
 Ideas queue: auto grocery reorder (recurring shopping items), smart
 scheduling suggestions (learn routines → propose automations), energy
 insights, arrival/leave routines (welcome-home scene, away mode),
@@ -23,6 +24,7 @@ Done:
 - B2 stacking toasts (no more lost messages) dfd9775
 - B3 focus-visible language everywhere + shared widget scrollbars 9f94824
 - B4 media remote emoji → stroked SVGs, flex-centered buttons 83f67db
+- B5 calendar month navigation (SVG chevrons, title=jump to today) c502edb
 Hunt list: toasts styling/stacking, widget spawn overlap edge cases, pill
 telemetry truthfulness, focus rings everywhere interactive, scrollbar
 styling consistency across widgets, orb mic/camera button states, login
