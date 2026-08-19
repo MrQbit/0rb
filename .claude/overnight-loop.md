@@ -4,7 +4,7 @@ Directive: alternate loops until 3 consecutive clean checks EACH.
 Commit locally, DO NOT push. One change at a time, tested, deployed.
 
 ## Loop A — feature research (house-AI gaps → build with widgets)
-Clean checks: 0/3 (reset — A8 found+built: instant safety alerts)
+Clean checks: 0/3 (A9 found+built: device-health watch)
 Done:
 - A1 morning briefing (buildBriefing + Today widget + ORB2_BRIEFING_TIME) e20deef
 - A2 staple auto-reorder (every_days recurrence + revive sweep + nudge + ↻ badge) dfd9775
@@ -13,6 +13,7 @@ Done:
 - A5 usage-pattern automation suggestions (haPatternDigest 7d history → suggest op, confirm-before-create) c502edb
 - A6 arrival routines (auto-disarm on member arrival + per-member arrival_scene pref) 62c01a9
 - A8 instant safety-class alerts (smoke/CO/gas/leak — every mode, self-clearing)
+- A9 device-health watch (battery ≤15%, unavailable >24h, weekly renudge cap)
 Ideas queue: auto grocery reorder (recurring shopping items), smart
 scheduling suggestions (learn routines → propose automations), energy
 insights, arrival/leave routines (welcome-home scene, away mode),
@@ -30,6 +31,7 @@ Done:
 - B6 docker/model widget empty + error states 62c01a9
 - B7 console-wide reduced-motion support
 - B8 login code digits-only + auto-verify at 6
+- B9 widget title tooltips + slider aria-labels
 Hunt list: toasts styling/stacking, widget spawn overlap edge cases, pill
 telemetry truthfulness, focus rings everywhere interactive, scrollbar
 styling consistency across widgets, orb mic/camera button states, login
