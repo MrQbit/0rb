@@ -38,11 +38,12 @@ function thresholdMs(): number {
 }
 
 /** Is this entity in a state Orb should keep an eye on? Returns a label or null. */
-function watchState(e: HaEntity): string | null {
+function watchState(e: HaEntity, motion = false): string | null {
   if (e.domain === 'lock' && e.state === 'unlocked') return 'unlocked'
   if (e.domain === 'binary_sensor') {
     const cls = e.attributes?.device_class
     if (['door', 'window', 'garage_door', 'opening'].includes(cls) && e.state === 'on') return 'open'
+    if (motion && ['motion', 'occupancy'].includes(cls) && e.state === 'on') return 'motion'
   }
   if (e.domain === 'cover' && e.state === 'open' && e.attributes?.device_class === 'garage') return 'open'
   return null
@@ -53,6 +54,7 @@ function phrase(e: HaEntity, label: string, mins: number): string {
   const m = Math.round(mins)
   const dur = m >= 60 ? `${Math.round(m / 60)}h` : `${m} min`
   if (label === 'unlocked') return `Heads up — the ${e.name} has been unlocked for ${dur}. Want me to lock it?`
+  if (label === 'motion') return `⚠️ Motion at the ${e.name} — and the house is set to away.`
   return `Heads up — the ${e.name} has been open for ${dur}.`
 }
 
@@ -170,13 +172,27 @@ async function tick(): Promise<void> {
   const now = Date.now()
   const seen = new Set<string>()
 
+  // House mode shifts the posture: away/vacation = instant alerts + motion;
+  // guest = stay quiet about doors.
+  let effThreshold: number | null = thresholdMs()
+  let motion = false
+  if (pushStore) {
+    try {
+      const { getMode, thresholdForMode, motionAlerts } = await import('./mode.js')
+      const mode = await getMode(pushStore)
+      effThreshold = thresholdForMode(mode, thresholdMs())
+      motion = motionAlerts(mode)
+    } catch { /* default posture */ }
+  }
+  if (effThreshold === null) return
+
   for (const e of entities) {
-    const label = watchState(e)
+    const label = watchState(e, motion)
     if (!label) continue
     seen.add(e.entity_id)
     if (!since.has(e.entity_id)) since.set(e.entity_id, now)
     const elapsed = now - (since.get(e.entity_id) || now)
-    if (elapsed >= thresholdMs() && !alerted.has(e.entity_id)) {
+    if (elapsed >= effThreshold && !alerted.has(e.entity_id)) {
       alerted.add(e.entity_id)
       await notifyOwner(phrase(e, label, elapsed / 60_000))
     }

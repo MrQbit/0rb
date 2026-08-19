@@ -422,7 +422,7 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
       name: 'Home',
       description: "Control and check the home's devices through Home Assistant — lights, switches/plugs, thermostats (climate), locks, window shades/blinds (cover), TVs & speakers (media_player), robot vacuums, fans, and door/window & motion sensors. This is how Orb acts as the house. Use op:'list' to see what's available (optionally a `type`), op:'status' to check a device by name, and op:'control' to change one: action on/off/toggle for lights/plugs/switches; lock/unlock for locks; open/close (or set with `value` 0-100) for shades; set with `value` for a thermostat's target temperature; play/pause/on/off (or set volume with `value` 0-100) for media; start/stop/dock for a vacuum. Always refer to devices by their friendly name (e.g. \"kitchen lights\", \"front door\").",
       input_schema: { type: 'object', properties: {
-        op: { type: 'string', enum: ['list', 'status', 'control', 'media', 'lights', 'climate', 'vacuum', 'covers', 'security', 'plugs', 'scenes', 'sensors', 'camera', 'presence', 'automations', 'printer'], description: "list = overview dashboard; status/control = one device; each FUNCTION op shows a focused widget: media (TV/speaker remote), lights (room-grouped), climate (thermostats), vacuum, covers (shades/blinds), security (locks + door/window/motion sensors), plugs (switches/outlets), scenes, sensors (readings: temperature/humidity/battery), camera (snapshots), presence (who's home/away), automations (list HA automations with on/off + run), printer (3D printer: live camera, progress, temps, pause/stop). ALWAYS prefer the function widget matching what the user is focused on — the overview dashboard (list) is for 'show me everything'." },
+        op: { type: 'string', enum: ['list', 'status', 'control', 'media', 'lights', 'climate', 'vacuum', 'covers', 'security', 'plugs', 'scenes', 'sensors', 'camera', 'presence', 'automations', 'printer', 'mode'], description: "list = overview dashboard; status/control = one device; each FUNCTION op shows a focused widget: media (TV/speaker remote), lights (room-grouped), climate (thermostats), vacuum, covers (shades/blinds), security (locks + door/window/motion sensors), plugs (switches/outlets), scenes, sensors (readings: temperature/humidity/battery), camera (snapshots), presence (who's home/away), automations (list HA automations with on/off + run), printer (3D printer: live camera, progress, temps, pause/stop); mode {mode:'home'|'away'|'vacation'|'guest', secure?:true} sets the HOUSE MODE — away/vacation = instant alerts incl. motion; guest = mute door nagging; secure:true when leaving also locks every lock and turns lights off (say what was done). Use for 'we're leaving', 'back home', 'guests are over'. ALWAYS prefer the function widget matching what the user is focused on — the overview dashboard (list) is for 'show me everything'." },
         query: { type: 'string', description: "Device name for status/control (e.g. 'living room lights', 'front door', 'bedroom thermostat')." },
         type: { type: 'string', enum: ['light', 'switch', 'climate', 'lock', 'cover', 'media_player', 'vacuum', 'fan', 'sensor', 'camera'], description: 'Optional device type filter for list.' },
         action: { type: 'string', enum: ['on', 'off', 'toggle', 'lock', 'unlock', 'open', 'close', 'play', 'pause', 'start', 'stop', 'dock', 'set'], description: 'What to do for op:control.' },
@@ -1075,6 +1075,27 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
         const st = pick(first, 'sensor', /(current_stage|print_status|stage)$/)
         const pg = pick(first, 'sensor', /(print_progress|progress)$/)
         return `Showed the printer widget${printers.size > 1 ? 's' : ''}. Status: ${st?.state || 'unknown'}${pg ? `, ${pg.state}%` : ''}.`
+      }
+      if (op === 'mode') {
+        const { getMode, setMode } = await import('../home/mode.js')
+        const want = String(args?.mode || '').toLowerCase()
+        if (!['home', 'away', 'vacation', 'guest'].includes(want)) {
+          return `House mode is "${await getMode(ctx.store)}". Set with mode:'home'|'away'|'vacation'|'guest'.`
+        }
+        await setMode(ctx.store, want as any)
+        const did: string[] = []
+        if (args?.secure === true && (want === 'away' || want === 'vacation')) {
+          const [locks, lights] = await Promise.all([haStates(['lock']), haStates(['light'])])
+          for (const l of locks.filter(x => x.state !== 'locked')) { await haCallService('lock', 'lock', l.entity_id); did.push(`locked ${l.name}`) }
+          for (const li of lights.filter(x => x.state === 'on')) { await haCallService('light', 'turn_off', li.entity_id); did.push(`${li.name} off`) }
+        }
+        const postures: Record<string, string> = {
+          home: 'normal watch — gentle nudges',
+          away: 'ARMED — instant alerts on any door, window or motion',
+          vacation: 'ARMED — instant alerts + I will keep an eye out daily',
+          guest: 'relaxed — door nudges muted while you have visitors',
+        }
+        return `House mode → ${want} (${postures[want]}).${did.length ? ` Secured: ${did.join(', ')}.` : ''}`
       }
       if (op === 'presence') {
         const people = (await haStates(['person'])).map(p => ({

@@ -210,3 +210,25 @@ describe('recurring shopping staples (loop A2)', () => {
     expect(items.find(i => i.name === 'oneoff')!.done).toBe(true)
   })
 })
+
+describe('house modes (loop A3)', () => {
+  test('thresholds per mode: away/vacation instant, guest muted, home base', async () => {
+    const { thresholdForMode, motionAlerts } = await import('../home/mode.ts')
+    expect(thresholdForMode('home', 600000)).toBe(600000)
+    expect(thresholdForMode('away', 600000)).toBe(0)
+    expect(thresholdForMode('vacation', 600000)).toBe(0)
+    expect(thresholdForMode('guest', 600000)).toBeNull()
+    expect(motionAlerts('away')).toBe(true)
+    expect(motionAlerts('home')).toBe(false)
+    expect(motionAlerts('guest')).toBe(false)
+  })
+
+  test('mode store roundtrip + garbage defaults to home', async () => {
+    const { getMode, setMode } = await import('../home/mode.ts')
+    expect(await getMode(store)).toBe('home')
+    await setMode(store, 'away')
+    expect(await getMode(store)).toBe('away')
+    store._kv.set('home:mode', 'party')
+    expect(await getMode(store)).toBe('home')
+  })
+})
