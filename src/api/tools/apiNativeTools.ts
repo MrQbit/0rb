@@ -264,12 +264,15 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
     },
     {
       name: 'Blender',
-      description: "Create or edit a 3D model with Blender — you write a Blender Python (bpy) script that builds the scene. The scene is CLEARED before each run and your script rebuilds the WHOLE thing, so to iterate (add/modify/remove objects) re-send the full updated script with the SAME id. It renders an interactive 3D model widget the user can orbit/zoom, refreshing every time you call it. `bpy`, `math`, `mathutils` are already imported; do NOT export — glTF export is automatic. Use for 'make a 3D <thing>', 'add a <part>', 'make it taller', etc.",
+      description: "Full 3D workshop (Blender). op:'build' (default): write a Blender Python (bpy) script that builds the scene — it's CLEARED each run, so re-send the FULL updated script with the SAME id to iterate; renders an interactive orbit/zoom widget and reports real dimensions. op:'render' {script | file}: a LIT studio still (camera + lights automatic) shown as an image — for beauty shots. op:'convert' {file, format:'stl'|'obj'|'fbx'|'glb'}: convert any mesh (STL/OBJ/PLY/FBX/glTF) — e.g. a downloaded STL becomes a viewable model, or a built model becomes an STL ready to slice for the 3D printer. op:'analyze' {file}: dimensions, volume, triangle count and WATERTIGHT check (3D-print readiness). `bpy`, `math`, `mathutils` pre-imported; never export in scripts — that's automatic.",
       input_schema: { type: 'object', properties: {
-        script: { type: 'string', description: 'Blender Python (bpy) building the full scene (pre-cleared; export is automatic).' },
+        op: { type: 'string', enum: ['build', 'render', 'convert', 'analyze'], description: 'Default build.' },
+        script: { type: 'string', description: "build/render: bpy script building the full scene (pre-cleared)." },
+        file: { type: 'string', description: 'render/convert/analyze: a mesh file in this session workspace (or a widget id like model-main).' },
+        format: { type: 'string', enum: ['stl', 'obj', 'fbx', 'glb'], description: "convert: output format." },
         title: { type: 'string' },
-        id: { type: 'string', description: 'Reuse the same id to update the same model widget as you iterate.' },
-      }, required: ['script'] },
+        id: { type: 'string', description: 'build: reuse the same id to update the same model widget as you iterate.' },
+      } },
       available: !!process.env.ORB2_BLENDER_URL,
     },
     {
@@ -782,18 +785,70 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
     } catch (e) { return `[ERROR] ${(e as Error).message}` }
   })
   add('Blender', { destructive: false }, async args => {
-    const script = String(args?.script || '').trim()
-    if (!script) return 'Provide a Blender Python (bpy) script that builds the scene.'
-    const id = (typeof args?.id === 'string' && args.id.trim()) ? args.id.trim() : 'model-main'
+    const base = (process.env.ORB2_BLENDER_URL || 'http://blender:8996').replace(/\/+$/, '')
     const wsRoot = process.env.ORB2_API_WORKSPACE_ROOT || '/workspace'
-    const out = `${wsRoot}/${ctx.sessionId}/.widget/${id}.glb`
+    const { join, resolve } = await import('node:path')
+    // Accept a workspace-relative path OR a bare widget id ("model-main").
+    const resolveFile = (f: string): string | null => {
+      const name = /^[A-Za-z0-9_-]+$/.test(f) ? `.widget/${f}.glb` : f
+      const full = resolve(join(wsRoot, ctx.sessionId, name))
+      return full.startsWith(resolve(wsRoot)) ? full : null
+    }
+    const call = async (path: string, body: any): Promise<any> => {
+      const r = await fetch(`${base}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+      return r.json()
+    }
+    const fmtDims = (d: any) => d?.dimensions_m
+      ? `${d.dimensions_m.map((x: number) => (x >= 0.01 ? `${(x * 100).toFixed(1)}cm` : `${(x * 1000).toFixed(1)}mm`)).join(' × ')}`
+      : ''
     try {
-      const base = (process.env.ORB2_BLENDER_URL || 'http://blender:8996').replace(/\/+$/, '')
-      const r = await fetch(`${base}/run`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ script, out }) })
-      const d = (await r.json()) as any
+      const op = String(args?.op || (args?.script ? 'build' : '')).trim()
+      if (op === 'analyze' || op === 'convert' || (op === 'render' && !args?.script)) {
+        const file = resolveFile(String(args?.file || '').trim())
+        if (!file) return "Which file? Give a workspace path or a model widget id (e.g. file:'model-main')."
+        if (op === 'analyze') {
+          const d = await call('/analyze', { in: file })
+          if (!d.ok) return `[ERROR] analyze failed: ${String(d.error || d.stderr || '').slice(-400)}`
+          return `Mesh: ${d.objects} object(s), ${d.triangles.toLocaleString()} triangles. Size: ${fmtDims(d)}. Volume: ${d.volume_l} L. ${d.watertight ? 'Watertight — ready to 3D print.' : 'NOT watertight — a printer/slicer may reject it; the mesh has open edges.'}`
+        }
+        if (op === 'convert') {
+          const format = String(args?.format || 'stl').toLowerCase()
+          const outName = `${file.split('/').pop()!.replace(/\.[^.]+$/, '')}.${format}`
+          const out = join(wsRoot, ctx.sessionId, outName)
+          const d = await call('/convert', { in: file, out })
+          if (!d.ok) return `[ERROR] convert failed: ${String(d.error || d.stderr || '').slice(-400)}`
+          return `Converted → ${outName}. Download: /v1/workspace/${ctx.sessionId}/${outName}${format === 'stl' ? ' — ready for the slicer.' : ''}`
+        }
+        // render from file
+        const out = join(wsRoot, ctx.sessionId, '.widget', 'render.png')
+        const d = await call('/render', { in: file, out })
+        if (!d.ok) return `[ERROR] render failed: ${String(d.error || d.stderr || '').slice(-400)}`
+        emitWidget(ctx.sessionId, { id: 'render', type: 'image', title: args?.title || 'Render', url: `/v1/workspace/${ctx.sessionId}/.widget/render.png?t=${Date.now()}` } as any)
+        return 'Rendered a studio still of the model.'
+      }
+
+      const script = String(args?.script || '').trim()
+      if (!script) return "Provide a bpy script (op:'build'/'render'), or a file for convert/analyze."
+      if (op === 'render') {
+        const out = join(wsRoot, ctx.sessionId, '.widget', 'render.png')
+        const d = await call('/render', { script, out })
+        if (!d.ok) return `[ERROR] render failed: ${String(d.error || d.stderr || '').slice(-400)}`
+        emitWidget(ctx.sessionId, { id: 'render', type: 'image', title: args?.title || 'Render', url: `/v1/workspace/${ctx.sessionId}/.widget/render.png?t=${Date.now()}` } as any)
+        return 'Rendered a studio still.'
+      }
+      // build (default)
+      const id = (typeof args?.id === 'string' && args.id.trim()) ? args.id.trim() : 'model-main'
+      const out = `${wsRoot}/${ctx.sessionId}/.widget/${id}.glb`
+      const d = await call('/run', { script, out })
       if (!d.ok) return `[ERROR] Blender failed: ${String(d.stderr || d.error || 'unknown').slice(-700)}`
-      emitWidget(ctx.sessionId, { id, type: 'model', title: args?.title || '3D model', url: `/v1/workspace/${ctx.sessionId}/.widget/${id}.glb?t=${Date.now()}` } as any)
-      return `Rendered the 3D model (id: ${id}). To iterate, call Blender again with id:"${id}" and the full updated script.`
+      // Real dimensions ride along on the widget and in the reply.
+      const a = await call('/analyze', { in: out }).catch(() => null)
+      emitWidget(ctx.sessionId, {
+        id, type: 'model', title: args?.title || '3D model',
+        url: `/v1/workspace/${ctx.sessionId}/.widget/${id}.glb?t=${Date.now()}`,
+        dims: a?.ok ? fmtDims(a) : undefined, watertight: a?.ok ? a.watertight : undefined,
+      } as any)
+      return `Rendered the 3D model (id: ${id}${a?.ok ? `, ${fmtDims(a)}${a.watertight ? '' : ', not watertight'}` : ''}). Iterate with the same id; op:'convert' format:'stl' makes it printable; op:'render' makes a beauty shot.`
     } catch (e) { return `[ERROR] ${(e as Error).message}` }
   })
   add('Publish', { destructive: false }, async args => {

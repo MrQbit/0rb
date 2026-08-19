@@ -1024,3 +1024,8 @@ sup.sq { font-size:.58em; color:var(--nv); font-weight:700; margin-left:1px; tra
 .set-sec.active { animation: secfade .18s ease-out; }
 @keyframes secfade { from { opacity: 0; transform: translateX(6px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .set-sec.active { animation: none; } }
+/* 3D model toolbar */
+.wg-model-bar { display:flex; align-items:center; gap:6px; padding-top:8px; flex:none; }
+.wg-med-btn.sm { padding:6px 8px; border-radius:8px; }
+.wg-model-bar .off { opacity:.45; }
+.wg-model-dims { margin-left:auto; font-family:var(--mono); font-size:11px; color:var(--ink-dim); }

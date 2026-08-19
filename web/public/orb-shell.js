@@ -1448,6 +1448,18 @@
     mv.setAttribute('touch-action','pan-y');
     mv.setAttribute('loading','eager');
     body.appendChild(mv);
+    // toolbar: turntable, snapshot, fullscreen — plus real-world size when known
+    const bar=document.createElement('div'); bar.className='wg-model-bar';
+    const mkBtn=(svg,label,fn)=>{ const b=document.createElement('button'); b.className='wg-med-btn sm'; b.title=label; b.setAttribute('aria-label',label);
+      b.innerHTML=`<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${svg}</svg>`; b.onclick=fn; return b; };
+    let spinning=true;
+    const rot=mkBtn('<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v5h-5"/>','Turntable',()=>{ spinning=!spinning; if(spinning) mv.setAttribute('auto-rotate',''); else mv.removeAttribute('auto-rotate'); rot.classList.toggle('off',!spinning); });
+    const snap=mkBtn('<rect x="3" y="7" width="18" height="13" rx="2"/><circle cx="12" cy="13.5" r="3.5"/><path d="M9 7l1.2-2h3.6L15 7"/>','Snapshot',async()=>{ try{ const url=await mv.toDataURL('image/png'); const a=document.createElement('a'); a.href=url; a.download=(spec.title||'model')+'.png'; a.click(); }catch{ toast('Snapshot failed'); } });
+    const fs=mkBtn('<path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/>','Fullscreen',()=>{ const host=body.closest('.wg')||body; if(document.fullscreenElement) document.exitFullscreen(); else host.requestFullscreen?.(); });
+    bar.append(rot,snap,fs);
+    if(spec.dims){ const d=document.createElement('span'); d.className='wg-model-dims';
+      d.textContent=spec.dims+(spec.watertight===false?' · not watertight':''); bar.appendChild(d); }
+    body.appendChild(bar);
   }
   // ── Calculator (fully interactive, no backend) ──
   // Safe expression evaluator: tokenize digits/./+-*/()% and recursive-descent
