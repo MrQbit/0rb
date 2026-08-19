@@ -951,3 +951,76 @@ sup.sq { font-size:.58em; color:var(--nv); font-weight:700; margin-left:1px; tra
 .wg-wallet-add input:first-child, .wg-wallet-add #shopAdd { flex:1 1 auto; min-width:0; }
 /* printer: no camera source → a quiet band, not a black void */
 .wg-printer .cam.empty { aspect-ratio:auto; min-height:72px; display:flex; align-items:center; justify-content:center; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Settings — inset-grouped system (HIG-derived). The palette is untouched;
+   what changes is the grammar: elevation instead of borders, one row shape
+   everywhere, quiet captions, hairline separators, accent only where you
+   can act. Overrides the earlier set-* rules by cascade order.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* the content column reads like a settings pane, not a dashboard */
+.set-content { max-width: 640px; }
+.set-sec h3 { font-size: 20px; font-weight: 650; letter-spacing: .2px; margin-bottom: 6px; }
+.set-sec > .set-muted { font-size: 13px; margin-bottom: 18px; }
+
+/* groups: rounded containers lifted by lightness — no borders, no shadows */
+.set-card, .set-list {
+  background: rgba(255,255,255,.055);
+  border: none; box-shadow: none;
+  border-radius: 10px;
+  padding: 0; overflow: hidden;
+  margin-bottom: 22px;
+}
+.set-card { padding: 12px 16px; }
+.set-list { display: block; }
+
+/* rows: one grammar — content left, values/controls right, 44px, hairlines */
+.set-list > .set-item {
+  background: transparent; border: none; border-radius: 0; box-shadow: none;
+  min-height: 44px; padding: 10px 16px; margin: 0;
+}
+.set-list > .set-item + .set-item { position: relative; }
+.set-list > .set-item + .set-item::before {
+  content: ''; position: absolute; top: 0; left: 16px; right: 0; height: 1px;
+  background: rgba(255,255,255,.08); transform: scaleY(.5);
+}
+.set-item:hover { background: rgba(255,255,255,.035); }
+.set-item .t { font-size: 14px; }
+.set-item .s { font-size: 12.5px; }
+.set-list > .set-muted { padding: 12px 16px; }
+
+/* captions above groups; footers below — quiet, never loud dividers */
+.set-h4 { font-size: 11.5px; letter-spacing: .07em; color: var(--ink-dim);
+  margin: 22px 0 7px; padding-left: 16px; font-weight: 600; }
+.set-h4:first-of-type { margin-top: 4px; }
+.set-sec .set-muted.small { font-size: 12.5px; line-height: 1.5; }
+
+/* buttons: one filled primary; everything else is a text button */
+.set-btn { padding: 8px 14px; border-radius: 9px; font-size: 13.5px; }
+.set-btn.ghost { background: transparent; border: none; color: var(--nv); padding: 8px 10px; }
+.set-btn.ghost:hover { background: rgba(118,185,0,.10); }
+.set-btn.danger { background: transparent; border: none; color: #ff7a7a; }
+.set-btn.danger:hover { background: rgba(255,93,93,.10); }
+
+/* nav: selected = quietly elevated + accent, like a sidebar, not tabs */
+.set-navi { border-radius: 9px; transition: background .15s ease-out, color .15s ease-out; }
+.set-navi:hover { background: rgba(255,255,255,.04); }
+.set-navi.active { background: rgba(255,255,255,.07); color: var(--nv); }
+
+/* forms inside groups keep the rhythm */
+.set-form input, .set-form select, .set-input {
+  background: rgba(255,255,255,.06); border: 1px solid transparent; border-radius: 9px;
+  min-height: 36px;
+}
+.set-form input:focus, .set-input:focus { border-color: var(--nv); }
+
+/* disclosure groups match the group container */
+.apps-conn { background: rgba(255,255,255,.055); border: none; border-radius: 10px; }
+.apps-conn > summary { padding: 12px 16px; font-size: 14px; }
+.apps-conn .set-card { background: rgba(255,255,255,.04); margin: 8px 12px 12px; }
+
+/* motion: fast, flat, no bounce; respect reduced-motion */
+.set-sec.active { animation: secfade .18s ease-out; }
+@keyframes secfade { from { opacity: 0; transform: translateX(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .set-sec.active { animation: none; } }

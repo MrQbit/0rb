@@ -354,7 +354,11 @@
     if(!spec || !spec.type || !widgetLayer) return;
     // Control events from the agent (not widgets): open the Settings panel.
     if(spec.type==='ui-settings'){
-      try{ openSettings(); if(spec.section){ const b=document.querySelector(`.set-navi[data-sec="${CSS.escape(spec.section)}"]`); if(b) b.click(); } }catch{}
+      try{ openSettings(); if(spec.section){
+        // Old section names keep working after the IA merge.
+        const alias={ access:'system', files:'system', integrations:'channels' };
+        const sec=alias[spec.section]||spec.section;
+        const b=document.querySelector(`.set-navi[data-sec="${CSS.escape(sec)}"]`); if(b) b.click(); } }catch{}
       return;
     }
     // Update in place if a widget with this id already exists (the agent
