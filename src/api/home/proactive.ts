@@ -139,13 +139,35 @@ async function checkArrivals(): Promise<void> {
     const prev = personState.get(p.entity_id)
     personState.set(p.entity_id, p.state)
     if (prev === undefined || prev === p.state || p.state !== 'home') continue
-    // Someone just arrived — deliver their waiting arrives-home notes.
+    // Someone just arrived.
+    // 1. Auto-disarm: if the house was set to away/vacation, a member coming
+    //    home flips it back and says so (no more alarm-mode nagging).
+    try {
+      const { getMode, setMode } = await import('./mode.js')
+      const mode = await getMode(pushStore)
+      if (mode === 'away' || mode === 'vacation') {
+        await setMode(pushStore, 'home')
+        await notifyOwner(`🏠 ${p.name} arrived — house mode back to home (was ${mode}).`)
+      }
+    } catch { /* mode optional */ }
+    // 2. Their arrival scene (personal pref 'arrival_scene' = HA scene name).
+    // 3. Waiting arrives-home notes.
     try {
       const fam = await import('../family/family.js')
       const { getUsers } = await import('../auth/otp.js')
       const users = await getUsers(pushStore)
       const who = users.filter(u => u.person_entity === p.entity_id)
       for (const u of who) {
+        try {
+          const prefs = await fam.getPrefs(pushStore, u.email)
+          const sceneName = (prefs['arrival_scene'] || '').trim()
+          if (sceneName) {
+            const { haStates: hs, haResolve: hr, haCallService: hc } = await import('../connectors/homeAssistant.js')
+            const scenes = await hs(['scene'])
+            const target = hr(scenes, sceneName, 'scene')[0]
+            if (target) { await hc('scene', 'turn_on', target.entity_id); log.info('arrival_scene', { user: u.email, scene: target.name }) }
+          }
+        } catch { /* scene optional */ }
         const due = await fam.takePendingNotes(pushStore, u.email, 'home')
         for (const n of due) {
           const from = await fam.memberName(pushStore, n.from)

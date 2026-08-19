@@ -1325,9 +1325,12 @@
     else { const a=document.createElement('a'); a.href=url; a.target='_blank'; a.rel='noopener'; a.className='set-url'; a.textContent='Open ↗ '+url; body.appendChild(a); }
   }
   function renderModel(body, spec){
+    const src=safeUrl(spec.url);
+    if(!src){ body.innerHTML='<div class="wg-empty">No model to show.</div>'; return; }
     const mv=document.createElement('model-viewer');
     mv.className='wg-model';
-    mv.setAttribute('src', spec.url||'');
+    mv.addEventListener('error',()=>{ mv.replaceWith(Object.assign(document.createElement('div'),{className:'wg-empty',textContent:'Model failed to load.'})); });
+    mv.setAttribute('src', src);
     mv.setAttribute('camera-controls','');
     mv.setAttribute('auto-rotate','');
     mv.setAttribute('shadow-intensity','1');
@@ -1528,6 +1531,7 @@
 
   // ── Docker (live micro-app: list + user/agent control) ──
   function renderDocker(body, spec){
+    if(!(spec.containers||[]).length){ body.innerHTML='<div class="wg-empty">No containers running.</div>'; return; }
     const wrap=document.createElement('div'); wrap.className='wg-docker'; body.appendChild(wrap);
     const ctrl=async(action,target)=>{ try{ await fetch('/v1/docker/control',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({action,target})}); }catch{} refresh(); };
     const btn=(label,action,target,cls)=>{ const b=document.createElement('button'); b.className='wg-dk-btn'+(cls?' '+cls:''); b.textContent=label;
