@@ -1,0 +1,227 @@
+# orb2 — cloud-brain stack for machines WITHOUT a capable NVIDIA GPU
+# (Mac/Windows via Docker Desktop, Raspberry Pi, plain x86). The brain is an
+# OpenAI-compatible cloud endpoint (OPENAI_* in .env); GPU voice services are
+# omitted (ORB2_VOICE_ENABLED=0). Derived from docker-compose.spark.yml —
+# keep service definitions in sync when editing that file.
+name: orb2
+services:
+  redis:
+    image: redis/redis-stack-server:7.4.0-v0
+    container_name: orb2-redis
+    command: redis-stack-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+  orb2-api:
+    image: orb2-api:dev
+    container_name: orb2-api
+    depends_on:
+      redis:
+        condition: service_healthy
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    environment:
+      ORB2_USE_OPENAI: "1"
+      ORB2_SECRET_SOURCE: env
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://openrouter.ai/api/v1}
+      OPENAI_MODEL: ${OPENAI_MODEL:-openai/gpt-4o}
+      LLM_ENDPOINT: ${OPENAI_BASE_URL:-https://openrouter.ai/api/v1}
+      LLM_KEY: local
+      LLM_MODEL: ${OPENAI_MODEL:-openai/gpt-4o}
+      ORB2_DISABLE_THINKING: "1"
+      ORB2_REASONING_STRENGTH: ""
+      ORB2_MAX_OUTPUT_TOKENS: "16384"
+      LLM_DEPLOYMENT_NAME: ${OPENAI_MODEL:-openai/gpt-4o}
+      LLM_PROVIDER: vllm
+      ORB2_DEFAULT_MODEL: ${OPENAI_MODEL:-openai/gpt-4o}
+      ORB2_HELPER_MODEL: ${OPENAI_MODEL:-openai/gpt-4o}
+      REDIS_URL: redis://redis:6379
+      ORB2_VOICE_ENABLED: ${ORB2_VOICE_ENABLED:-0}
+      ORB2_VOICE_BACKEND: whisper
+      ORB2_TTS_VOICE: af_heart
+      ORB2_VISION_BACKEND: ${ORB2_VISION_BACKEND:-llm}
+      ORB2_HA_URL: ${ORB2_HA_URL:-http://host.docker.internal:8123}
+      ORB2_HA_TOKEN: ${ORB2_HA_TOKEN:-}
+      ORB2_EMBED_URL: http://embed:8994
+      ORB2_SEARXNG_URL: ${ORB2_SEARXNG_URL:-http://searxng:8080}
+      ORB2_BRAVE_API_KEY: ${ORB2_BRAVE_API_KEY:-}
+      ORB2_YOUTUBE_API_KEY: ${ORB2_YOUTUBE_API_KEY:-}
+      ORB2_SPOTIFY_CLIENT_ID: ${ORB2_SPOTIFY_CLIENT_ID:-}
+      ORB2_SPOTIFY_CLIENT_SECRET: ${ORB2_SPOTIFY_CLIENT_SECRET:-}
+      ORB2_NEWSAPI_KEY: ${ORB2_NEWSAPI_KEY:-}
+      ORB2_VERCEL_TOKEN: ${ORB2_VERCEL_TOKEN:-}
+      ORB2_VERCEL_TEAM_ID: ${ORB2_VERCEL_TEAM_ID:-}
+      ORB2_GOOGLE_CLIENT_ID: ${ORB2_GOOGLE_CLIENT_ID:-}
+      ORB2_GOOGLE_CLIENT_SECRET: ${ORB2_GOOGLE_CLIENT_SECRET:-}
+      ORB2_MS_CLIENT_ID: ${ORB2_MS_CLIENT_ID:-}
+      ORB2_MS_CLIENT_SECRET: ${ORB2_MS_CLIENT_SECRET:-}
+      ORB2_BLENDER_URL: ${ORB2_BLENDER_URL:-http://blender:8996}
+      ORB2_TELEGRAM_BOT_TOKEN: ${ORB2_TELEGRAM_BOT_TOKEN:-}
+      ORB2_TELEGRAM_OWNER_ID: ${ORB2_TELEGRAM_OWNER_ID:-}
+      ORB2_WHATSAPP_BRIDGE_SECRET: ${ORB2_WHATSAPP_BRIDGE_SECRET:-}
+      ORB2_WHATSAPP_BRIDGE_URL: ${ORB2_WHATSAPP_BRIDGE_URL:-http://whatsapp:8995}
+      ORB2_SANDBOX_MODE: inproc
+      ORB2_FILES_ENABLED: "1"
+      ORB2_FILES_ROOT: /workspace/orb2-files
+      ORB2_FILES_MAX_BYTES: "104857600"
+      ORB2_FILES_QUOTA_BYTES: "1073741824"
+      ORB2_CANVAS_ENABLED: "0"
+      ORB2_CANVAS: "true"
+      ORB2_STANDALONE: "1"
+      ORB2_COWORK_MEMORY_PATH_OVERRIDE: /memory
+      ORB2_API_PORT: "8080"
+      ORB2_API_HOST: 0.0.0.0
+      ORB2_API_WORKSPACE_ROOT: /workspace
+      ORB2_API_AUTH_REQUIRED: ${ORB2_API_AUTH_REQUIRED:-0}
+      ORB2_AUTH_SECRET: ${ORB2_AUTH_SECRET:-}
+      ORB2_AUTH_COOKIE_SECURE: ${ORB2_AUTH_COOKIE_SECURE:-0}
+      ORB2_PUBLIC_URL: ${ORB2_PUBLIC_URL:-}
+      ORB2_AUTH_ALLOWED_EMAILS: ${ORB2_AUTH_ALLOWED_EMAILS:-}
+      ORB2_SMTP_HOST: ${ORB2_SMTP_HOST:-}
+      ORB2_SMTP_PORT: ${ORB2_SMTP_PORT:-465}
+      ORB2_SMTP_USER: ${ORB2_SMTP_USER:-}
+      ORB2_SMTP_PASS: ${ORB2_SMTP_PASS:-}
+      ORB2_SMTP_FROM: ${ORB2_SMTP_FROM:-}
+      ORB2_API_SESSION_TTL: "604800"
+      ORB2_SKILLS_ENABLED: "1"
+      ORB2_CORS_ORIGINS: "*"
+      AGENT_ID: orb2-api
+      NODE_ENV: production
+      ORB2_SELF_MODIFY_ENABLED: ${ORB2_SELF_MODIFY_ENABLED:-1}
+      ORB2_SELF_SRC: ${ORB2_SELF_SRC_HOST:-/home/mrqbit/Downloads/orb2}
+      ORB2_DOCKER_OPS_ENABLED: "1"
+      ORB2_COMPOSE_FILE: docker-compose.spark.yml
+      ORB2_COMPOSE_PROJECT: orb2
+      ORB2_COMPOSE_NETWORK: orb2_default
+      ORB2_SELF_REGISTRY: localhost:5001
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    group_add:
+      - "988"
+      - "1000"
+    volumes:
+      - orb2-workspace:/workspace
+      - orb2-files:/workspace/orb2-files
+      - orb2-memory:/memory
+      - ${ORB2_SELF_SRC_HOST:-/home/mrqbit/Downloads/orb2}:${ORB2_SELF_SRC_HOST:-/home/mrqbit/Downloads/orb2}
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/run/tailscale/tailscaled.sock:/var/run/tailscale/tailscaled.sock
+      - /usr/bin/tailscale:/usr/bin/tailscale:ro
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -fsS
+        - http://localhost:8080/healthz
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+  ui:
+    image: orb2-ui:dev
+    container_name: orb2-ui
+    depends_on:
+      - orb2-api
+    ports:
+      - ${ORB2_UI_PORT:-9080}:8080
+      - ${ORB2_UI_HTTPS_PORT:-9443}:8443
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -qO-
+        - http://127.0.0.1:8080/health
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+  searxng:
+    image: searxng/searxng:latest
+    container_name: orb2-searxng
+    environment:
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-orb2-searxng-secret}
+      SEARXNG_BASE_URL: http://localhost:8080/
+    volumes:
+      - ./services/searxng/settings.yml:/etc/searxng/settings.yml:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -qO- http://127.0.0.1:8080/healthz >/dev/null 2>&1 || wget -qO-
+          http://127.0.0.1:8080/ >/dev/null 2>&1
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: orb2-homeassistant
+    network_mode: host
+    environment:
+      TZ: ${TZ:-America/Chicago}
+    volumes:
+      - ${HOME}/.orb2/homeassistant:/config
+      - /etc/localtime:/etc/localtime:ro
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - import urllib.request,sys; sys.exit(0 if
+          urllib.request.urlopen('http://127.0.0.1:8123/',timeout=5).status <
+          500 else 1)
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+    restart: unless-stopped
+  whatsapp:
+    build:
+      context: ./services/whatsapp
+    image: orb2-whatsapp:dev
+    container_name: orb2-whatsapp
+    ports:
+      - 8995:8995
+    environment:
+      ORB2_API_URL: http://orb2-api:8080
+      ORB2_WHATSAPP_ALLOWED: ${ORB2_WHATSAPP_ALLOWED:-}
+      ORB2_WHATSAPP_BRIDGE_SECRET: ${ORB2_WHATSAPP_BRIDGE_SECRET:-}
+    volumes:
+      - orb2-wa:/wa-auth
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - require('http').get('http://127.0.0.1:8995/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+  watchdog:
+    image: docker:cli
+    container_name: orb2-watchdog
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./scripts/orb2-watchdog.sh:/orb2-watchdog.sh:ro
+      - watchdog-logs:/var/log/orb2
+    entrypoint:
+      - /bin/sh
+      - /orb2-watchdog.sh
+    restart: unless-stopped
+volumes:
+  redis-data: null
+  orb2-files: null
+  orb2-workspace: null
+  watchdog-logs: null
+  orb2-memory: null
+  orb2-wa: null

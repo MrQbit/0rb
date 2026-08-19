@@ -44,14 +44,18 @@ changes.
 - New agent capabilities are usually a **connector** (`src/api/connectors/`) plus
   a **tool** (`src/api/tools/apiNativeTools.ts`) and, where it has a UI, a
   **widget** renderer (`web/public/orb-shell.js`). Gate tools on their config.
+- A new widget can also ship as a **runtime plugin** instead of a built-in —
+  see [docs/widget-plugins.md](docs/widget-plugins.md).
 - Add or update tests when behavior changes; update docs when setup, commands,
   or user-facing behavior changes.
 
 ## Validation
 
 ```bash
-bun run build:api
+bun run typecheck                   # tsc, no emit
+bun test                            # the full suite must stay green
 bun test ./path/to/file.test.ts     # focused tests
+bun run build:api                   # bundle must still build
 ```
 
 Verify a deployed change against the running stack (health + a real turn) before

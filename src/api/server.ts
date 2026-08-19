@@ -559,6 +559,13 @@ export async function startApiServer(config: ApiServerConfig) {
 
   log.info('api_listening', { url: `http://${config.host}:${config.port}` })
 
+  // ── Per-device HTTPS at <id>.device.orb2.app (Let's Encrypt DNS-01 via the
+  // hosted device-DNS relay). No-op unless ORB2_DEVICE_DOMAIN + ORB2_BROKER_URL
+  // + ORB2_ENROLL_SECRET are set. Best-effort — HTTP stays up regardless.
+  void import('./devicecert/serve.js')
+    .then(m => m.startDeviceTls(serveOpts, store))
+    .catch(err => log.warn('device_tls_init_failed', { error: (err as Error).message }))
+
   // ── Free HTTPS via Tailscale (https://<node>.ts.net) ──
   // Best-effort, in the background; no-op unless this box is already on a
   // tailnet (opt out with ORB2_TS_AUTO_HTTPS=0). Tailscale provisions/renews a

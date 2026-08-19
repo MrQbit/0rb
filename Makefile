@@ -1,10 +1,9 @@
 .PHONY: help dev dev-no-vllm build build-api docker-build docker-build-ui \
-       spark spark-forward spark-status spark-logs spark-teardown \
-       k3d k3d-build k3d-deploy k3d-status k3d-logs k3d-teardown k3d-port-forward \
+       docker-build-canvas push \
+       spark spark-status spark-logs spark-down \
        install-service start stop status tunnel-start tunnel-status tailscale-status \
-       voice-setup voice-setup-personaplex voice-start-personaplex voice-status \
-       verify-phase1 \
-       test smoke clean
+       voice-status \
+       test clean ensure-bun ensure-deps
 
 .DEFAULT_GOAL := help
 
@@ -12,53 +11,40 @@
 IMAGE_NAME    := orb2-api
 IMAGE_TAG     ?= dev
 API_PORT      ?= 9080
-VLLM_PORT     ?= 8000
+# Used by the lightweight dev stack (docker-compose.yml) only. The Spark
+# stack (docker-compose.spark.yml) pins its own brain + revision.
 VLLM_MODEL    ?= Qwen/Qwen3-Coder-Next
 VLLM_SERVED   ?= qwen3-coder-next
-CLUSTER_NAME  ?= orb2-dev
-# Host vLLM URL (for DGX Spark where vLLM runs natively)
-VLLM_HOST_URL ?= http://host.k3d.internal:$(VLLM_PORT)/v1
 UI_IMAGE      := orb2-ui
 UI_PORT       ?= 9081
 BUN           := $(shell command -v bun 2>/dev/null || echo "$$HOME/.bun/bin/bun")
 
 help:
 	@echo "═══════════════════════════════════════════════════════════════"
-	@echo "  orb2 — Personal AI Coding Agent (DGX Spark)"
+	@echo "  orb2 — self-hosted personal AI agent (Docker Compose)"
 	@echo "═══════════════════════════════════════════════════════════════"
 	@echo ""
-	@echo "  DGX Spark (vLLM already running on host):"
-	@echo "    make spark            k3d cluster + Redis + API + UI (uses host vLLM)"
-	@echo "    make spark-forward    Port-forward UI + API to host"
-	@echo "    make spark-status     Show pods + services"
-	@echo "    make spark-logs       Tail API logs"
-	@echo "    make spark-teardown   Teardown cluster"
+	@echo "  The stack (docker-compose.spark.yml):"
+	@echo "    make spark            Bring the whole stack up (wraps orb2-stack.sh)"
+	@echo "    make spark-status     ps + health"
+	@echo "    make spark-logs       Tail the agent API logs"
+	@echo "    make spark-down       Stop the stack"
 	@echo ""
 	@echo "  Local development:"
-	@echo "    make dev              Full stack: vLLM + Redis + API (docker compose)"
+	@echo "    make dev              Lightweight dev stack: vLLM + Redis + API (docker-compose.yml)"
 	@echo "    make dev-no-vllm      Redis + API only (vLLM on host)"
 	@echo "    make build            Build CLI bundle (dist/cli.mjs)"
 	@echo "    make build-api        Build API bundle (dist/api.mjs)"
 	@echo "    make test             Run tests"
-	@echo "    make smoke            Build + version check"
-	@echo "    make verify-phase1    Verify cluster backbone (RBAC/worker/canvas)"
-	@echo ""
-	@echo "  Kubernetes (k3d) — full stack including vLLM in cluster:"
-	@echo "    make k3d              One-command: create cluster + deploy all"
-	@echo "    make k3d-build        Build + import Docker image into k3d"
-	@echo "    make k3d-deploy       Helm upgrade in existing cluster"
-	@echo "    make k3d-status       Show pods + services"
-	@echo "    make k3d-logs         Tail API logs"
-	@echo "    make k3d-port-forward Port-forward API + vLLM to host"
-	@echo "    make k3d-teardown     Uninstall release (--full to delete cluster)"
 	@echo ""
 	@echo "  Docker:"
 	@echo "    make docker-build     Build API Docker image"
+	@echo "    make docker-build-ui  Build UI (console) image"
+	@echo "    make push             Tag + push api/ui/canvas to localhost:5001"
 	@echo ""
 	@echo "  Config:"
-	@echo "    VLLM_MODEL=$(VLLM_MODEL)  VLLM_SERVED=$(VLLM_SERVED)"
-	@echo "    VLLM_PORT=$(VLLM_PORT)  API_PORT=$(API_PORT)"
-	@echo "    VLLM_HOST_URL=$(VLLM_HOST_URL)"
+	@echo "    VLLM_MODEL=$(VLLM_MODEL)  VLLM_SERVED=$(VLLM_SERVED)  (dev stack only)"
+	@echo "    API_PORT=$(API_PORT)"
 	@echo ""
 
 # ── Bun auto-install ─────────────────────────────────────────────────
@@ -94,7 +80,8 @@ docker-build-ui:
 docker-build-canvas:
 	docker build -t $(CANVAS_IMAGE):$(IMAGE_TAG) -f Dockerfile.canvas .
 
-# Push all images to the internal cluster registry (localhost:5001)
+# Push all images to the local registry the compose stack pulls from
+# (scripts/install.sh starts it on :5001).
 push: docker-build docker-build-ui docker-build-canvas
 	docker tag $(IMAGE_NAME):$(IMAGE_TAG) $(REGISTRY)/$(IMAGE_NAME):$(IMAGE_TAG)
 	docker push $(REGISTRY)/$(IMAGE_NAME):$(IMAGE_TAG)
@@ -104,12 +91,6 @@ push: docker-build docker-build-ui docker-build-canvas
 	docker push $(REGISTRY)/$(CANVAS_IMAGE):$(IMAGE_TAG)
 	@echo "✓ All images pushed to $(REGISTRY)"
 
-# Create internal registry and connect to cluster (one-time setup)
-registry:
-	k3d registry create orb2-registry --port 5001 || true
-	docker network connect k3d-orb2-dev k3d-orb2-registry || true
-	@echo "✓ Registry at localhost:5001"
-
 # ── Local dev (docker compose) ────────────────────────────────────────
 dev: build-api
 	VLLM_MODEL=$(VLLM_MODEL) VLLM_SERVED_NAME=$(VLLM_SERVED) \
@@ -118,144 +99,39 @@ dev: build-api
 dev-no-vllm: build-api
 	docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 
-# ── DGX Spark (vLLM on host, everything else in k3d) ──────────────────
-spark: build-api docker-build docker-build-ui
-	@echo "═══════════════════════════════════════════════════════════════"
-	@echo "  orb2 — DGX Spark mode"
-	@echo "  vLLM on host → k3d (Redis + API + UI console)"
-	@echo "═══════════════════════════════════════════════════════════════"
-	@# 1. Create cluster if needed (expose API and UI ports)
-	@if ! k3d cluster list 2>/dev/null | grep -q "$(CLUSTER_NAME)"; then \
-		echo "→ Creating k3d cluster '$(CLUSTER_NAME)'..."; \
-		k3d cluster create $(CLUSTER_NAME) \
-			-p "$(API_PORT):80@loadbalancer" \
-			-p "$(UI_PORT):8081@loadbalancer" \
-			--wait; \
-	else \
-		echo "✓ Cluster '$(CLUSTER_NAME)' already exists"; \
-	fi
-	@# 2. Import images
-	@echo "→ Importing images into k3d..."
-	@k3d image import $(IMAGE_NAME):$(IMAGE_TAG) -c $(CLUSTER_NAME)
-	@k3d image import $(UI_IMAGE):$(IMAGE_TAG) -c $(CLUSTER_NAME)
-	@# 3. Helm deploy — no vLLM pod, point API at host vLLM, enable UI
-	@echo "→ Deploying Redis + API + UI (vLLM on host at $(VLLM_HOST_URL))..."
-	helm upgrade --install orb2 deploy/helm/orb2 \
-		--set global.imageTag=$(IMAGE_TAG) \
-		--set global.imagePullPolicy=Never \
-		--set global.imageRepository=$(IMAGE_NAME) \
-		--set vllm.enabled=false \
-		--set llm.defaultProvider=local \
-		--set llm.local.baseUrl=$(VLLM_HOST_URL) \
-		--set llm.local.model=$(VLLM_SERVED) \
-		--set llm.local.helperModel=$(VLLM_SERVED) \
-		--set ui.enabled=true \
-		--set ui.image.repository=$(UI_IMAGE) \
-		--set ui.image.tag=$(IMAGE_TAG) \
-		--set ui.image.pullPolicy=Never \
-		--wait --timeout 120s
-	@# 4. Wait
-	@kubectl -n orb2 rollout status deploy/orb2-api --timeout=120s
-	@kubectl -n orb2 rollout status deploy/orb2-ui --timeout=60s
-	@echo ""
-	@echo "═══════════════════════════════════════════════════════════════"
-	@echo "  orb2 is running! (DGX Spark mode)"
-	@echo "═══════════════════════════════════════════════════════════════"
-	@echo ""
-	@echo "  Console: kubectl -n orb2 port-forward svc/orb2-ui $(UI_PORT):80 &"
-	@echo "           then open http://localhost:$(UI_PORT)"
-	@echo ""
-	@echo "  API:     kubectl -n orb2 port-forward svc/orb2-api $(API_PORT):8080 &"
-	@echo "           curl http://localhost:$(API_PORT)/healthz"
-	@echo ""
-	@echo "  vLLM:    $(VLLM_HOST_URL) (on host)"
-	@echo ""
-	@echo "  Quick:   make spark-forward  (port-forward both API + UI)"
-	@echo "  Pods:    make spark-status"
-	@echo "  Logs:    make spark-logs"
-	@echo "  Stop:    make spark-teardown"
-	@echo ""
+# ── The Spark stack (docker-compose.spark.yml) ────────────────────────
+spark:
+	./scripts/orb2-stack.sh up
 
-spark-forward:
-	@echo "→ Port-forwarding UI → localhost:$(UI_PORT), API → localhost:$(API_PORT)"
-	@kubectl -n orb2 port-forward svc/orb2-ui $(UI_PORT):80 &
-	@kubectl -n orb2 port-forward svc/orb2-api $(API_PORT):8080 &
-	@echo ""
-	@echo "  Console: http://localhost:$(UI_PORT)"
-	@echo "  API:     http://localhost:$(API_PORT)"
-	@echo "  Stop:    kill %1 %2"
+spark-status:
+	./scripts/orb2-stack.sh status
 
-spark-status: k3d-status
+spark-logs:
+	./scripts/orb2-stack.sh logs orb2-api
 
-spark-logs: k3d-logs
-
-spark-teardown: k3d-teardown
-
-# ── k3d (full stack in Kubernetes, vLLM included) ─────────────────────
-k3d:
-	./scripts/k3d-setup.sh --model=$(VLLM_MODEL) --served-name=$(VLLM_SERVED)
-
-k3d-build: build-api docker-build
-	k3d image import $(IMAGE_NAME):$(IMAGE_TAG) -c $(CLUSTER_NAME)
-
-k3d-deploy:
-	helm upgrade --install orb2 deploy/helm/orb2 \
-		--set global.imageTag=$(IMAGE_TAG) \
-		--set global.imagePullPolicy=Never \
-		--set global.imageRepository=$(IMAGE_NAME) \
-		--set vllm.model=$(VLLM_MODEL) \
-		--set vllm.servedModelName=$(VLLM_SERVED) \
-		--set llm.local.model=$(VLLM_SERVED) \
-		--wait --timeout 300s
-
-k3d-status:
-	@kubectl -n orb2 get pods,svc,deploy,statefulset 2>/dev/null || \
-		echo "No orb2 namespace found. Run: make k3d"
-
-k3d-logs:
-	kubectl -n orb2 logs deploy/orb2-api -f
-
-k3d-port-forward:
-	@echo "→ Port-forwarding API → localhost:$(API_PORT), vLLM → localhost:$(VLLM_PORT)"
-	@kubectl -n orb2 port-forward svc/orb2-api $(API_PORT):8080 &
-	@kubectl -n orb2 port-forward svc/orb2-vllm $(VLLM_PORT):8000 2>/dev/null &
-	@echo "  API:  http://localhost:$(API_PORT)"
-	@echo "  vLLM: http://localhost:$(VLLM_PORT)"
-	@echo "  Stop: kill %1 %2"
-
-k3d-teardown:
-	./scripts/k3d-teardown.sh
+spark-down:
+	./scripts/orb2-stack.sh down
 
 # ── Test ──────────────────────────────────────────────────────────────
 test: ensure-deps
 	$(BUN) test src/api/smoke.test.ts src/api/auth/bootstrap.test.ts src/api/control/rateLimit.test.ts
 
-smoke: ensure-deps
-	$(BUN) run scripts/smoke-test.ts
-
-verify-phase1:
-	@bash scripts/verify-phase1.sh
-
 # ── Service management (systemd) ──────────────────────────────────────
-install-service: build-api
-	@echo "→ Installing rakoon systemd service..."
-	@install -d /etc/rakoon /var/log/rakoon
-	@cp scripts/rakoon.service /etc/systemd/system/rakoon.service
-	@install -d /opt/rakoon
-	@cp dist/api.mjs /opt/rakoon/dist/api.mjs 2>/dev/null || cp -r dist /opt/rakoon/
-	@systemctl daemon-reload
-	@systemctl enable rakoon
+install-service:
+	@echo "→ Installing the orb2 boot unit..."
+	@sudo cp scripts/orb2.service /etc/systemd/system/orb2.service
+	@sudo systemctl daemon-reload
+	@sudo systemctl enable orb2
 	@echo "✓ Service installed. Run: make start"
-	@echo "  Edit /etc/rakoon/env with your environment variables."
 
 start:
-	systemctl start rakoon
+	sudo systemctl start orb2
 
 stop:
-	systemctl stop rakoon
+	sudo systemctl stop orb2
 
 status:
-	@systemctl status rakoon
+	@systemctl status orb2 --no-pager || true
 	@echo ""
 	@curl -sf http://localhost:$(API_PORT)/v1/status | python3 -m json.tool 2>/dev/null || echo "API not responding"
 
@@ -273,20 +149,11 @@ tunnel-status:
 tailscale-status:
 	@tailscale status 2>/dev/null || echo "Tailscale not installed"
 
-# ── Voice / PersonaPlex ───────────────────────────────────────────────
-# Default voice stack: local whisper.cpp (STT) + Piper (TTS).
-voice-setup:
-	bash scripts/install-whisper.sh
-
-# Optional full-duplex backend (ORB2_VOICE_BACKEND=personaplex).
-voice-setup-personaplex:
-	bash scripts/install-personaplex.sh
-
-voice-start-personaplex:
-	bash scripts/start-personaplex.sh
-
+# ── Voice ─────────────────────────────────────────────────────────────
+# STT/TTS run as GPU compose services (stt :8990, tts :8991) — see
+# docker-compose.spark.yml. This just checks the wired-up status.
 voice-status:
-	@curl -sf http://localhost:9080/v1/voice/status 2>/dev/null | python3 -m json.tool || echo "Voice status unavailable"
+	@curl -sf http://localhost:$(API_PORT)/v1/voice/status 2>/dev/null | python3 -m json.tool || echo "Voice status unavailable"
 
 # ── Clean ─────────────────────────────────────────────────────────────
 clean:

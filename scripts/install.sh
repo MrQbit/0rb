@@ -21,6 +21,14 @@ warn(){ printf '\033[1;33m⚠ %s\033[0m\n' "$*"; }
 
 dk(){ if id -nG | grep -qw docker; then docker "$@"; else sg docker -c "docker $*"; fi; }
 
+# ── 0. hardware preflight — is a local brain even possible here? ──────────
+bash scripts/preflight.sh || true
+if ! command -v nvidia-smi >/dev/null 2>&1; then
+  warn "No NVIDIA GPU detected — this installer is for GPU boxes."
+  warn "Use the cloud-brain installer instead:  bash scripts/install-cloudbrain.sh"
+  exit 1
+fi
+
 # ── 1. prerequisites ──────────────────────────────────────────────────────
 command -v docker >/dev/null || { warn "Docker is required: https://docs.docker.com/engine/install/"; exit 1; }
 dk compose version >/dev/null 2>&1 || { warn "The 'docker compose' plugin is required."; exit 1; }
