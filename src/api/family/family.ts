@@ -35,6 +35,8 @@ export interface FamilyEvent {
   date: string
   time?: string
   who?: string
+  /** 'yearly' = birthdays/anniversaries — rolls to the next occurrence */
+  repeat?: 'yearly'
 }
 
 function rid(prefix: string): string {
@@ -141,24 +143,35 @@ export async function familyPromptExtra(store: Store, ownerId: string): Promise<
 }
 
 // ── shared household calendar ──────────────────────────────────────────
+/** Pure: roll a yearly event forward to its next occurrence on/after `from`. */
+export function nextOccurrence(dateISO: string, from: string): string {
+  const [, m, d] = dateISO.split('-')
+  const fromY = Number(from.slice(0, 4))
+  const thisYear = `${fromY}-${m}-${d}`
+  return thisYear >= from ? thisYear : `${fromY + 1}-${m}-${d}`
+}
+
 export async function listEvents(store: Store): Promise<FamilyEvent[]> {
   try {
     const all = JSON.parse((await store.getKv(EVENTS_KEY)) || '[]') as FamilyEvent[]
     const cutoff = new Date(Date.now() - 24 * 3600_000).toISOString().slice(0, 10)
-    return all.filter(e => e.date >= cutoff).sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''))
+    const materialized = all.map(e => e.repeat === 'yearly' ? { ...e, date: nextOccurrence(e.date, cutoff) } : e)
+    return materialized.filter(e => e.date >= cutoff).sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''))
   } catch { return [] }
 }
-export async function addEvent(store: Store, ev: { title: string; date: string; time?: string; who?: string }): Promise<FamilyEvent | { error: string }> {
+export async function addEvent(store: Store, ev: { title: string; date: string; time?: string; who?: string; repeat?: 'yearly' }): Promise<FamilyEvent | { error: string }> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(ev.date)) return { error: 'date must be YYYY-MM-DD' }
   if (ev.time && !/^\d{1,2}:\d{2}$/.test(ev.time)) return { error: 'time must be HH:MM' }
-  const events = await listEvents(store)
-  const e: FamilyEvent = { id: rid('fe'), title: String(ev.title).slice(0, 120), date: ev.date, time: ev.time, who: ev.who }
+  let events: FamilyEvent[] = []
+  try { events = JSON.parse((await store.getKv(EVENTS_KEY)) || '[]') } catch { /* empty */ }
+  const e: FamilyEvent = { id: rid('fe'), title: String(ev.title).slice(0, 120), date: ev.date, time: ev.time, who: ev.who, repeat: ev.repeat === 'yearly' ? 'yearly' : undefined }
   events.push(e)
   await store.putKv(EVENTS_KEY, JSON.stringify(events), 0)
   return e
 }
 export async function removeEvent(store: Store, query: string): Promise<FamilyEvent | null> {
-  const events = await listEvents(store)
+  let events: FamilyEvent[] = []
+  try { events = JSON.parse((await store.getKv(EVENTS_KEY)) || '[]') } catch { /* empty */ }
   const q = query.toLowerCase()
   const idx = events.findIndex(e => e.id === query || e.title.toLowerCase().includes(q))
   if (idx < 0) return null

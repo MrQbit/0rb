@@ -107,7 +107,10 @@ body {
 .wg [role="button"]:focus-visible, .wg select:focus-visible, .wg textarea:focus-visible {
   outline: 2px solid rgba(118,185,0,.65); outline-offset: 2px; border-radius: 8px;
 }
-.set-navi:focus-visible, .icon-btn:focus-visible, .set-btn:focus-visible {
+.set-navi:focus-visible, .icon-btn:focus-visible, .set-btn:focus-visible,
+#settingsPanel button:focus-visible, #settingsPanel input:focus-visible,
+#settingsPanel select:focus-visible, #settingsPanel textarea:focus-visible,
+#settingsPanel a:focus-visible {
   outline: 2px solid rgba(118,185,0,.65); outline-offset: 2px;
 }
 /* chart fills the card + reflows on resize (maintainAspectRatio:false).

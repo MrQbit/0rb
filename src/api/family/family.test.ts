@@ -315,3 +315,23 @@ describe('smart-paste key detection (connectors QoL)', () => {
     expect(detectKey('').length).toBe(0)
   })
 })
+
+describe('yearly events (loop A12)', () => {
+  test('nextOccurrence rolls birthdays forward correctly', async () => {
+    const { nextOccurrence } = await import('./family.ts')
+    expect(nextOccurrence('1990-06-15', '2031-03-01')).toBe('2031-06-15')
+    expect(nextOccurrence('1990-06-15', '2031-06-15')).toBe('2031-06-15')
+    expect(nextOccurrence('1990-06-15', '2031-07-01')).toBe('2032-06-15')
+  })
+
+  test('yearly events materialize in listEvents; storage keeps the original date', async () => {
+    const { addEvent, listEvents } = await import('./family.ts')
+    await addEvent(store, { title: 'Mom birthday', date: '1960-04-01', repeat: 'yearly' })
+    const ev = await listEvents(store)
+    expect(ev.length).toBe(1)
+    expect(ev[0]!.date >= new Date(Date.now() - 24*3600_000).toISOString().slice(0,10)).toBe(true)
+    expect(ev[0]!.date.slice(5)).toBe('04-01')
+    const raw = JSON.parse(store._kv.get('family:events'))
+    expect(raw[0].date).toBe('1960-04-01')
+  })
+})
