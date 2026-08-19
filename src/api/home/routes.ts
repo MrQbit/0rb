@@ -19,7 +19,7 @@ async function readJson(req: Request): Promise<any> {
 }
 
 /** Pick the HA service for a tap/toggle-style action on an entity domain. */
-function serviceFor(domain: string, action: string, value?: number): { service: string; data: Record<string, any> } | null {
+export function serviceFor(domain: string, action: string, value?: number): { service: string; data: Record<string, any> } | null {
   switch (domain) {
     case 'light':
       if (action === 'toggle') return { service: 'toggle', data: {} }

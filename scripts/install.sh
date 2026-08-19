@@ -89,6 +89,7 @@ dk build -t $REG/orb2-api:dev -f Dockerfile.api.dev . && dk push $REG/orb2-api:d
 dk build -t $REG/orb2-ui:dev  -f web/Dockerfile web/    && dk push $REG/orb2-ui:dev
 dk build -t $REG/orb2-whatsapp:dev services/whatsapp/   && dk push $REG/orb2-whatsapp:dev
 dk build -t $REG/orb2-bridge:dev services/bridge/       && dk push $REG/orb2-bridge:dev
+dk build -t $REG/orb2-matter:dev services/matter/       && dk push $REG/orb2-matter:dev
 
 # ── 5. GPU service images (need the personaplex:cuda base) ────────────────
 # Pre-rebrand boxes already have these built as rak00n-* — retag, don't rebuild.

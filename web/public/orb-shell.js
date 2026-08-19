@@ -1978,6 +1978,29 @@
       });
     }catch{ devs.innerHTML='<div class="set-muted">Could not load devices.</div>'; }
     loadBridgeDevices();
+    loadMatterCard();
+  }
+  // ── Apple Home & Siri: the Matter bridge pairing card ──
+  async function loadMatterCard(){
+    const card=$('#matterCard'); if(!card) return;
+    let d=null;
+    try{ d=await (await fetch('/v1/matter/pairing',{credentials:'same-origin'})).json(); }catch{}
+    if(!d||!d.enabled){ card.style.display='none'; return; }
+    card.style.display='';
+    const dot=$('#mtDot'), st=$('#mtState'), code=$('#mtCode');
+    if(d.commissioned){
+      dot.className='pill-dot ok';
+      st.textContent='Paired — Siri controls orb on every Apple device'+(d.devices?` · ${d.devices} bridged`:'');
+      code.style.display='none';
+    } else if(d.manualCode){
+      dot.className='pill-dot';
+      st.textContent='Ready to pair';
+      const pretty=String(d.manualCode).replace(/(\d{4})(\d{3})(\d{4})/,'$1-$2-$3');
+      code.style.display='block';
+      code.innerHTML=`Setup code:<div class="dev-code-big">${esc(pretty)}</div>`;
+    } else {
+      dot.className='pill-dot err'; st.textContent=d.error||'Bridge starting…'; code.style.display='none';
+    }
   }
   // Devices the LAN bridge reaches directly (AirPlay + IPP) — independent of HA.
   async function loadBridgeDevices(){

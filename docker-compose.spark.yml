@@ -502,6 +502,24 @@ services:
       ORB2_UI_HTTPS_PORT: "${ORB2_UI_HTTPS_PORT:-9443}"
     restart: unless-stopped
 
+  # ── Matter bridge ─────────────────────────────────────────────────
+  # Exposes orb's world into Apple Home / any Matter controller (Siri
+  # controls it on every Apple device). Host networking — commissioning
+  # is mDNS + UDP. Pairing survives restarts via the volume.
+  matter:
+    build:
+      context: ./services/matter
+    image: localhost:5001/orb2-matter:dev
+    container_name: orb2-matter
+    network_mode: host
+    environment:
+      ORB2_API_URL: "http://127.0.0.1:${ORB2_UI_PORT:-9080}"
+      ORB2_MATTER_TOKEN: "${ORB2_MATTER_TOKEN:-}"
+      ORB2_MATTER_HTTP_PORT: "8998"
+    volumes:
+      - orb2-matter:/data
+    restart: unless-stopped
+
   ui:
     image: localhost:5001/orb2-ui:dev
     container_name: orb2-ui
@@ -534,6 +552,7 @@ services:
 
 volumes:
   redis-data:
+  orb2-matter:
   orb2-files:
   orb2-workspace:
   watchdog-logs:

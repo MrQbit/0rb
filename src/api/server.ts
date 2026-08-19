@@ -1260,6 +1260,14 @@ async function dispatch(
     if (authResp) return authResp
   }
 
+  // Matter sidecar callbacks (token-gated, no session) — the pairing proxy
+  // stays behind the identity gate with everything else console-facing.
+  if (pathname.startsWith('/v1/matter/') && pathname !== '/v1/matter/pairing') {
+    const { tryHandleMatterRoute } = await import('./matter/routes.js')
+    const r = await tryHandleMatterRoute(method, pathname, req, ctx.store)
+    if (r) return r
+  }
+
   // From here on: identity required.
   if (!identity) {
     return jsonResponse(401, {
@@ -1629,6 +1637,12 @@ async function dispatch(
     if (mode !== 'lan' && mode !== 'direct') return jsonResponse(400, { error: "mode must be 'lan' or 'direct'" })
     const { setRemoteMode } = await import('./devicecert/remote.js')
     return jsonResponse(200, await setRemoteMode(ctx.store, mode))
+  }
+  // ─── Matter pairing state (Settings → Smart home → Apple Home card) ───
+  if (method === 'GET' && pathname === '/v1/matter/pairing') {
+    const { tryHandleMatterRoute } = await import('./matter/routes.js')
+    const r = await tryHandleMatterRoute(method, pathname, req, ctx.store)
+    if (r) return r
   }
   // ─── LAN bridge (Settings → Smart home: devices seen directly, no HA) ───
   if (method === 'GET' && pathname === '/v1/bridge/devices') {
