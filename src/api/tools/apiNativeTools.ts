@@ -494,7 +494,7 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
       description: "The user's shopping list + buying flow (Amazon and grocery/other). op:'show' displays the shopping widget; op:'add' {items:[{name,qty?,note?}]} adds to the list; op:'remove' {query} removes by name; op:'options' {query} researches buy options with prices (web search + merchant links) and shows them in the widget — use this when the user hasn't named an exact product; op:'checkout' {query?} produces checkout links — Amazon items check out in the user's own Amazon account, other merchants via their site with the Wallet for payment choice. NEVER claim an order was placed — Orb hands off to the merchant, the user completes payment there.",
       input_schema: { type: 'object', properties: {
         op: { type: 'string', enum: ['show', 'add', 'remove', 'options', 'checkout'] },
-        items: { type: 'array', description: "op:'add': [{name, qty?, note?}] or plain strings.", items: { type: ['object', 'string'] } },
+        items: { type: 'array', description: "op:'add': [{name, qty?, note?, every_days?}] or plain strings. every_days makes it a STAPLE that re-adds itself that many days after being checked off (auto grocery reorder — 'we buy milk weekly' → every_days:7).", items: { type: ['object', 'string'] } },
         query: { type: 'string', description: 'Item name for remove/options/checkout.' },
       }, required: ['op'] },
       available: true,
@@ -1520,7 +1520,7 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
         for (const r of raw.slice(0, 20)) {
           const name = typeof r === 'string' ? r : String(r?.name || '')
           if (!name.trim()) continue
-          items.push(newShoppingItem(name, typeof r === 'object' ? Number(r?.qty) || undefined : undefined, typeof r === 'object' && r?.note ? String(r.note) : undefined))
+          items.push(newShoppingItem(name, typeof r === 'object' ? Number(r?.qty) || undefined : undefined, typeof r === 'object' && r?.note ? String(r.note) : undefined, typeof r === 'object' ? Number(r?.every_days) || undefined : undefined))
           added.push(name.trim())
         }
         await saveShoppingList(ctx.store, items)

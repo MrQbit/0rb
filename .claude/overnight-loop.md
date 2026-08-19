@@ -1,18 +1,26 @@
 # Overnight loop state (2026-08-19 night)
 
-Directive: alternate two loops until 3 consecutive clean checks EACH.
-Commit locally, DO NOT push. One change at a time, tested.
+Directive: alternate loops until 3 consecutive clean checks EACH.
+Commit locally, DO NOT push. One change at a time, tested, deployed.
 
 ## Loop A — feature research (house-AI gaps → build with widgets)
 Clean checks: 0/3
 Done:
-Ideas queue (research + candidates): smart scheduling/routines suggestions,
-auto grocery reorder (Shopping → recurring), energy insights, arrival/leave
-routines, medication reminders, plant care, laundry cycle tracking, guest
-mode, vacation/away mode, pet feeding, package tracking, meal planning,
-white-noise/sleep sounds, morning briefing.
+- A1 morning briefing (buildBriefing + Today widget + ORB2_BRIEFING_TIME) e20deef
+Ideas queue: auto grocery reorder (recurring shopping items), smart
+scheduling suggestions (learn routines → propose automations), energy
+insights, arrival/leave routines (welcome-home scene, away mode),
+medication reminders, package tracking, meal planning, sleep sounds,
+guest mode, vacation mode, plant care, pet feeding, laundry timer flow.
 
 ## Loop B — UI scrutiny (details: every widget/button/icon/motion)
 Clean checks: 0/3
 Done:
-Notes: audit findings from earlier rounds all fixed; now hunt NEW details.
+- B1 SVG close buttons + resize grip cue b400e78
+Hunt list: toasts styling/stacking, widget spawn overlap edge cases, pill
+telemetry truthfulness, focus rings everywhere interactive, scrollbar
+styling consistency across widgets, orb mic/camera button states, login
+page polish, empty states for docker/model widgets, calendar widget nav,
+media widget artwork fallback aesthetics, keyboard nav for panel tabs,
+reduced-motion audit, contrast audit (ink-dim on glass), settings brain
+card layout, publish flow UX.

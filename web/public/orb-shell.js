@@ -782,6 +782,7 @@
       cb.onclick=async()=>{ try{ const r=await fetch('/v1/shopping/toggle',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({id:it.id})});
         if(r.ok){ it.done=!it.done; row.classList.toggle('done',it.done); cb.textContent=it.done?'✓':''; } else toast('Failed'); }catch{ toast('Failed'); } };
       const nm=document.createElement('span'); nm.className='nm'; nm.textContent=(it.qty&&it.qty>1?it.qty+'× ':'')+it.name; nm.title=it.note||it.name;
+      if(it.recur_days){ const rc=document.createElement('span'); rc.className='rec'; rc.textContent='↻'+it.recur_days+'d'; rc.title='Staple — re-adds itself '+it.recur_days+' days after checkoff'; nm.appendChild(rc); }
       const buy=document.createElement('a'); buy.className='buy'; buy.textContent='buy ↗'; buy.target='_blank'; buy.rel='noopener';
       buy.href='https://www.amazon.com/s?k='+encodeURIComponent(it.name);
       const rm=document.createElement('button'); rm.className='rm'; rm.textContent='✕'; rm.setAttribute('aria-label','remove');
@@ -2165,7 +2166,17 @@
   //  status + boot
   // ════════════════════════════════════════════════════════════════════════
   let toastT=null;
-  function toast(t){ const el=$('#toast'); el.textContent=t; el.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>el.classList.remove('show'),3200); }
+  // Stacking toasts: rapid actions each get their own chip (max 3 visible,
+  // oldest yields), so no message is ever silently overwritten.
+  function toast(t){
+    const host=$('#toast'); if(!host) return;
+    host.classList.add('stack');
+    while(host.children.length>=3) host.firstChild.remove();
+    const chip=document.createElement('div'); chip.className='toast-chip'; chip.textContent=t;
+    host.appendChild(chip);
+    requestAnimationFrame(()=>chip.classList.add('show'));
+    setTimeout(()=>{ chip.classList.remove('show'); setTimeout(()=>chip.remove(),380); },3200);
+  }
   async function checkVoice(){
     try {
       const d = await (await fetch('/v1/voice/status')).json();

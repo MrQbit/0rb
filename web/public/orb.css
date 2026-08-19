@@ -341,12 +341,19 @@ body {
 
 /* toast */
 #toast {
-  position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(20px);
-  z-index: 40; background: var(--glass); backdrop-filter: blur(14px);
-  border:1px solid var(--glass-edge); color: var(--ink); padding: 11px 18px; border-radius: 999px;
-  font-size: 13px; opacity:0; pointer-events:none; transition: all .35s var(--spring); max-width: 90vw;
+  position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+  z-index: 40; pointer-events: none; display: flex; flex-direction: column;
+  align-items: center; gap: 8px; max-width: 90vw;
 }
-#toast.show { opacity:1; transform: translateX(-50%) translateY(0); }
+.toast-chip {
+  background: var(--glass); backdrop-filter: blur(14px);
+  border: 1px solid var(--glass-edge); color: var(--ink); padding: 11px 18px;
+  border-radius: 999px; font-size: 13px; max-width: 90vw;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  opacity: 0; transform: translateY(14px); transition: all .35s var(--spring);
+}
+.toast-chip.show { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { .toast-chip { transition: opacity .2s; transform: none; } }
 
 /* ── dock: live-audio + camera (one pill) ────────────────────────────────── */
 .dock {
@@ -636,6 +643,7 @@ body {
 .wg-shop-it .cb { flex:none; width:20px; height:20px; border-radius:6px; border:1px solid var(--glass-edge);
   background:rgba(0,0,0,.25); color:var(--nv-bright); font-size:12px; line-height:1; cursor:pointer; }
 .wg-shop-it .nm { flex:1; min-width:0; font-size:12.5px; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wg-shop-it .rec { margin-left:6px; font-size:9.5px; color:var(--nv-bright); font-family:var(--mono); opacity:.85; }
 .wg-shop-it .buy { flex:none; font-size:11px; color:var(--nv-bright); text-decoration:none; }
 .wg-shop-it .buy:hover { text-decoration:underline; }
 .wg-shop-it .rm { flex:none; background:none; border:0; color:var(--ink-dim); cursor:pointer; font-size:12px; }

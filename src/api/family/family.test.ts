@@ -192,3 +192,21 @@ describe('chores', () => {
     expect(chores.find(c => c.title === 'Water plants')?.done).toBeUndefined()
   })
 })
+
+describe('recurring shopping staples (loop A2)', () => {
+  test('sweepRecurring revives staples after their cycle, leaves the rest', async () => {
+    const { sweepRecurring } = await import('../shopping/routes.ts')
+    const now = Date.now()
+    const items: any[] = [
+      { id: '1', name: 'milk', done: true, added: 0, recur_days: 7, done_at: now - 8 * 86_400_000 },
+      { id: '2', name: 'eggs', done: true, added: 0, recur_days: 7, done_at: now - 2 * 86_400_000 },
+      { id: '3', name: 'oneoff', done: true, added: 0, done_at: now - 30 * 86_400_000 },
+      { id: '4', name: 'open', done: false, added: 0, recur_days: 7 },
+    ]
+    const revived = sweepRecurring(items, now)
+    expect(revived.map(r => r.name)).toEqual(['milk'])
+    expect(items.find(i => i.name === 'milk')!.done).toBe(false)
+    expect(items.find(i => i.name === 'eggs')!.done).toBe(true)
+    expect(items.find(i => i.name === 'oneoff')!.done).toBe(true)
+  })
+})
