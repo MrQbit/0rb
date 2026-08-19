@@ -25,7 +25,7 @@ medication reminders, package tracking, meal planning, sleep sounds,
 guest mode, vacation mode, plant care, pet feeding, laundry timer flow.
 
 ## Loop B — UI scrutiny (details: every widget/button/icon/motion)
-Clean checks: 2/3 (pass-9 clean: full index.html read + CSS degradation review)
+Clean checks: 3/3 — LOOP B COMPLETE (pass-10 clean)
 Done:
 - B1 SVG close buttons + resize grip cue b400e78
 - B2 stacking toasts (no more lost messages) dfd9775
@@ -54,3 +54,40 @@ card layout, publish flow UX.
 Owner queued: site overhaul (pushed to MrQbit/orb — allowed: site ships via
 push) + connectors smart-paste QoL (committed locally 36761f7 + whitelist
 fix). Loop resumes on next wakeup at clean-check verification pass 2.
+
+
+# ═══ FINAL SUMMARY (loop stopped ~03:30) ═══
+
+Both loops complete: 3 consecutive clean checks each. All work committed
+LOCALLY on 0rb main (NOT pushed, per instruction) — ready for morning
+review. Tests: 104 pass / 0 fail. Stack: 13 services healthy.
+
+## Features shipped tonight (Loop A)
+A1  Morning briefing (Today widget + ORB2_BRIEFING_TIME daily delivery)
+A2  Shopping staples auto-reorder (every_days revive + nudge + ↻ badge)
+A3  House modes home/away/vacation/guest (+ secure lock-up macro)
+A4  Care routines (recurring HH:MM reminders, weekday filters, per-member)
+A5  Automation suggestions from real usage patterns (confirm-first)
+A6  Arrival routines (auto-disarm + per-member arrival scenes)
+A8  Instant safety alerts (smoke/CO/gas/leak — every mode)
+A9  Device-health watch (low batteries, unreachable devices)
+A10 House-mode widget (posture chips + /v1/home/mode)
+A11 Announce room/speaker targeting
+A12 Yearly events (birthdays) + calendar storage-integrity fix
+ +  Smart-paste connector setup (owner-directed, same night)
+
+## UI details fixed tonight (Loop B)
+B1  SVG close buttons + resize grip · B2 stacking toasts
+B3  focus rings + scrollbars · B4 media-remote SVGs
+B5  calendar month nav · B6 docker/model empty states
+B7  console-wide reduced motion · B8 login auto-verify
+B9  tooltips + slider a11y · B10 role badges in users panel
+B11 timer cancel buttons + endpoint · B12 settings-panel focus rings
+B13 shopping remove SVG · B14 truthful pill telemetry
+B15 chat-panel branding + chevron
+
+## Flagged for morning (needs a live browser / hardware / accounts)
+- Interaction feel: widget drag-overlap, dock hover, orb mic/camera states
+- A real product video for the site's demo slot
+- Energy insights (needs metering hardware); package tracking (needs Gmail OAuth)
+- Bambu X2D pairing when it arrives ("set up the bambu printer")
