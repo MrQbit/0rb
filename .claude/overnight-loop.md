@@ -4,7 +4,7 @@ Directive: alternate loops until 3 consecutive clean checks EACH.
 Commit locally, DO NOT push. One change at a time, tested, deployed.
 
 ## Loop A — feature research (house-AI gaps → build with widgets)
-Clean checks: 2/3 (pass-6 also clean)
+Clean checks: 3/3 — LOOP A COMPLETE (pass-7 clean)
 Done:
 - A1 morning briefing (buildBriefing + Today widget + ORB2_BRIEFING_TIME) e20deef
 - A2 staple auto-reorder (every_days recurrence + revive sweep + nudge + ↻ badge) dfd9775
@@ -25,7 +25,7 @@ medication reminders, package tracking, meal planning, sleep sounds,
 guest mode, vacation mode, plant care, pet feeding, laundry timer flow.
 
 ## Loop B — UI scrutiny (details: every widget/button/icon/motion)
-Clean checks: 0/3 (pass-6 found: B14 live pill telemetry)
+Clean checks: 0/3 (pass-7 found: B15 panel brand + chevron)
 Done:
 - B1 SVG close buttons + resize grip cue b400e78
 - B2 stacking toasts (no more lost messages) dfd9775
@@ -41,6 +41,7 @@ Done:
 - B12 settings-panel-wide focus rings
 - B13 shopping remove button → SVG (last text-glyph button)
 - B14 truthful pill telemetry (live timer counts, climate/media/printer/mode lines)
+- B15 chat panel '0rb' branding + collapse chevron SVG
 Hunt list: toasts styling/stacking, widget spawn overlap edge cases, pill
 telemetry truthfulness, focus rings everywhere interactive, scrollbar
 styling consistency across widgets, orb mic/camera button states, login
