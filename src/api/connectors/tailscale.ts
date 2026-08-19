@@ -37,6 +37,7 @@ export interface TsStatus {
   available: boolean   // CLI + socket reachable at all
   running: boolean     // tailscaled BackendState === Running
   serving: boolean     // `tailscale serve` is proxying the UI
+  funnel?: boolean     // Funnel: the URL is reachable from the open internet
   hostname?: string
   url?: string         // https://<magicdns> when up
   tailnet?: string
@@ -51,15 +52,36 @@ export async function tailscaleStatus(): Promise<TsStatus> {
   const dns = String(j?.Self?.DNSName || '').replace(/\.$/, '')
   const s = await run(['serve', 'status'], 8000)
   const serving = s.ok && /proxy\s+http/i.test(s.out)
+  // "(Funnel on)" vs "(tailnet only)" in serve status output.
+  const funnel = s.ok && /funnel on/i.test(s.out)
   return {
     available: true,
     running: j?.BackendState === 'Running',
     serving,
+    funnel,
     hostname: j?.Self?.HostName,
     url: dns ? `https://${dns}` : undefined,
     tailnet: j?.CurrentTailnet?.Name,
     account: j?.User?.[String(j?.Self?.UserID)]?.LoginName,
   }
+}
+
+/**
+ * Toggle Funnel: on = the tailscale URL becomes reachable from the open
+ * internet (still behind Orb's OTP auth); off = back to tailnet-only.
+ * The tailnet policy must allow Funnel — if not, tailscale prints an
+ * approval URL, which we surface for the owner to click.
+ */
+export async function tailscaleFunnel(on: boolean): Promise<{ ok: boolean; message: string }> {
+  const r = on
+    ? await run(['funnel', '--bg', '--https=443', serveTarget()], 30000)
+    : await run(['funnel', '--https=443', 'off'], 30000)
+  const out = `${r.out}\n${r.err}`.trim()
+  if (!r.ok) {
+    const approval = out.match(/https:\/\/login\.tailscale\.com\S*/)?.[0]
+    return { ok: false, message: approval ? `Funnel needs one-time approval for this tailnet: ${approval}` : (out || 'funnel failed') }
+  }
+  return { ok: true, message: on ? 'Public access is ON — the URL now works from anywhere, sign-in still required.' : 'Public access is OFF — tailnet-only again.' }
 }
 
 export async function tailscaleUp(authKey: string, hostname?: string): Promise<{ ok: boolean; message: string; status?: TsStatus }> {

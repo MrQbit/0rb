@@ -37,5 +37,11 @@ export async function tryTailscaleRoute(req: Request, method: string, pathname: 
     const r = await tailscaleDown()
     return json(r.ok ? 200 : 400, r)
   }
+  if (method === 'POST' && pathname === '/v1/tailscale/funnel') {
+    const b = (await req.json().catch(() => ({}))) as any
+    const { tailscaleFunnel } = await import('./tailscale.js')
+    const r = await tailscaleFunnel(b.on === true)
+    return json(r.ok ? 200 : 400, r)
+  }
   return null
 }

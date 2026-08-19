@@ -247,6 +247,12 @@
               <button id="tsUpBtn" class="set-btn">Connect</button>
             </div>
             <p id="tsHelp" class="set-muted small" style="display:none;margin-top:6px;">Generate a key at <a href="https://login.tailscale.com/admin/settings/keys" target="_blank" rel="noopener">login.tailscale.com</a> → <em>Generate auth key</em>. The orb joins your tailnet and serves itself over HTTPS.</p>
+            <div class="set-row" id="fnRow" style="display:none;margin-top:10px;">
+              <div class="info-label" style="color:var(--ink);">Public access</div>
+              <span id="fnState" class="set-muted small"></span>
+              <button id="fnToggle" class="set-btn ghost">Turn on</button>
+            </div>
+            <p id="fnHelp" class="set-muted small" style="display:none;">Off = only devices on your tailnet can reach the URL. On = it works from anywhere on the internet (Tailscale Funnel) — sign-in is still required, but the door is public. The phone apps need this ON to work away from home without the Tailscale app.</p>
             <button id="tsDownBtn" class="set-btn ghost" style="display:none;margin-top:8px;">Disconnect</button>
             <div id="tsMsg" class="set-muted small" style="margin-top:6px;"></div>
           </div>

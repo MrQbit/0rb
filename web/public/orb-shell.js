@@ -2018,6 +2018,24 @@
       state.className='set-muted small ok-text';
       if(s.url){ a.textContent=s.url; a.href=s.url; urlRow.style.display=''; } else urlRow.style.display='none';
       conn.style.display='none'; help.style.display='none'; down.style.display='';
+      // Public access (Funnel) toggle — the away-from-home switch.
+      const fr=$('#fnRow'), fs=$('#fnState'), ft=$('#fnToggle'), fh=$('#fnHelp');
+      if(fr&&s.serving){
+        fr.style.display=''; if(fh) fh.style.display='';
+        const on=!!s.funnel;
+        fs.textContent=on?'ON — reachable from anywhere (sign-in required)':'off — tailnet only';
+        fs.className='set-muted small'+(on?' ok-text':'');
+        ft.textContent=on?'Turn off':'Turn on';
+        ft.onclick=async()=>{
+          if(!on && !confirm('Make this orb reachable from the public internet? Sign-in stays required, but the URL becomes public.')) return;
+          ft.disabled=true;
+          try{ const r=await fetch('/v1/tailscale/funnel',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({on:!on})});
+            const j=await r.json().catch(()=>({}));
+            toast(j.message||(r.ok?'Done':'Failed')); if(r.ok) setTimeout(loadTailscale,1200);
+          }catch{ toast('Failed'); }
+          ft.disabled=false;
+        };
+      }
     } else {
       state.textContent = (s && s.available===false) ? 'Not available on this host' : 'Not connected';
       state.className='set-muted small';
