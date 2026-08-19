@@ -61,6 +61,7 @@ export const WIDGET_CATALOG: WidgetDef[] = [
   { id: 'scenes', name: 'Scenes', desc: 'One-tap scenes.', category: 'Home', setup: 'none', icon: '✨', envKeys: ['ORB2_HA_TOKEN'] },
   { id: 'sensors', name: 'Readings', desc: 'Temperature, humidity, battery, energy.', category: 'Home', setup: 'none', icon: '📊', envKeys: ['ORB2_HA_TOKEN'] },
   { id: 'camera', name: 'Cameras', desc: 'Camera snapshots.', category: 'Home', setup: 'none', icon: '📷', envKeys: ['ORB2_HA_TOKEN'] },
+  { id: 'briefing', name: 'Today', desc: 'Morning briefing — weather, events, chores, security, presence.', category: 'Productivity', setup: 'none', icon: '☀️' },
   { id: 'familyboard', name: 'Family board', desc: 'Notes between members, delivered when they chat or arrive home.', category: 'Productivity', setup: 'none', icon: '👨‍👩‍👧' },
   { id: 'timers', name: 'Timers', desc: 'Kitchen timers, alarms, reminders — with countdowns.', category: 'Productivity', setup: 'none', icon: '⏱️' },
   { id: 'presence', name: "Who's home", desc: 'Family presence at a glance.', category: 'Home', setup: 'none', icon: '🧑‍🤝‍🧑', envKeys: ['ORB2_HA_TOKEN'] },

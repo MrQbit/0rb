@@ -159,6 +159,7 @@ async function tick(): Promise<void> {
   // Discovery queue changes rarely — check every 5th poll (~5 min default).
   if (discoveryTicks++ % 5 === 0) await checkDiscoveries().catch(() => { /* best effort */ })
   await checkArrivals().catch(() => { /* best effort */ })
+  if (pushStore) { import('./briefing.js').then(m => m.maybeSendBriefing(pushStore!, notifyOwner)).catch(() => { /* optional */ }) }
   let entities: HaEntity[]
   try {
     entities = await haStates(['lock', 'binary_sensor', 'cover'])

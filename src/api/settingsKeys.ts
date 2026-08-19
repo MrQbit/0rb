@@ -10,6 +10,8 @@ export const SETTINGS_KEYS = [
   'ORB2_HA_URL', 'ORB2_HA_TOKEN',
   // Home location — used for the concierge's "nearby stores" search
   'ORB2_HOME_LOCATION',
+  // Daily morning briefing (HH:MM, empty = off)
+  'ORB2_BRIEFING_TIME',
   // Push (FCM) — proactive nudges to the 0rb apps
   'ORB2_FCM_PROJECT_ID', 'ORB2_FCM_SERVICE_ACCOUNT',
   // Access — who may sign in, and how OTP codes are emailed

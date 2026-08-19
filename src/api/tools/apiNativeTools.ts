@@ -461,9 +461,9 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
     },
     {
       name: 'Family',
-      description: "The household: notes between members, a shared family calendar, reminders for each other, and announcements over the speakers. op:'note' {to, text, when:'next'|'home'} leaves a note delivered on their next chat ('next') or when they arrive home ('home'). op:'board' shows the family board widget. op:'remind' {to, label, minutes|at} sets a reminder that notifies THAT member on their channel. op:'calendar_add' {title, date:'YYYY-MM-DD', time?, who?} and op:'calendar' (show) manage the shared household calendar (no external account). op:'calendar_remove' {query}. op:'announce' {message} speaks a message on the home's speakers ('dinner is ready!'). op:'members' lists the household. op:'pref' {key, value} saves a personal preference for the CURRENT user (nickname, style, tastes — honoured in their future chats; empty value deletes); op:'prefs' lists theirs. Chores: op:'chore_add' {title, to, day?(0-6 weekly)}, op:'chore_done' {query}, op:'chores' shows the rota. Resolve people by first name.",
+      description: "The household: notes between members, a shared family calendar, reminders for each other, and announcements over the speakers. op:'note' {to, text, when:'next'|'home'} leaves a note delivered on their next chat ('next') or when they arrive home ('home'). op:'board' shows the family board widget. op:'remind' {to, label, minutes|at} sets a reminder that notifies THAT member on their channel. op:'calendar_add' {title, date:'YYYY-MM-DD', time?, who?} and op:'calendar' (show) manage the shared household calendar (no external account). op:'calendar_remove' {query}. op:'announce' {message} speaks a message on the home's speakers ('dinner is ready!'). op:'members' lists the household. op:'pref' {key, value} saves a personal preference for the CURRENT user (nickname, style, tastes — honoured in their future chats; empty value deletes); op:'prefs' lists theirs. Chores: op:'chore_add' {title, to, day?(0-6 weekly)}, op:'chore_done' {query}, op:'chores' shows the rota. op:'briefing' shows the day-at-a-glance widget (weather, today's events, chores, security, who's home) — use for 'good morning', 'what's my day', 'morning briefing'. Resolve people by first name.",
       input_schema: { type: 'object', properties: {
-        op: { type: 'string', enum: ['note', 'board', 'remind', 'calendar_add', 'calendar', 'calendar_remove', 'announce', 'members', 'pref', 'prefs', 'chore_add', 'chore_done', 'chores'] },
+        op: { type: 'string', enum: ['note', 'board', 'remind', 'calendar_add', 'calendar', 'calendar_remove', 'announce', 'members', 'pref', 'prefs', 'chore_add', 'chore_done', 'chores', 'briefing'] },
         to: { type: 'string', description: 'Member (name or email) for note/remind.' },
         text: { type: 'string', description: 'Note text.' },
         when: { type: 'string', enum: ['next', 'home'], description: "note delivery: next chat (default) or arrives-home." },
@@ -1361,6 +1361,12 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
       if (op === 'members') {
         const users = await getUsers(ctx.store)
         return 'Household: ' + users.map((u, i) => `${u.label || u.email.split('@')[0]} <${u.email}> (${u.role ?? (i === 0 ? 'owner' : 'member')}${u.telegram_chat_id ? ', telegram' : ''})`).join(' · ')
+      }
+      if (op === 'briefing') {
+        const { buildBriefing, briefingText, briefingWidgetSpec } = await import('../home/briefing.js')
+        const b = await buildBriefing(ctx.store)
+        emitWidget(ctx.sessionId, briefingWidgetSpec(b) as any)
+        return briefingText(b) + ' (Shown in the Today widget. Owners can schedule this daily via the ORB2_BRIEFING_TIME setting, e.g. 07:30.)'
       }
       if (op === 'pref') {
         const key = String(args?.title || args?.label || args?.query || args?.key || '').trim() || 'note'

@@ -408,6 +408,7 @@
     else if(spec.type==='automations'){ wg.style.width='420px'; wg.style.height='400px'; }
     else if(spec.type==='printer3d'){ wg.style.width='480px'; wg.style.height='560px'; }
     else if(spec.type==='familyboard'){ wg.style.width='420px'; wg.style.height='440px'; }
+    else if(spec.type==='briefing'){ wg.style.width='420px'; wg.style.height='460px'; }
     else if(spec.type==='document'){ wg.style.width='560px'; wg.style.height='520px'; }
     else if(spec.type==='wallet'){ wg.style.width='380px'; wg.style.height='400px'; }
     else if(spec.type==='lights'){ wg.style.width='400px'; wg.style.height='440px'; }
@@ -523,7 +524,7 @@
     }
   }, 15000);
 
-  function titleFor(s){ return ({chart:'Chart',results:'Results',video:'Video',music:'Music',table:'Table',stats:'Stats',gallery:'Gallery',image:'Image',embed:'Embed',model:'3D model',calculator:'Calculator',weather:'Weather',calendar:'Calendar',code:'Code',mail:'Mail',vercel:'Vercel',map:'Map',docker:'Docker',app:'App',html:'HTML',note:'Note',vacuum:'Vacuum',covers:'Shades',security:'Security',plugs:'Plugs',scenes:'Scenes',sensors:'Readings',camera:'Camera',timers:'Timers',presence:"Who's home",automations:'Automations',printer3d:'Printer',familyboard:'Family board',document:'Document',wallet:'Wallet',lights:'Lights',media:'Media',climate:'Climate',todo:'Tasks',home:'Home'})[s.type]||(s.type?String(s.type):'Note'); }
+  function titleFor(s){ return ({chart:'Chart',results:'Results',video:'Video',music:'Music',table:'Table',stats:'Stats',gallery:'Gallery',image:'Image',embed:'Embed',model:'3D model',calculator:'Calculator',weather:'Weather',calendar:'Calendar',code:'Code',mail:'Mail',vercel:'Vercel',map:'Map',docker:'Docker',app:'App',html:'HTML',note:'Note',vacuum:'Vacuum',covers:'Shades',security:'Security',plugs:'Plugs',scenes:'Scenes',sensors:'Readings',camera:'Camera',timers:'Timers',presence:"Who's home",automations:'Automations',printer3d:'Printer',familyboard:'Family board',briefing:'Today',document:'Document',wallet:'Wallet',lights:'Lights',media:'Media',climate:'Climate',todo:'Tasks',home:'Home'})[s.type]||(s.type?String(s.type):'Note'); }
 
   // ── widget placement: free-floating, but flow without >15% overlap; when the
   //    visible band is full, drop below + scroll there (the orb follows). ──
@@ -598,6 +599,7 @@
     else if(spec.type==='automations') renderAutomations(body, spec);
     else if(spec.type==='printer3d') renderPrinter3d(body, spec, wg);
     else if(spec.type==='familyboard') renderFamilyBoard(body, spec);
+    else if(spec.type==='briefing') renderBriefing(body, spec);
     else if(_plugins[spec.type]) renderPlugin(body, spec, _plugins[spec.type]);
     else {
       // Freshly-minted custom widget? (CreateWidget installs plugins at
@@ -925,6 +927,30 @@
     bust(); body.appendChild(img);
     if(wg){ if(wg._camTimer) clearInterval(wg._camTimer);
       wg._camTimer=setInterval(()=>{ if(!document.contains(wg)){ clearInterval(wg._camTimer); return; } if(wg._state==='active') bust(); },10000); }
+  }
+
+  // ── briefing: the day at a glance ──
+  function renderBriefing(body, spec){
+    const b=spec.briefing||{};
+    const wrap=document.createElement('div'); wrap.className='wg-brief'; body.appendChild(wrap);
+    if(b.weather){
+      const w=document.createElement('div'); w.className='bw';
+      w.innerHTML=`<span class="ic">${esc2(weatherIcon(b.weather.condition))}</span><span class="t">${esc2(String(b.weather.temp))}°</span>`+
+        `<span class="cond">${esc2(b.weather.condition)}<br><span class="hl">H ${esc2(String(b.weather.high))}° · L ${esc2(String(b.weather.low))}°</span></span>`;
+      wrap.appendChild(w);
+    }
+    const sec=[...(b.security&&b.security.locksOpen||[]).map(l=>l+' unlocked'),...(b.security&&b.security.sensorsOpen||[]).map(s2=>s2+' open')];
+    if(sec.length){ const a=document.createElement('div'); a.className='wg-sec-row alert'; a.innerHTML=`<span class="ic">${homeIcon('lock')}</span><span class="nm">${esc2(sec.join(' · '))}</span>`; wrap.appendChild(a); }
+    const section=(label,rows)=>{ if(!rows.length)return;
+      const h=document.createElement('div'); h.className='wg-area-h'; h.textContent=label; wrap.appendChild(h);
+      rows.forEach(r=>{ const d=document.createElement('div'); d.className='wg-fam-ev'; d.innerHTML=r; wrap.appendChild(d); }); };
+    section('Today', (b.events||[]).map(e=>`<span class="d mono">${esc2(e.time||'—')}</span><span class="t">${esc2(e.title)}${e.who?` <span class="w">· ${esc2(e.who)}</span>`:''}</span>`));
+    section('Chores', (b.chores||[]).map(c=>`<span class="d mono">☑</span><span class="t">${esc2(c.title)} <span class="w">· ${esc2(c.who)}</span></span>`));
+    section('Timers', (b.timers||[]).map(t=>`<span class="d mono">${esc2(String(t.minutesLeft))}m</span><span class="t">${esc2(t.label)}</span>`));
+    if(b.home&&b.home.length||b.away&&b.away.length){
+      section('Presence', [ `<span class="d mono">🏠</span><span class="t">${esc2((b.home||[]).join(', ')||'nobody home')}${b.away&&b.away.length?` <span class="w">· away: ${esc2(b.away.join(', '))}</span>`:''}</span>` ]);
+    }
+    if(!wrap.children.length) wrap.innerHTML='<div class="wg-empty">Nothing on today’s radar — enjoy it.</div>';
   }
 
   // ── family board: notes between members + upcoming events ──
