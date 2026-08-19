@@ -380,41 +380,41 @@
     else if(spec.type==='model'){ wg.style.width='460px'; wg.style.height='420px'; }
     else if(spec.type==='music'){ wg.style.width='400px'; wg.style.height='240px'; }
     else if(spec.type==='calculator'){ wg.style.width='280px'; wg.style.height='400px'; }
-    else if(spec.type==='weather'){ wg.style.width='360px'; wg.style.height='320px'; }
+    else if(spec.type==='weather'){ wg.style.width='360px'; wg.style.maxHeight='320px'; }
     else if(spec.type==='calendar'){ wg.style.width='420px'; wg.style.height='380px'; }
-    else if(spec.type==='code'){ wg.style.width='560px'; wg.style.height='420px'; }
-    else if(spec.type==='mail'){ wg.style.width='440px'; wg.style.height='400px'; }
-    else if(spec.type==='vercel'){ wg.style.width='420px'; wg.style.height='360px'; }
+    else if(spec.type==='code'){ wg.style.width='560px'; wg.style.maxHeight='420px'; }
+    else if(spec.type==='mail'){ wg.style.width='440px'; wg.style.maxHeight='400px'; }
+    else if(spec.type==='vercel'){ wg.style.width='420px'; wg.style.maxHeight='360px'; }
     else if(spec.type==='map'){ wg.style.width='560px'; wg.style.height='420px'; }
-    else if(spec.type==='docker'){ wg.style.width='460px'; wg.style.height='400px'; }
+    else if(spec.type==='docker'){ wg.style.width='460px'; wg.style.maxHeight='400px'; }
     else if(spec.type==='chart') wg.style.height='340px';   // give charts room (resizable)
-    else if(spec.type==='todo'){ wg.style.width='380px'; wg.style.height='360px'; }
-    else if(spec.type==='home'){ wg.style.width='560px'; wg.style.height='480px'; }
-    else if(spec.type==='document'){ wg.style.width='560px'; wg.style.height='520px'; }
-    else if(spec.type==='wallet'){ wg.style.width='380px'; wg.style.height='420px'; }
+    else if(spec.type==='todo'){ wg.style.width='380px'; wg.style.maxHeight='360px'; }
+    else if(spec.type==='home'){ wg.style.width='560px'; wg.style.maxHeight='480px'; }
+    else if(spec.type==='document'){ wg.style.width='560px'; wg.style.maxHeight='520px'; }
+    else if(spec.type==='wallet'){ wg.style.width='380px'; wg.style.maxHeight='420px'; }
     else if(spec.type==='setup'){ wg.style.width='360px'; }
-    else if(spec.type==='lights'){ wg.style.width='400px'; wg.style.height='460px'; }
-    else if(spec.type==='media'){ wg.style.width='380px'; wg.style.height='320px'; }
+    else if(spec.type==='lights'){ wg.style.width='400px'; wg.style.maxHeight='460px'; }
+    else if(spec.type==='media'){ wg.style.width='380px'; wg.style.maxHeight='320px'; }
     else if(spec.type==='climate'){ wg.style.width='300px'; wg.style.height='300px'; }
-    else if(spec.type==='shopping'){ wg.style.width='420px'; wg.style.height='480px'; }
+    else if(spec.type==='shopping'){ wg.style.width='420px'; wg.style.maxHeight='480px'; }
     else if(spec.type==='vacuum'){ wg.style.width='300px'; wg.style.height='300px'; }
-    else if(spec.type==='covers'){ wg.style.width='400px'; wg.style.height='420px'; }
-    else if(spec.type==='security'){ wg.style.width='400px'; wg.style.height='440px'; }
-    else if(spec.type==='plugs'){ wg.style.width='460px'; wg.style.height='420px'; }
-    else if(spec.type==='scenes'){ wg.style.width='360px'; wg.style.height='300px'; }
-    else if(spec.type==='sensors'){ wg.style.width='420px'; wg.style.height='400px'; }
+    else if(spec.type==='covers'){ wg.style.width='400px'; wg.style.maxHeight='420px'; }
+    else if(spec.type==='security'){ wg.style.width='400px'; wg.style.maxHeight='440px'; }
+    else if(spec.type==='plugs'){ wg.style.width='460px'; wg.style.maxHeight='420px'; }
+    else if(spec.type==='scenes'){ wg.style.width='360px'; wg.style.maxHeight='300px'; }
+    else if(spec.type==='sensors'){ wg.style.width='420px'; wg.style.maxHeight='400px'; }
     else if(spec.type==='camera'){ wg.style.width='480px'; wg.style.height='340px'; }
-    else if(spec.type==='timers'){ wg.style.width='340px'; wg.style.height='340px'; }
-    else if(spec.type==='presence'){ wg.style.width='340px'; wg.style.height='260px'; }
-    else if(spec.type==='automations'){ wg.style.width='420px'; wg.style.height='400px'; }
+    else if(spec.type==='timers'){ wg.style.width='340px'; wg.style.maxHeight='340px'; }
+    else if(spec.type==='presence'){ wg.style.width='340px'; wg.style.maxHeight='260px'; }
+    else if(spec.type==='automations'){ wg.style.width='420px'; wg.style.maxHeight='400px'; }
     else if(spec.type==='printer3d'){ wg.style.width='480px'; wg.style.height='560px'; }
-    else if(spec.type==='familyboard'){ wg.style.width='420px'; wg.style.height='440px'; }
-    else if(spec.type==='briefing'){ wg.style.width='420px'; wg.style.height='460px'; }
-    else if(spec.type==='housemode'){ wg.style.width='340px'; wg.style.height='240px'; }
-    else if(spec.type==='document'){ wg.style.width='560px'; wg.style.height='520px'; }
-    else if(spec.type==='wallet'){ wg.style.width='380px'; wg.style.height='400px'; }
-    else if(spec.type==='lights'){ wg.style.width='400px'; wg.style.height='440px'; }
-    else if(spec.type==='media'){ wg.style.width='360px'; wg.style.height='300px'; }
+    else if(spec.type==='familyboard'){ wg.style.width='420px'; wg.style.maxHeight='440px'; }
+    else if(spec.type==='briefing'){ wg.style.width='420px'; wg.style.maxHeight='460px'; }
+    else if(spec.type==='housemode'){ wg.style.width='340px'; wg.style.maxHeight='240px'; }
+    else if(spec.type==='document'){ wg.style.width='560px'; wg.style.maxHeight='520px'; }
+    else if(spec.type==='wallet'){ wg.style.width='380px'; wg.style.maxHeight='400px'; }
+    else if(spec.type==='lights'){ wg.style.width='400px'; wg.style.maxHeight='440px'; }
+    else if(spec.type==='media'){ wg.style.width='360px'; wg.style.maxHeight='300px'; }
     else if(spec.type==='climate'){ wg.style.width='280px'; wg.style.height='260px'; }
     else if(_plugins[spec.type]){ const p=_plugins[spec.type]; if(p.width)wg.style.width=p.width+'px'; if(p.height)wg.style.height=p.height+'px'; }
     wgCount++;
@@ -459,6 +459,10 @@
   //    Keeps the page light: idle widgets shrink to a named pill with a bit of
   //    live info; hours-stale ones free their heavy resources entirely and
   //    re-render from spec the instant you touch them. Tunable below. ──
+  // Debug/test hook: the widget gallery harness (tests/ui/gallery.mjs)
+  // spawns every widget type with fixture specs through the REAL renderer.
+  try { window.__orbSpawnWidget = spawnWidget; } catch { /* strict contexts */ }
+
   const IDLE_TO_PILL = 120000;          // 2 min idle → collapse to a pill
   const IDLE_TO_STALE = 60*60*1000;     // 1 h idle → fully stop (free memory)
   function markTouched(wg){ wg._lastTouch=Date.now(); if(wg._state==='pill'||wg._state==='stale') expandFromPill(wg); }
@@ -759,7 +763,7 @@
     const art=document.createElement('div'); art.className='art';
     const artUrl=spec.artwork&&safeUrl(spec.artwork);
     if(artUrl){ const im=document.createElement('img'); im.src=artUrl; im.alt=''; im.onerror=()=>im.remove(); art.appendChild(im); }
-    else art.innerHTML=homeIcon('media_player');
+    else art.innerHTML=homeIcon(String(spec.kind||'').toLowerCase()==='tv'?'media_player':'speaker');
     wrap.appendChild(art);
     const meta=document.createElement('div'); meta.className='meta';
     meta.innerHTML=`<div class="now">${esc2(spec.media_title||spec.state||'idle')}</div><div class="src">${esc2([spec.kind,spec.area,spec.app].filter(Boolean).join(' · ')||spec.name||'')}</div>`;
@@ -1024,7 +1028,7 @@
     const wrap=document.createElement('div'); wrap.className='wg-brief'; body.appendChild(wrap);
     if(b.weather){
       const w=document.createElement('div'); w.className='bw';
-      w.innerHTML=`<span class="ic">${esc2(weatherIcon(b.weather.condition))}</span><span class="t">${esc2(String(b.weather.temp))}°</span>`+
+      w.innerHTML=`<span class="ic">${weatherIcon(b.weather.condition)}</span><span class="t">${esc2(String(b.weather.temp))}°</span>`+
         `<span class="cond">${esc2(b.weather.condition)}<br><span class="hl">H ${esc2(String(b.weather.high))}° · L ${esc2(String(b.weather.low))}°</span></span>`;
       wrap.appendChild(w);
     }
@@ -1034,10 +1038,10 @@
       const h=document.createElement('div'); h.className='wg-area-h'; h.textContent=label; wrap.appendChild(h);
       rows.forEach(r=>{ const d=document.createElement('div'); d.className='wg-fam-ev'; d.innerHTML=r; wrap.appendChild(d); }); };
     section('Today', (b.events||[]).map(e=>`<span class="d mono">${esc2(e.time||'—')}</span><span class="t">${esc2(e.title)}${e.who?` <span class="w">· ${esc2(e.who)}</span>`:''}</span>`));
-    section('Chores', (b.chores||[]).map(c=>`<span class="d mono">☑</span><span class="t">${esc2(c.title)} <span class="w">· ${esc2(c.who)}</span></span>`));
+    section('Chores', (b.chores||[]).map(c=>`<span class="d ic-d">${checkIcon}</span><span class="t">${esc2(c.title)} <span class="w">· ${esc2(c.who)}</span></span>`));
     section('Timers', (b.timers||[]).map(t=>`<span class="d mono">${esc2(String(t.minutesLeft))}m</span><span class="t">${esc2(t.label)}</span>`));
     if(b.home&&b.home.length||b.away&&b.away.length){
-      section('Presence', [ `<span class="d mono">🏠</span><span class="t">${esc2((b.home||[]).join(', ')||'nobody home')}${b.away&&b.away.length?` <span class="w">· away: ${esc2(b.away.join(', '))}</span>`:''}</span>` ]);
+      section('Presence', [ `<span class="d ic-d">${houseIcon}</span><span class="t">${esc2((b.home||[]).join(', ')||'nobody home')}${b.away&&b.away.length?` <span class="w">· away: ${esc2(b.away.join(', '))}</span>`:''}</span>` ]);
     }
     if(!wrap.children.length) wrap.innerHTML='<div class="wg-empty">Nothing on today’s radar — enjoy it.</div>';
   }
@@ -1085,7 +1089,7 @@
       img.src=stream||''; if(!stream) useSnap();
       cam.appendChild(img);
       const live=document.createElement('span'); live.className='live'; live.textContent='LIVE'; cam.appendChild(live);
-    } else cam.innerHTML='<div class="wg-empty">No camera.</div>';
+    } else { cam.classList.add('empty'); cam.innerHTML='<div class="wg-empty">No camera yet.</div>'; }
     wrap.appendChild(cam);
     // Job status
     const st=document.createElement('div'); st.className='job';
@@ -1266,6 +1270,7 @@
   // Stroked SVG icons per HA domain — same visual language as the shell's
   // chrome (the emoji set read as off-brand and grayscaled to mud).
   const HOME_ICONS={
+    speaker:'<rect x="6" y="3" width="12" height="18" rx="2.5"/><circle cx="12" cy="14.5" r="3.5"/><circle cx="12" cy="7.5" r="1.2"/>',
     light:'<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.6.5 1 1.5 1 2.5h6c0-1 .4-2 1-2.5A6 6 0 0 0 12 3z"/>',
     switch:'<path d="M12 3v9"/><path d="M6.6 6.6a8 8 0 1 0 10.8 0"/>',
     fan:'<circle cx="12" cy="12" r="2"/><path d="M12 10c0-3 1.5-6 4-6 2 0 3 1.5 3 3 0 2.5-3 3-7 3zM12 14c0 3-1.5 6-4 6-2 0-3-1.5-3-3 0-2.5 3-3 7-3zM10 12c-3 0-6-1.5-6-4 0-2 1.5-3 3-3 2.5 0 3 3 3 7zM14 12c3 0 6 1.5 6 4 0 2-1.5 3-3 3-2.5 0-3-3-3-7z"/>',
@@ -1365,10 +1370,17 @@
       cols.forEach(c=>{ const th=document.createElement('th'); const s=c==null?'':String(c); th.textContent=s; th.title=s; tr.appendChild(th); });
       thead.appendChild(tr); t.appendChild(thead); }
     const tb=document.createElement('tbody');
-    rows.forEach(r=>{ const tr=document.createElement('tr'); (Array.isArray(r)?r:[r]).forEach(c=>{
+    // Numeric detection covers currency/percent/thousands ("$62.10", "1,204", "38%").
+    const isNum=s=>{ const v=s.trim().replace(/^[$€£]|[%,]/g,''); return v!=='' && Number.isFinite(Number(v)); };
+    const numCount=new Array(cols.length||0).fill(0);
+    rows.forEach(r=>{ const tr=document.createElement('tr'); (Array.isArray(r)?r:[r]).forEach((c,i)=>{
       const td=document.createElement('td'); const s=c==null?'':String(c); td.textContent=s; td.title=s;
-      if(s.trim()!=='' && Number.isFinite(Number(s.trim()))) td.classList.add('num');
+      if(isNum(s)){ td.classList.add('num'); if(i<numCount.length) numCount[i]++; }
       tr.appendChild(td); }); tb.appendChild(tr); });
+    // Headers align with their column's data — a right-aligned number under a
+    // left-aligned header reads broken.
+    if(cols.length && rows.length){ const ths=t.querySelectorAll('th');
+      numCount.forEach((n,i)=>{ if(n>=rows.length/2 && ths[i]) ths[i].classList.add('num'); }); }
     t.appendChild(tb); body.appendChild(t);
   }
   function renderStats(body, spec){
@@ -1394,7 +1406,9 @@
   function safeUrl(u){
     const s=String(u||'');
     if(/^https?:\/\//i.test(s)) return s;
-    if(s.startsWith('/v1/workspace/')||s.startsWith('/pub/')) return s;
+    // Same-origin surfaces widgets legitimately load from: workspace files,
+    // published pages, the authed HA image proxy, and bundled assets.
+    if(s.startsWith('/v1/workspace/')||s.startsWith('/pub/')||s.startsWith('/v1/home/ha-image')||s.startsWith('/assets/')) return s;
     return null;
   }
   function safeHost(u, hosts){
@@ -1505,19 +1519,32 @@
     w.innerHTML=`<div class="wg-wx-loc">${esc2(spec.location||'—')}</div>
       <div class="wg-wx-now"><span class="wg-wx-ic">${ic}</span><span class="wg-wx-temp">${cur.temp!=null?esc2(cur.temp)+'<span class="u">'+unit+'</span>':'—'}</span></div>
       <div class="wg-wx-cond">${esc2(cur.condition||'')}</div>
-      <div class="wg-wx-meta">${cur.humidity!=null?'💧 '+esc2(cur.humidity)+'%':''} ${cur.wind!=null?' · 🌬 '+esc2(cur.wind):''}</div>`;
+      <div class="wg-wx-meta">${cur.humidity!=null?'<span class="mi">'+dropIcon+'</span> '+esc2(cur.humidity)+'%':''}${cur.wind!=null?' · <span class="mi">'+windIcon+'</span> '+esc2(cur.wind)+' '+(unit==='°C'?'km/h':'mph'):''}</div>`;
     if(Array.isArray(spec.forecast)&&spec.forecast.length){
       const f=document.createElement('div'); f.className='wg-wx-fc';
       spec.forecast.slice(0,6).forEach(d=>{ const c=document.createElement('div'); c.className='wg-wx-day';
-        c.innerHTML=`<span>${esc2(d.day||'')}</span><span class="i">${weatherIcon(d.condition||'')}</span><span class="t">${d.high!=null?esc2(d.high)+unit:''}${d.low!=null?' <em>'+esc2(d.low)+unit+'</em>':''}</span>`; f.appendChild(c); });
+        c.innerHTML=`<span>${esc2(d.day||'')}</span><span class="i">${weatherIcon(d.condition||'')}</span><span class="t">${d.high!=null?esc2(d.high)+'°':''}${d.low!=null?' <em>'+esc2(d.low)+'°</em>':''}</span>`; f.appendChild(c); });
       w.appendChild(f);
     }
     body.appendChild(w);
   }
+  // Weather icons in the console's own stroke language — one family, one
+  // weight, monochrome (no emoji: they clash and render inconsistently).
   function weatherIcon(c){ c=(c||'').toLowerCase();
-    if(/storm|thunder/.test(c))return'⛈'; if(/snow|sleet|flurr/.test(c))return'❄️';
-    if(/rain|drizzle|shower/.test(c))return'🌧'; if(/fog|mist|haze/.test(c))return'🌫';
-    if(/cloud|overcast/.test(c))return'☁️'; if(/part/.test(c))return'⛅'; if(/clear|sun/.test(c))return'☀️'; return'🌡'; }
+    const s=(p)=>`<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+    const CLOUD='M17.5 18H7a4 4 0 1 1 .6-7.96A5.5 5.5 0 0 1 18 8.7 3.9 3.9 0 0 1 17.5 18z';
+    if(/storm|thunder/.test(c))return s(`<path d="${CLOUD}"/><path d="m12 20 2-3h-3l2-3"/>`);
+    if(/snow|sleet|flurr/.test(c))return s(`<path d="${CLOUD}"/><path d="M9 21v.5M13 21v.5M11 23v.5"/>`);
+    if(/rain|drizzle|shower/.test(c))return s(`<path d="${CLOUD}"/><path d="M9 20v2M13 20v2M16 19v2"/>`);
+    if(/fog|mist|haze/.test(c))return s('<path d="M4 10h16M3 14h18M5 18h14"/>');
+    if(/part/.test(c))return s(`<circle cx="8" cy="8" r="3"/><path d="M8 2v1.5M2 8h1.5M3.8 3.8l1 1"/><path d="M18.5 20H10a3.5 3.5 0 1 1 .5-6.96A4.8 4.8 0 0 1 19.7 12 3.4 3.4 0 0 1 18.5 20z"/>`);
+    if(/cloud|overcast/.test(c))return s(`<path d="${CLOUD}"/>`);
+    if(/clear|sun|hot/.test(c))return s('<circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/>');
+    return s('<path d="M14 14.8V5a2 2 0 1 0-4 0v9.8a4 4 0 1 0 4 0z"/>'); }
+  const dropIcon='<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s6 6.3 6 10.5a6 6 0 0 1-12 0C6 9.3 12 3 12 3z"/></svg>';
+  const windIcon='<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h11a2.5 2.5 0 1 0-2.5-2.5M3 12h15a2.5 2.5 0 1 1-2.5 2.5M3 16h8a2 2 0 1 1-2 2"/></svg>';
+  const houseIcon='<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>';
+  const checkIcon='<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></svg>';
 
   // ── Calendar (month grid + agenda; wire to Google Calendar later) ──
   function renderCalendar(body, spec){
@@ -1703,7 +1730,7 @@
     deps.forEach(d=>{ const st=(d.state||d.readyState||'').toLowerCase();
       const cls=/ready|success/.test(st)?'ok':/build|queu|pending/.test(st)?'warn':/error|fail|cancel/.test(st)?'err':'';
       const r=document.createElement('div'); r.className='wg-vc-row';
-      r.innerHTML=`<span class="dot ${cls}"></span><div class="grow"><div class="nm">${esc2(d.name||d.url||'deploy')}</div><div class="mt">${esc2(d.branch||'')}${d.created?' · '+esc2(relTime(d.created)):''}</div></div><span class="st ${cls}">${esc2(d.state||d.readyState||'')}</span>`;
+      r.innerHTML=`<span class="dot ${cls}"></span><div class="grow"><div class="nm">${esc2(d.name||d.url||'deploy')}</div><div class="mt">${esc2(d.branch||'')}${d.created?' · '+esc2(relTime(d.created)):''}</div></div><span class="st ${cls}">${esc2((st?st.charAt(0).toUpperCase()+st.slice(1):''))}</span>`;
       const du=safeUrl(/^https?:\/\//i.test(d.url||'')?d.url:'https://'+d.url); if(du){ r.style.cursor='pointer'; r.onclick=()=>window.open(du,'_blank','noopener'); }
       list.appendChild(r); });
     if(!deps.length){ list.innerHTML='<div class="wg-empty">No deployments.</div>'; }

@@ -137,7 +137,7 @@ body {
 .wg-dk-row .dot.ok { background:var(--nv-bright); } .wg-dk-row .dot.warn { background:#e0c46a; } .wg-dk-row .dot.err { background:var(--danger); }
 .wg-dk-row .nm { font-size:13px; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .wg-dk-row .mt { font-size:11px; color:var(--ink-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.wg-dk-act { display:flex; gap:5px; flex:none; }
+.wg-dk-act { display:flex; gap:5px; flex:none; margin-left:auto; }
 .wg-dk-btn { border:0; border-radius:7px; background:rgba(255,255,255,.06); color:var(--ink-dim); font-size:11px; padding:4px 9px; cursor:pointer; }
 .wg-dk-btn:hover { background:rgba(255,255,255,.12); color:var(--ink); }
 .wg-dk-btn.danger:hover { background:rgba(255,93,93,.2); color:var(--danger); }
@@ -161,6 +161,7 @@ body {
 .wg-wx-ic { font-size:42px; } .wg-wx-temp { font-size:46px; font-weight:300; color:var(--ink); }
 .wg-wx-temp .u { font-size:20px; color:var(--ink-dim); margin-left:2px; }
 .wg-wx-cond { font-size:14px; color:var(--ink); } .wg-wx-meta { font-size:12px; color:var(--ink-dim); margin-bottom:6px; }
+.wg-wx-meta .mi svg { vertical-align:-2px; }
 .wg-wx-fc { display:flex; gap:6px; border-top:1px solid var(--line); padding-top:10px; margin-top:2px; }
 .wg-wx-day { flex:1; text-align:center; display:flex; flex-direction:column; gap:3px; font-size:11px; color:var(--ink-dim); }
 .wg-wx-day .i { font-size:18px; } .wg-wx-day .t { color:var(--ink); } .wg-wx-day .t em { color:var(--ink-dim); font-style:normal; }
@@ -193,8 +194,10 @@ body {
 .wg-code-trunc { font-size:11px; color:var(--ink-dim); padding:6px 2px 0; }
 /* mail */
 .wg-mail { display:flex; flex-direction:column; gap:2px; }
-.wg-mail-row { padding:9px 10px; border-radius:9px; border-left:2px solid transparent; }
-.wg-mail-row:hover { background:rgba(255,255,255,.03); } .wg-mail-row.unread { border-left-color:var(--nv-bright); }
+.wg-mail-row { padding:9px 10px; border-radius:9px; }
+.wg-mail-row:hover { background:rgba(255,255,255,.03); }
+.wg-mail-row.unread .from::before { content:''; display:inline-block; width:7px; height:7px; border-radius:50%;
+  background:var(--nv-bright); margin-right:7px; vertical-align:1px; }
 .wg-mail-top { display:flex; justify-content:space-between; gap:8px; }
 .wg-mail-top .from { font-size:13px; color:var(--ink); font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .wg-mail-row.unread .from { color:var(--nv-bright); }
@@ -631,7 +634,7 @@ sup.sq { font-size:.58em; color:var(--nv); font-weight:700; margin-left:1px; tra
 .wg-lights { flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:6px; }
 .wg-light { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:11px;
   background:rgba(255,255,255,.03); border:1px solid var(--line); transition:border-color .2s, background .2s; }
-.wg-light.on { background:rgba(118,185,0,.10); border-color:rgba(118,185,0,.4); }
+.wg-light.on { background:rgba(118,185,0,.05); }
 .wg-light .ic { line-height:0; color:var(--ink-dim); flex:none; }
 .wg-light.on .ic { color:var(--nv); }
 .wg-light .nm { flex:1; min-width:0; font-size:12.5px; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -930,3 +933,21 @@ sup.sq { font-size:.58em; color:var(--nv); font-weight:700; margin-left:1px; tra
 .ha-flow-abort { color:var(--ink-dim); font-size:13px; }
 .ha-flow-title { font-size:14px; font-weight:600; color:var(--ink); }
 .ha-flow-help { font-size:11px; color:var(--ink-dim); text-transform:none; letter-spacing:0; }
+
+/* briefing: SVG glyphs in the leading column */
+.wg-fam-ev .ic-d { color:var(--nv); display:inline-flex; align-items:center; }
+.wg-fam-ev .ic-d svg { width:13px; height:13px; }
+
+/* map: the console is dark — so is its map. The classic tile filter keeps
+   labels legible while streets/water go dark; controls match the tokens. */
+.wg-map .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.75) contrast(1.1) saturate(.5); }
+.wg-map .leaflet-control-zoom a { background:rgba(20,26,18,.92) !important; color:var(--ink) !important;
+  border:1px solid var(--line) !important; }
+.wg-map .leaflet-control-zoom a:hover { background:rgba(40,50,36,.95) !important; }
+.wg-map .leaflet-control-attribution { background:rgba(10,14,9,.75) !important; color:var(--ink-dim) !important; font-size:9px !important; }
+.wg-map .leaflet-control-attribution a { color:var(--ink-dim) !important; }
+/* shopping/wallet add-forms: the input takes the room, buttons stay compact */
+.wg-wallet-add { display:flex; gap:8px; }
+.wg-wallet-add input:first-child, .wg-wallet-add #shopAdd { flex:1 1 auto; min-width:0; }
+/* printer: no camera source → a quiet band, not a black void */
+.wg-printer .cam.empty { aspect-ratio:auto; min-height:72px; display:flex; align-items:center; justify-content:center; }
