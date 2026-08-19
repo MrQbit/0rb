@@ -102,6 +102,13 @@ export async function tryHandleHomeRoute(method: string, pathname: string, req: 
       return jsonResponse(200, { mode: m })
     }
   }
+  const tdel = pathname.match(/^\/v1\/home\/timers\/(t-[a-z0-9-]+)$/)
+  if (method === 'DELETE' && tdel && store) {
+    const { cancelTimer, listTimers } = await import('./timers.js')
+    const gone = await cancelTimer(store, tdel[1]!)
+    if (!gone) return jsonResponse(404, { error: 'no such timer' })
+    return jsonResponse(200, { removed: gone.id, remaining: await listTimers(store) })
+  }
   if (method === 'GET' && pathname === '/v1/home/devices') {
     try {
       const all = await haJoinAreas(await haStates(HOME_DOMAINS))

@@ -1058,6 +1058,11 @@
     timers.forEach(t=>{
       const row=document.createElement('div'); row.className='wg-timer';
       row.innerHTML=`<div class="bar"><div class="fill"></div></div><span class="nm">${esc2(t.label)}</span><span class="left mono"></span>`;
+      const rm=document.createElement('button'); rm.className='rm'; rm.setAttribute('aria-label','Cancel '+t.label);
+      rm.innerHTML='<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+      rm.onclick=async()=>{ try{ const r=await fetch('/v1/home/timers/'+encodeURIComponent(t.id),{method:'DELETE',credentials:'same-origin'});
+        if(r.ok){ row.remove(); toast('Timer cancelled'); } else toast('Failed'); }catch{ toast('Failed'); } };
+      row.appendChild(rm);
       wrap.appendChild(row); rows.push({t,row});
     });
     const fmt=ms=>{ const s=Math.max(0,Math.round(ms/1000)); const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),ss=s%60;

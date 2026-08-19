@@ -763,6 +763,8 @@ body {
 .wg-timer .fill { height:100%; background:var(--nv); transition:width 1s linear; }
 .wg-timer .nm { flex:1; min-width:0; font-size:12.5px; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .wg-timer .left { flex:none; font-size:14px; color:var(--nv-bright); font-family:var(--mono); }
+.wg-timer .rm { flex:none; background:none; border:0; color:var(--ink-dim); cursor:pointer; line-height:0; padding:3px; border-radius:6px; }
+.wg-timer .rm:hover { color:var(--danger); background:rgba(255,93,93,.1); }
 .wg-timer.done { border-color:rgba(118,185,0,.55); background:rgba(118,185,0,.12); }
 .wg-timer.done .left { color:var(--ink); }
 

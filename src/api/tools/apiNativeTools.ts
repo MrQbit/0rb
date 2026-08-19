@@ -461,7 +461,7 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
     },
     {
       name: 'Family',
-      description: "The household: notes between members, a shared family calendar, reminders for each other, and announcements over the speakers. op:'note' {to, text, when:'next'|'home'} leaves a note delivered on their next chat ('next') or when they arrive home ('home'). op:'board' shows the family board widget. op:'remind' {to, label, minutes|at} sets a reminder that notifies THAT member on their channel. op:'calendar_add' {title, date:'YYYY-MM-DD', time?, who?} and op:'calendar' (show) manage the shared household calendar (no external account). op:'calendar_remove' {query}. op:'announce' {message} speaks a message on the home's speakers ('dinner is ready!'). op:'members' lists the household. op:'pref' {key, value} saves a personal preference for the CURRENT user (nickname, style, tastes — honoured in their future chats; empty value deletes; special key 'arrival_scene' = an HA scene activated when THEY arrive home); op:'prefs' lists theirs. Chores: op:'chore_add' {title, to, day?(0-6 weekly)}, op:'chore_done' {query}, op:'chores' shows the rota. ROUTINES (recurring care reminders — medication, pet feeding, plant watering): op:'routine_add' {label, at:'HH:MM', to, days?:[0-6]} fires EVERY day (or listed weekdays) at that time to that member's channel; op:'routines' lists; op:'routine_remove' {query}. op:'briefing' shows the day-at-a-glance widget (weather, today's events, chores, security, who's home) — use for 'good morning', 'what's my day', 'morning briefing'. Resolve people by first name.",
+      description: "The household: notes between members, a shared family calendar, reminders for each other, and announcements over the speakers. op:'note' {to, text, when:'next'|'home'} leaves a note delivered on their next chat ('next') or when they arrive home ('home'). op:'board' shows the family board widget. op:'remind' {to, label, minutes|at} sets a reminder that notifies THAT member on their channel. op:'calendar_add' {title, date:'YYYY-MM-DD', time?, who?} and op:'calendar' (show) manage the shared household calendar (no external account). op:'calendar_remove' {query}. op:'announce' {message, where?} speaks a message on the home's speakers ('dinner is ready!'); where narrows to a room or speaker name ('living room', 'kitchen sonos'). op:'members' lists the household. op:'pref' {key, value} saves a personal preference for the CURRENT user (nickname, style, tastes — honoured in their future chats; empty value deletes; special key 'arrival_scene' = an HA scene activated when THEY arrive home); op:'prefs' lists theirs. Chores: op:'chore_add' {title, to, day?(0-6 weekly)}, op:'chore_done' {query}, op:'chores' shows the rota. ROUTINES (recurring care reminders — medication, pet feeding, plant watering): op:'routine_add' {label, at:'HH:MM', to, days?:[0-6]} fires EVERY day (or listed weekdays) at that time to that member's channel; op:'routines' lists; op:'routine_remove' {query}. op:'briefing' shows the day-at-a-glance widget (weather, today's events, chores, security, who's home) — use for 'good morning', 'what's my day', 'morning briefing'. Resolve people by first name.",
       input_schema: { type: 'object', properties: {
         op: { type: 'string', enum: ['note', 'board', 'remind', 'calendar_add', 'calendar', 'calendar_remove', 'announce', 'members', 'pref', 'prefs', 'chore_add', 'chore_done', 'chores', 'briefing', 'routine_add', 'routines', 'routine_remove'] },
         to: { type: 'string', description: 'Member (name or email) for note/remind.' },
@@ -1526,7 +1526,14 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
         if (!haEnabled()) return 'No speakers available (Home Assistant not configured).'
         const [ttsEntities, players] = await Promise.all([haStates(['tts']), haJoinAreas(await haStates(['media_player']))])
         const tts = ttsEntities[0]
-        const targets = players.filter(p => p.state !== 'unavailable')
+        let targets = players.filter(p => p.state !== 'unavailable')
+        const where = String(args?.where || '').trim().toLowerCase()
+        if (where && targets.length) {
+          const narrowed = targets.filter(p =>
+            (p.area || '').toLowerCase().includes(where) || p.name.toLowerCase().includes(where))
+          if (!narrowed.length) return `No reachable speaker matching "${args?.where}". Speakers: ${targets.map(p => `${p.name}${p.area ? ` (${p.area})` : ''}`).join(', ')}.`
+          targets = narrowed
+        }
         if (!tts || !targets.length) return 'No TTS engine or reachable speakers in Home Assistant.'
         for (const p of targets.slice(0, 4)) {
           await haCallService('tts', 'speak', tts.entity_id, { media_player_entity_id: p.entity_id, message: msg })
