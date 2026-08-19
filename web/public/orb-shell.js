@@ -1967,6 +1967,24 @@
         });
       });
     }catch{ devs.innerHTML='<div class="set-muted">Could not load devices.</div>'; }
+    loadBridgeDevices();
+  }
+  // Devices the LAN bridge reaches directly (AirPlay + IPP) — independent of HA.
+  async function loadBridgeDevices(){
+    const wrap=$('#bridgeWrap'), list=$('#bridgeDevices');
+    if(!wrap) return;
+    let d=null;
+    try{ d=await (await fetch('/v1/bridge/devices',{credentials:'same-origin'})).json(); }catch{}
+    if(!d||!d.enabled){ wrap.style.display='none'; return; }
+    const rows=[...(d.speakers||[]).map(s=>({name:s.name, sub:(s.model||'AirPlay')+' · speaker', state:'ready'})),
+                ...(d.printers||[]).map(p=>({name:p.name, sub:'printer · '+p.address, state:'ready'}))];
+    wrap.style.display=rows.length?'':'none';
+    list.innerHTML='';
+    rows.forEach(r=>{
+      const it=document.createElement('div'); it.className='set-item';
+      it.innerHTML=`<span class="pill-dot ok"></span><div class="grow"><div class="t">${esc(r.name)}</div><div class="s">${esc(r.sub)}</div></div>`;
+      list.appendChild(it);
+    });
   }
   async function haStartAdd(){
     const name=($('#haAddName').value||'').trim().toLowerCase(); const box=$('#haAddForm');

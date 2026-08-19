@@ -31,6 +31,7 @@ import { executeVision, visionToolAvailable } from '../vision/vision.js'
 import { executeRecall, semanticMemoryEnabled } from '../memory/semantic.js'
 import { executeSelfEvolve, selfModifyEnabled } from '../cluster/selfEvolve.js'
 import { emitWidget } from '../widgets/bus.js'
+import { bridgeEnabled } from '../connectors/bridge.js'
 import { youtubeEnabled, youtubeSearch } from '../connectors/youtube.js'
 import { spotifyEnabled, spotifySearch } from '../connectors/spotify.js'
 import { spotifyApi, getUserToken } from '../connectors/spotifyOAuth.js'
@@ -447,6 +448,29 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
         conditions: { type: 'array', description: "op:'automate': optional HA condition list.", items: { type: 'object' } },
       }, required: ['op'] },
       available: haEnabled(),
+    },
+    {
+      name: 'AirPlay',
+      description: "See and use AirPlay speakers & TVs found DIRECTLY on the network — no Home Assistant setup needed (covers devices HA doesn't know). op:'list' shows every AirPlay device (and network printer) the LAN bridge sees. op:'say' {device, text} speaks a message on a speaker (TTS, e.g. \"tell the living room dinner is ready\"). op:'play' {device, url} streams an audio URL (internet radio, a music file). op:'stop' stops playback; op:'volume' {device, level:0-100}. Refer to devices by name (e.g. 'living room'). Prefer the Home tool when the device IS in Home Assistant (richer control); use AirPlay for devices that aren't, or when Home fails.",
+      input_schema: { type: 'object', properties: {
+        op: { type: 'string', enum: ['list', 'say', 'play', 'stop', 'volume'] },
+        device: { type: 'string', description: "Speaker/TV name (fuzzy matched), e.g. 'living room'." },
+        text: { type: 'string', description: "op:'say': the message to speak." },
+        url: { type: 'string', description: "op:'play': direct URL of an audio stream or file (mp3/wav/flac/ogg)." },
+        level: { type: 'number', description: "op:'volume': 0-100." },
+      }, required: ['op'] },
+      available: bridgeEnabled(),
+    },
+    {
+      name: 'Print',
+      description: "Print DIRECTLY to network printers (IPP/AirPrint) — no Home Assistant or driver setup. op:'list' shows printers with the formats they accept; op:'status' {printer} checks state (idle/printing/stopped + reasons like low toner); op:'print' {printer, text} prints plain text, or {printer, file} prints a workspace file — ONLY in a format the printer advertises (a PDF is refused if the printer only takes raster; say so honestly rather than printing garbage).",
+      input_schema: { type: 'object', properties: {
+        op: { type: 'string', enum: ['list', 'status', 'print'] },
+        printer: { type: 'string', description: 'Printer name (fuzzy matched); optional when only one printer exists.' },
+        text: { type: 'string', description: "op:'print': plain text to print." },
+        file: { type: 'string', description: "op:'print': path of a file in this session's workspace." },
+      }, required: ['op'] },
+      available: bridgeEnabled(),
     },
     {
       name: 'Settings',
@@ -1341,6 +1365,99 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
       return `Unknown op "${op}".`
     } catch (e) {
       return `[Home Assistant] ${(e as Error).message}`
+    }
+  })
+  add('AirPlay', {}, async args => {
+    const { bridgeDevices, bridgePlay, bridgeStop, bridgeVolume, bridgeAnnounce, bridgeResolve, pcmToWav } = await import('../connectors/bridge.js')
+    try {
+      const op = String(args?.op || 'list')
+      const { speakers, printers } = await bridgeDevices()
+      if (op === 'list') {
+        if (!speakers.length && !printers.length) return 'The LAN bridge sees no AirPlay devices or printers yet (it rescans every 2 minutes).'
+        let out = speakers.length ? 'AirPlay devices (directly reachable, no HA needed): ' + speakers.map(s => `${s.name} (${s.model || s.protocols.join('/')})`).join(' · ') : 'No AirPlay devices found.'
+        if (printers.length) out += `\nNetwork printers: ${printers.map(p => p.name).join(' · ')} — use the Print tool.`
+        return out
+      }
+      const dev = bridgeResolve(speakers, String(args?.device || ''))
+      if (!dev) return `No AirPlay device matching "${args?.device || ''}". Available: ${speakers.map(s => s.name).join(', ') || 'none'}.`
+      if (op === 'stop') { await bridgeStop(dev.id); return `Stopped playback on ${dev.name}.` }
+      if (op === 'volume') {
+        const level = Math.max(0, Math.min(100, Number(args?.level)))
+        if (!Number.isFinite(level)) return 'Give level: 0-100.'
+        await bridgeVolume(dev.id, level)
+        return `${dev.name} volume → ${level}.`
+      }
+      if (op === 'play') {
+        const url = String(args?.url || '').trim()
+        if (!/^https?:\/\//.test(url)) return 'op:play needs a direct http(s) audio URL (mp3/wav/flac/ogg stream or file).'
+        await bridgePlay(dev.id, url)
+        return `Streaming to ${dev.name}. Stop with op:'stop'.`
+      }
+      if (op === 'say') {
+        const text = String(args?.text || '').trim()
+        if (!text) return 'What should I say?'
+        const ttsBase = (process.env.ORB2_TTS_URL || '').replace(/\/+$/, '')
+        if (!ttsBase) return 'TTS is not configured (ORB2_TTS_URL) — cannot speak, but op:play with an audio URL works.'
+        const res = await fetch(`${ttsBase}/tts`, {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ text, voice: process.env.ORB2_TTS_VOICE || undefined }),
+        })
+        if (!res.ok) return `TTS failed (${res.status}) — nothing played.`
+        const rate = Number(res.headers.get('X-Sample-Rate')) || 24000
+        const wav = pcmToWav(new Uint8Array(await res.arrayBuffer()), rate)
+        await bridgeAnnounce(dev.id, wav, 'audio/wav')
+        return `Speaking on ${dev.name}: "${text.slice(0, 80)}"`
+      }
+      return `Unknown op '${op}'.`
+    } catch (e) {
+      return `[AirPlay bridge] ${(e as Error).message}`
+    }
+  })
+  add('Print', {}, async args => {
+    const { bridgeDevices, bridgePrinterStatus, bridgePrint, bridgeResolve } = await import('../connectors/bridge.js')
+    try {
+      const op = String(args?.op || 'list')
+      const { printers } = await bridgeDevices()
+      if (op === 'list') {
+        if (!printers.length) return 'No network printers found (the bridge rescans continuously — is the printer awake?).'
+        return 'Network printers (direct IPP, no setup needed): ' + printers.map(p => `${p.name} @ ${p.address} — accepts: ${p.pdl.join(', ') || 'unknown'}`).join('\n')
+      }
+      const dev = printers.length === 1 && !args?.printer ? printers[0]! : bridgeResolve(printers, String(args?.printer || ''))
+      if (!dev) return `No printer matching "${args?.printer || ''}". Available: ${printers.map(p => p.name).join(', ') || 'none'}.`
+      if (op === 'status') {
+        const s = await bridgePrinterStatus(dev.id)
+        return `${s.make || dev.name}: ${s.state}${s.reasons?.length && s.reasons[0] !== 'none' ? ` (${s.reasons.join(', ')})` : ''}. Accepts: ${s.formats.join(', ')}.`
+      }
+      if (op === 'print') {
+        const accepts = (m: string) => dev.pdl.some(f => f.toLowerCase() === m)
+        if (typeof args?.text === 'string' && args.text.trim()) {
+          // Plain text: text/plain when advertised, else raw passthrough —
+          // laser printers render plain ASCII sent as octet-stream.
+          const fmt = accepts('text/plain') ? 'text/plain' : 'application/octet-stream'
+          const body = new TextEncoder().encode(args.text.replace(/\n/g, '\r\n') + '\r\n\f')
+          const r = await bridgePrint(dev.id, body, fmt, 'orb note')
+          return r.ok ? `Printed on ${dev.name} (job ${r.job_id ?? '?'}).` : `Printer rejected the job (IPP status ${r.ipp_status}).`
+        }
+        const file = String(args?.file || '').trim()
+        if (!file) return "Give text:'...' or file:'<workspace path>' to print."
+        const { join, resolve } = await import('node:path')
+        const wsRoot = process.env.ORB2_API_WORKSPACE_ROOT || '/workspace'
+        const full = resolve(join(wsRoot, ctx.sessionId, file))
+        if (!full.startsWith(resolve(wsRoot))) return 'File must be inside the session workspace.'
+        const ext = (file.split('.').pop() || '').toLowerCase()
+        const mime = ({ pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', txt: 'text/plain' } as Record<string, string>)[ext]
+        if (!mime) return `Can't determine a print format for .${ext} — pdf, jpg, png or txt.`
+        if (!accepts(mime) && !(mime === 'text/plain' && accepts('application/octet-stream'))) {
+          return `${dev.name} does not accept ${mime} (it takes: ${dev.pdl.join(', ')}). Printing that would need format conversion Orb doesn't do yet — plain text printing works.`
+        }
+        const { readFile } = await import('node:fs/promises')
+        const doc = await readFile(full)
+        const r = await bridgePrint(dev.id, new Uint8Array(doc), accepts(mime) ? mime : 'application/octet-stream', file)
+        return r.ok ? `Printed ${file} on ${dev.name} (job ${r.job_id ?? '?'}).` : `Printer rejected the job (IPP status ${r.ipp_status}).`
+      }
+      return `Unknown op '${op}'.`
+    } catch (e) {
+      return `[Print bridge] ${(e as Error).message}`
     }
   })
   add('Settings', {}, async args => {

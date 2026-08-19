@@ -367,6 +367,9 @@ services:
       # gateway; the token comes from .env after HA's first-run onboarding.
       ORB2_HA_URL: "${ORB2_HA_URL:-http://host.docker.internal:8123}"
       ORB2_HA_TOKEN: "${ORB2_HA_TOKEN:-}"
+      # LAN bridge (host networking) — direct AirPlay + IPP, no HA needed
+      ORB2_BRIDGE_URL: "${ORB2_BRIDGE_URL:-http://host.docker.internal:8997}"
+      ORB2_BRIDGE_TOKEN: "${ORB2_BRIDGE_TOKEN:-}"
       # Semantic memory (embeddings)
       ORB2_EMBED_URL: http://embed:8994
       # Web search backend for the WebSearch tool (DDG is blocked server-side)
@@ -477,6 +480,28 @@ services:
     restart: unless-stopped
 
   # ── Web console (nginx; proxies API + voice WS to orb2-api) ───────
+  # ── LAN bridge ────────────────────────────────────────────────────
+  # Host networking (mDNS multicast can't cross the Docker bridge):
+  # discovers AirPlay speakers + IPP printers and drives them directly —
+  # no Home Assistant setup needed — and advertises the console as
+  # _orb2._tcp so the native apps can auto-discover the server.
+  bridge:
+    build:
+      context: ./services/bridge
+    image: localhost:5001/orb2-bridge:dev
+    container_name: orb2-bridge
+    network_mode: host
+    environment:
+      ORB2_BRIDGE_PORT: "8997"
+      ORB2_BRIDGE_TOKEN: "${ORB2_BRIDGE_TOKEN:-}"
+      ORB2_DEVICE_LAN_IP: "${ORB2_DEVICE_LAN_IP:-}"
+      ORB2_PUBLIC_URL: "${ORB2_PUBLIC_URL:-}"
+      ORB2_DEVICE_URL: "${ORB2_DEVICE_URL:-}"
+      ORB2_ADVERTISE_NAME: "${ORB2_ADVERTISE_NAME:-Orb}"
+      ORB2_UI_PORT: "${ORB2_UI_PORT:-9080}"
+      ORB2_UI_HTTPS_PORT: "${ORB2_UI_HTTPS_PORT:-9443}"
+    restart: unless-stopped
+
   ui:
     image: localhost:5001/orb2-ui:dev
     container_name: orb2-ui

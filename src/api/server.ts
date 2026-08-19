@@ -1612,6 +1612,13 @@ async function dispatch(
   // ─── Home (device dashboard refresh + tap-to-control via Home Assistant) ───
   const homeResp = await tryHandleHomeRoute(method, pathname, req, ctx.store)
   if (homeResp) return homeResp
+  // ─── LAN bridge (Settings → Smart home: devices seen directly, no HA) ───
+  if (method === 'GET' && pathname === '/v1/bridge/devices') {
+    const { bridgeEnabled, bridgeDevices } = await import('./connectors/bridge.js')
+    if (!bridgeEnabled()) return jsonResponse(200, { enabled: false, speakers: [], printers: [] })
+    try { return jsonResponse(200, { enabled: true, ...(await bridgeDevices()) }) }
+    catch (e) { return jsonResponse(200, { enabled: true, reachable: false, error: (e as Error).message, speakers: [], printers: [] }) }
+  }
   // ─── Push registration for the 0rb apps ───
   const pushResp = await tryHandlePushRoute(method, pathname, req, ctx.store)
   if (pushResp) return pushResp
