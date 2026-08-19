@@ -3458,7 +3458,7 @@ async function handleChat(
           fallbackModels,
           userMcpServers,
           extraTools: apiNativeTools,
-          appendSystemPromptExtra: agentContextPrompt(),
+          appendSystemPromptExtra: agentContextPrompt() + (await (await import('./family/family.js')).familyPromptExtra(ctx.store, attributionFor(identity).oid || '')),
         },
         {
           onToolStart: e => {
@@ -3824,7 +3824,7 @@ async function handleChat(
               autoApprove: () => true,
               mcpToken,
               extraTools: apiNativeTools,
-              appendSystemPromptExtra: agentContextPrompt(),
+              appendSystemPromptExtra: agentContextPrompt() + (await (await import('./family/family.js')).familyPromptExtra(ctx.store, attributionFor(identity).oid || '')),
             },
             hooks,
           )

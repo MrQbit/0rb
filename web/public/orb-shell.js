@@ -407,6 +407,7 @@
     else if(spec.type==='presence'){ wg.style.width='340px'; wg.style.height='260px'; }
     else if(spec.type==='automations'){ wg.style.width='420px'; wg.style.height='400px'; }
     else if(spec.type==='printer3d'){ wg.style.width='480px'; wg.style.height='560px'; }
+    else if(spec.type==='familyboard'){ wg.style.width='420px'; wg.style.height='440px'; }
     else if(spec.type==='document'){ wg.style.width='560px'; wg.style.height='520px'; }
     else if(spec.type==='wallet'){ wg.style.width='380px'; wg.style.height='400px'; }
     else if(spec.type==='lights'){ wg.style.width='400px'; wg.style.height='440px'; }
@@ -522,7 +523,7 @@
     }
   }, 15000);
 
-  function titleFor(s){ return ({chart:'Chart',results:'Results',video:'Video',music:'Music',table:'Table',stats:'Stats',gallery:'Gallery',image:'Image',embed:'Embed',model:'3D model',calculator:'Calculator',weather:'Weather',calendar:'Calendar',code:'Code',mail:'Mail',vercel:'Vercel',map:'Map',docker:'Docker',app:'App',html:'HTML',note:'Note',vacuum:'Vacuum',covers:'Shades',security:'Security',plugs:'Plugs',scenes:'Scenes',sensors:'Readings',camera:'Camera',timers:'Timers',presence:"Who's home",automations:'Automations',printer3d:'Printer',document:'Document',wallet:'Wallet',lights:'Lights',media:'Media',climate:'Climate',todo:'Tasks',home:'Home'})[s.type]||(s.type?String(s.type):'Note'); }
+  function titleFor(s){ return ({chart:'Chart',results:'Results',video:'Video',music:'Music',table:'Table',stats:'Stats',gallery:'Gallery',image:'Image',embed:'Embed',model:'3D model',calculator:'Calculator',weather:'Weather',calendar:'Calendar',code:'Code',mail:'Mail',vercel:'Vercel',map:'Map',docker:'Docker',app:'App',html:'HTML',note:'Note',vacuum:'Vacuum',covers:'Shades',security:'Security',plugs:'Plugs',scenes:'Scenes',sensors:'Readings',camera:'Camera',timers:'Timers',presence:"Who's home",automations:'Automations',printer3d:'Printer',familyboard:'Family board',document:'Document',wallet:'Wallet',lights:'Lights',media:'Media',climate:'Climate',todo:'Tasks',home:'Home'})[s.type]||(s.type?String(s.type):'Note'); }
 
   // ── widget placement: free-floating, but flow without >15% overlap; when the
   //    visible band is full, drop below + scroll there (the orb follows). ──
@@ -596,6 +597,7 @@
     else if(spec.type==='presence') renderPresence(body, spec);
     else if(spec.type==='automations') renderAutomations(body, spec);
     else if(spec.type==='printer3d') renderPrinter3d(body, spec, wg);
+    else if(spec.type==='familyboard') renderFamilyBoard(body, spec);
     else if(_plugins[spec.type]) renderPlugin(body, spec, _plugins[spec.type]);
     else {
       // Freshly-minted custom widget? (CreateWidget installs plugins at
@@ -923,6 +925,30 @@
     bust(); body.appendChild(img);
     if(wg){ if(wg._camTimer) clearInterval(wg._camTimer);
       wg._camTimer=setInterval(()=>{ if(!document.contains(wg)){ clearInterval(wg._camTimer); return; } if(wg._state==='active') bust(); },10000); }
+  }
+
+  // ── family board: notes between members + upcoming events ──
+  function renderFamilyBoard(body, spec){
+    const wrap=document.createElement('div'); wrap.className='wg-fam'; body.appendChild(wrap);
+    const notes=spec.notes||[], events=spec.events||[];
+    if(!notes.length&&!events.length){ wrap.innerHTML='<div class="wg-empty">Nothing on the board.<br><span style="font-size:11px;">Say “leave a note for Sarah…”.</span></div>'; return; }
+    if(notes.length){
+      notes.forEach(n=>{
+        const row=document.createElement('div'); row.className='wg-fam-note'+(n.delivered?' done':'');
+        row.innerHTML=`<div class="who">${esc2(n.from)} <span class="arr">→</span> ${esc2(n.to)}`+
+          `<span class="badge">${n.delivered?'delivered':(n.trigger==='home'?'on arrival':'waiting')}</span></div>`+
+          `<div class="txt">${esc2(n.text)}</div>`;
+        wrap.appendChild(row);
+      });
+    }
+    if(events.length){
+      const h=document.createElement('div'); h.className='wg-area-h'; h.textContent='Coming up'; wrap.appendChild(h);
+      events.forEach(e=>{
+        const row=document.createElement('div'); row.className='wg-fam-ev';
+        row.innerHTML=`<span class="d mono">${esc2(e.date.slice(5))}${e.time?' '+esc2(e.time):''}</span><span class="t">${esc2(e.title)}${e.who?` <span class="w">· ${esc2(e.who)}</span>`:''}</span>`;
+        wrap.appendChild(row);
+      });
+    }
   }
 
   // ── printer3d: live chamber view + job progress + controls ──

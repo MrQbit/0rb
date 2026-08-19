@@ -20,6 +20,8 @@ export interface OrbTimer {
   /** epoch ms when it was set (for progress rendering) */
   set: number
   sessionId?: string
+  /** deliver to this member instead of the owner (family reminders) */
+  for?: string
 }
 
 export async function listTimers(store: Store): Promise<OrbTimer[]> {
@@ -29,9 +31,9 @@ async function save(store: Store, timers: OrbTimer[]): Promise<void> {
   await store.putKv(KEY, JSON.stringify(timers), 0)
 }
 
-export async function addTimer(store: Store, label: string, at: number, sessionId?: string): Promise<OrbTimer> {
+export async function addTimer(store: Store, label: string, at: number, sessionId?: string, forEmail?: string): Promise<OrbTimer> {
   const timers = await listTimers(store)
-  const t: OrbTimer = { id: `t-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e4).toString(36)}`, label: label.slice(0, 80), at, set: Date.now(), sessionId }
+  const t: OrbTimer = { id: `t-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e4).toString(36)}`, label: label.slice(0, 80), at, set: Date.now(), sessionId, for: forEmail }
   timers.push(t)
   await save(store, timers)
   return t
@@ -69,7 +71,12 @@ export function startTimerLoop(store: Store, notify: (text: string) => Promise<v
       const remaining = timers.filter(t => t.at > now)
       await save(store, remaining)
       for (const t of due) {
-        await notify(`⏱ ${t.label} — time's up!`)
+        const text = `⏱ ${t.label.replace(/ → .*$/, '')} — time's up!`
+        let sent = false
+        if (t.for) {
+          try { const { notifyUser } = await import('../family/family.js'); sent = await notifyUser(store, t.for, text) } catch { /* fall through */ }
+        }
+        if (!sent) await notify(text)
         if (t.sessionId) { try { emitWidget(t.sessionId, timerWidgetSpec(remaining)) } catch { /* session gone */ } }
         log.info('timer_fired', { label: t.label })
       }

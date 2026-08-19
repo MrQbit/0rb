@@ -460,6 +460,21 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
       available: true,
     },
     {
+      name: 'Family',
+      description: "The household: notes between members, a shared family calendar, reminders for each other, and announcements over the speakers. op:'note' {to, text, when:'next'|'home'} leaves a note delivered on their next chat ('next') or when they arrive home ('home'). op:'board' shows the family board widget. op:'remind' {to, label, minutes|at} sets a reminder that notifies THAT member on their channel. op:'calendar_add' {title, date:'YYYY-MM-DD', time?, who?} and op:'calendar' (show) manage the shared household calendar (no external account). op:'calendar_remove' {query}. op:'announce' {message} speaks a message on the home's speakers ('dinner is ready!'). op:'members' lists the household. Resolve people by first name.",
+      input_schema: { type: 'object', properties: {
+        op: { type: 'string', enum: ['note', 'board', 'remind', 'calendar_add', 'calendar', 'calendar_remove', 'announce', 'members'] },
+        to: { type: 'string', description: 'Member (name or email) for note/remind.' },
+        text: { type: 'string', description: 'Note text.' },
+        when: { type: 'string', enum: ['next', 'home'], description: "note delivery: next chat (default) or arrives-home." },
+        label: { type: 'string' }, minutes: { type: 'number' }, at: { type: 'string' },
+        title: { type: 'string' }, date: { type: 'string' }, time: { type: 'string' }, who: { type: 'string' },
+        message: { type: 'string', description: 'What to announce aloud.' },
+        query: { type: 'string' },
+      }, required: ['op'] },
+      available: true,
+    },
+    {
       name: 'Timer',
       description: "Timers, alarms and time-based reminders — use for ANY 'set a timer', 'remind me in/at', 'wake me', 'alarm' request. op:'set' {label, minutes} or {label, at:'HH:MM'} (24h, today/tomorrow if past); op:'list'; op:'cancel' {query}. Shows the countdown widget; when it fires the owner is notified on their channels even if the app is closed.",
       input_schema: { type: 'object', properties: {
@@ -1316,6 +1331,91 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
       return `Set ${key}${SETTINGS_PLAINTEXT_KEYS.has(key) ? ` = ${value}` : ''} (live).${/BASE_URL|API_KEY/.test(key) ? ' A restart may be needed for the brain endpoint to fully switch.' : ''}`
     }
     return `Unknown op "${op}".`
+  })
+  add('Family', {}, async args => {
+    const op = String(args?.op || 'board')
+    const fam = await import('../family/family.js')
+    const { getUsers } = await import('../auth/otp.js')
+    const me = fam.emailFromOwnerId(ctx.ownerId)
+    const boardSpec = async () => {
+      const [notes, events] = await Promise.all([fam.listNotes(ctx.store), fam.listEvents(ctx.store)])
+      const named = await Promise.all(notes.slice(-12).reverse().map(async n => ({
+        from: await fam.memberName(ctx.store, n.from), to: await fam.memberName(ctx.store, n.to),
+        text: n.text, trigger: n.trigger, delivered: !!n.delivered,
+      })))
+      return { id: 'familyboard', type: 'familyboard', title: 'Family board', notes: named,
+        events: events.slice(0, 6), pill: `${notes.filter(n => !n.delivered).length} waiting` }
+    }
+    try {
+      if (op === 'members') {
+        const users = await getUsers(ctx.store)
+        return 'Household: ' + users.map((u, i) => `${u.label || u.email.split('@')[0]} <${u.email}> (${u.role ?? (i === 0 ? 'owner' : 'member')}${u.telegram_chat_id ? ', telegram' : ''})`).join(' · ')
+      }
+      if (op === 'note') {
+        const rec = await fam.resolveMember(ctx.store, String(args?.to || ''))
+        if (!rec) return `I don't know "${args?.to}". Household members: ${(await getUsers(ctx.store)).map(u => u.label || u.email.split('@')[0]).join(', ')}.`
+        const text = String(args?.text || '').trim()
+        if (!text) return 'What should the note say?'
+        const trigger = args?.when === 'home' ? 'home' : 'next'
+        await fam.addNote(ctx.store, me, rec.email, text, trigger)
+        emitWidget(ctx.sessionId, await boardSpec() as any)
+        if (trigger === 'home' && !rec.person_entity) {
+          return `Note saved for ${rec.label || rec.email}. Heads-up: they have no presence link yet (no HA person attached), so I'll also deliver it on their next chat. An owner can link one via the users settings.`
+        }
+        return `Saved — I'll pass it to ${rec.label || rec.email.split('@')[0]} ${trigger === 'home' ? 'when they get home' : 'next time they talk to me'}.`
+      }
+      if (op === 'remind') {
+        const rec = await fam.resolveMember(ctx.store, String(args?.to || ''))
+        if (!rec) return `I don't know "${args?.to}".`
+        const label = String(args?.label || 'Reminder').trim()
+        let at: number | null = null
+        if (args?.minutes != null && Number(args.minutes) > 0) at = Date.now() + Number(args.minutes) * 60_000
+        else if (typeof args?.at === 'string' && /^\d{1,2}:\d{2}$/.test(args.at.trim())) {
+          const [h, m] = args.at.trim().split(':').map(Number)
+          const d = new Date(); d.setHours(h!, m!, 0, 0)
+          if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1)
+          at = d.getTime()
+        }
+        if (!at) return "Give me minutes or at:'HH:MM'."
+        const { addTimer } = await import('../home/timers.js')
+        await addTimer(ctx.store, `${label} → ${rec.email}`, at, ctx.sessionId, rec.email)
+        return `Set — I'll remind ${rec.label || rec.email.split('@')[0]} ${Math.round((at - Date.now()) / 60_000)} min from now${rec.telegram_chat_id ? ' on their Telegram' : " (no Telegram linked — it'll reach the house channels)"}.`
+      }
+      if (op === 'calendar_add') {
+        const r = await fam.addEvent(ctx.store, { title: String(args?.title || ''), date: String(args?.date || ''), time: args?.time ? String(args.time) : undefined, who: args?.who ? String(args.who) : undefined })
+        if ('error' in r) return `[Family] ${r.error}`
+        const events = await fam.listEvents(ctx.store)
+        emitWidget(ctx.sessionId, { id: 'familycal', type: 'calendar', title: 'Family calendar',
+          events: events.map(e => ({ date: e.date, title: `${e.time ? e.time + ' ' : ''}${e.title}${e.who ? ` (${e.who})` : ''}` })) } as any)
+        return `Added "${r.title}" on ${r.date}${r.time ? ` at ${r.time}` : ''} to the family calendar.`
+      }
+      if (op === 'calendar_remove') {
+        const gone = await fam.removeEvent(ctx.store, String(args?.query || ''))
+        return gone ? `Removed "${gone.title}".` : `Nothing matching "${args?.query}" on the calendar.`
+      }
+      if (op === 'calendar') {
+        const events = await fam.listEvents(ctx.store)
+        emitWidget(ctx.sessionId, { id: 'familycal', type: 'calendar', title: 'Family calendar',
+          events: events.map(e => ({ date: e.date, title: `${e.time ? e.time + ' ' : ''}${e.title}${e.who ? ` (${e.who})` : ''}` })) } as any)
+        return events.length ? `Family calendar: ${events.slice(0, 8).map(e => `${e.date}${e.time ? ' ' + e.time : ''} ${e.title}`).join(' · ')}.` : 'The family calendar is empty.'
+      }
+      if (op === 'announce') {
+        const msg = String(args?.message || '').trim()
+        if (!msg) return 'What should I announce?'
+        if (!haEnabled()) return 'No speakers available (Home Assistant not configured).'
+        const [ttsEntities, players] = await Promise.all([haStates(['tts']), haJoinAreas(await haStates(['media_player']))])
+        const tts = ttsEntities[0]
+        const targets = players.filter(p => p.state !== 'unavailable')
+        if (!tts || !targets.length) return 'No TTS engine or reachable speakers in Home Assistant.'
+        for (const p of targets.slice(0, 4)) {
+          await haCallService('tts', 'speak', tts.entity_id, { media_player_entity_id: p.entity_id, message: msg })
+        }
+        return `Announced on ${targets.slice(0, 4).map(p => p.name).join(', ')}: "${msg}"`
+      }
+      emitWidget(ctx.sessionId, await boardSpec() as any)
+      const notes = await fam.listNotes(ctx.store)
+      return notes.length ? `Family board is up — ${notes.filter(n => !n.delivered).length} note(s) waiting, ${notes.length} total.` : 'Family board is up — empty right now.'
+    } catch (e) { return `[Family] ${(e as Error).message}` }
   })
   add('Timer', {}, async args => {
     const op = String(args?.op || 'list')

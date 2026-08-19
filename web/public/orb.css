@@ -667,6 +667,22 @@ body {
 .wg-read .v .u { font-size:11px; color:var(--ink-dim); margin-left:2px; }
 .wg-read .n { font-size:10.5px; color:var(--ink-dim); margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
+/* ── family board ── */
+.wg-fam { flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:7px; }
+.wg-fam-note { padding:10px 12px; border-radius:12px; background:rgba(255,255,255,.03); border:1px solid var(--glass-edge); }
+.wg-fam-note.done { opacity:.55; border-color:var(--line); }
+.wg-fam-note .who { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--ink-dim); margin-bottom:4px; }
+.wg-fam-note .arr { color:var(--nv); }
+.wg-fam-note .badge { margin-left:auto; font-size:9.5px; text-transform:uppercase; letter-spacing:.5px;
+  padding:2px 7px; border-radius:6px; background:rgba(118,185,0,.12); color:var(--nv-bright); }
+.wg-fam-note.done .badge { background:rgba(255,255,255,.06); color:var(--ink-dim); }
+.wg-fam-note .txt { font-size:13px; color:var(--ink); line-height:1.4; }
+.wg-fam-ev { display:flex; align-items:baseline; gap:10px; padding:7px 11px; border-radius:10px;
+  background:rgba(255,255,255,.02); border:1px solid var(--line); }
+.wg-fam-ev .d { flex:none; font-size:11px; color:var(--nv-bright); font-family:var(--mono); }
+.wg-fam-ev .t { font-size:12.5px; color:var(--ink); }
+.wg-fam-ev .w { color:var(--ink-dim); font-size:11px; }
+
 /* ── 3D printer ── */
 .wg-printer { flex:1; min-height:0; display:flex; flex-direction:column; gap:10px; }
 .wg-printer .cam { position:relative; flex:1; min-height:180px; border-radius:12px; overflow:hidden;

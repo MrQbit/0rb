@@ -72,11 +72,17 @@ export async function isAllowed(store: Store, email: string): Promise<boolean> {
 // The allowlist as a richer record: per-user delivery channels. The flat
 // ORB2_AUTH_ALLOWED_EMAILS is still honoured (union) for back-compat.
 
+export type UserRole = 'owner' | 'member'
+
 export type AuthUser = {
   email: string
   telegram_chat_id?: string
   label?: string
   added_at: string
+  /** owner = full control incl. critical settings; member = daily use. */
+  role?: UserRole
+  /** HA person entity for presence-linked features (e.g. person.sarah). */
+  person_entity?: string
 }
 
 /**
@@ -89,7 +95,22 @@ export async function getUsers(store: Store): Promise<AuthUser[]> {
     const raw = await store.getKv(USERS_KEY)
     if (raw) {
       const arr = JSON.parse(raw) as AuthUser[]
-      if (Array.isArray(arr) && arr.length) return arr
+      if (Array.isArray(arr) && arr.length) {
+        // Keep in sync with the flat allowlist: emails allowlisted later
+        // (env or Settings) join the db as members automatically.
+        let legacy: string[] = []
+        try {
+          const flat = await store.getKv(ALLOWLIST_KEY)
+          legacy = flat ? parseList(flat) : envAllowed()
+        } catch { legacy = envAllowed() }
+        const known = new Set(arr.map(u => u.email))
+        const missing = legacy.filter(e => !known.has(e))
+        if (missing.length) {
+          for (const email of missing) arr.push({ email, role: 'member', added_at: new Date().toISOString() })
+          await store.putKv(USERS_KEY, JSON.stringify(arr), LONG_TTL_S).catch(() => {})
+        }
+        return arr
+      }
     }
   } catch { /* seed below */ }
   const ownerTg = String(process.env.ORB2_TELEGRAM_OWNER_ID || '').trim()
@@ -97,6 +118,7 @@ export async function getUsers(store: Store): Promise<AuthUser[]> {
     email,
     telegram_chat_id: i === 0 && ownerTg ? ownerTg : undefined,
     label: i === 0 ? 'owner' : undefined,
+    role: (i === 0 ? 'owner' : 'member') as UserRole,
     added_at: new Date().toISOString(),
   }))
   if (seeded.length) await store.putKv(USERS_KEY, JSON.stringify(seeded), LONG_TTL_S).catch(() => {})
@@ -121,17 +143,53 @@ export async function findUser(store: Store, email: string): Promise<AuthUser | 
   return (await getUsers(store)).find(u => u.email === e) ?? null
 }
 
-export async function addUser(store: Store, u: { email: string; telegram_chat_id?: string; label?: string }): Promise<AuthUser[]> {
+export async function addUser(store: Store, u: { email: string; telegram_chat_id?: string; label?: string; role?: UserRole; person_entity?: string }): Promise<AuthUser[]> {
   const users = await getUsers(store)
   const email = normalizeEmail(u.email)
   const existing = users.find(x => x.email === email)
   if (existing) {
     if (u.telegram_chat_id !== undefined) existing.telegram_chat_id = String(u.telegram_chat_id).trim() || undefined
     if (u.label !== undefined) existing.label = u.label
+    if (u.role !== undefined) existing.role = u.role
+    if (u.person_entity !== undefined) existing.person_entity = u.person_entity || undefined
   } else {
-    users.push({ email, telegram_chat_id: u.telegram_chat_id ? String(u.telegram_chat_id).trim() : undefined, label: u.label, added_at: new Date().toISOString() })
+    users.push({ email, telegram_chat_id: u.telegram_chat_id ? String(u.telegram_chat_id).trim() : undefined, label: u.label, role: u.role ?? 'member', person_entity: u.person_entity, added_at: new Date().toISOString() })
   }
   return saveUsers(store, users)
+}
+
+/**
+ * A user's role. Legacy records (no role field) default to: first user in
+ * the database = owner, everyone else = member — matching the long-standing
+ * "first allowlisted email is the owner" convention.
+ */
+export async function getRole(store: Store, email: string): Promise<UserRole> {
+  const users = await getUsers(store)
+  const e = normalizeEmail(email)
+  const idx = users.findIndex(u => u.email === e)
+  if (idx < 0) return 'member'
+  return users[idx]!.role ?? (idx === 0 ? 'owner' : 'member')
+}
+
+export async function isOwner(store: Store, email: string): Promise<boolean> {
+  return (await getRole(store, email)) === 'owner'
+}
+
+/** Change a role. The LAST owner can never be demoted (lockout guard). */
+export async function setRole(store: Store, email: string, role: UserRole): Promise<{ ok: boolean; error?: string }> {
+  const users = await getUsers(store)
+  const e = normalizeEmail(email)
+  const idx = users.findIndex(u => u.email === e)
+  if (idx < 0) return { ok: false, error: 'no such user' }
+  if (role === 'member') {
+    const owners = users.filter((u, i) => (u.role ?? (i === 0 ? 'owner' : 'member')) === 'owner')
+    if (owners.length <= 1 && (users[idx]!.role ?? (idx === 0 ? 'owner' : 'member')) === 'owner') {
+      return { ok: false, error: 'cannot demote the last owner' }
+    }
+  }
+  users[idx]!.role = role
+  await saveUsers(store, users)
+  return { ok: true }
 }
 
 export async function removeUser(store: Store, email: string): Promise<AuthUser[]> {

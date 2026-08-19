@@ -127,9 +127,38 @@ async function checkDiscoveries(): Promise<void> {
   log.info('home_discovery_nudge', { handlers: fresh.map(f => f.handler) })
 }
 
+/** person entity → last state, for arrival detection. */
+const personState = new Map<string, string>()
+
+async function checkArrivals(): Promise<void> {
+  if (!pushStore) return
+  const people = await haStates(['person']).catch(() => [] as HaEntity[])
+  for (const p of people) {
+    const prev = personState.get(p.entity_id)
+    personState.set(p.entity_id, p.state)
+    if (prev === undefined || prev === p.state || p.state !== 'home') continue
+    // Someone just arrived — deliver their waiting arrives-home notes.
+    try {
+      const fam = await import('../family/family.js')
+      const { getUsers } = await import('../auth/otp.js')
+      const users = await getUsers(pushStore)
+      const who = users.filter(u => u.person_entity === p.entity_id)
+      for (const u of who) {
+        const due = await fam.takePendingNotes(pushStore, u.email, 'home')
+        for (const n of due) {
+          const from = await fam.memberName(pushStore, n.from)
+          const text = `🏠 Welcome home! Note from ${from}: ${n.text}`
+          if (!(await fam.notifyUser(pushStore, u.email, text))) await notifyOwner(text)
+        }
+      }
+    } catch (err) { log.warn('arrival_notes_failed', { error: (err as Error).message }) }
+  }
+}
+
 async function tick(): Promise<void> {
   // Discovery queue changes rarely — check every 5th poll (~5 min default).
   if (discoveryTicks++ % 5 === 0) await checkDiscoveries().catch(() => { /* best effort */ })
+  await checkArrivals().catch(() => { /* best effort */ })
   let entities: HaEntity[]
   try {
     entities = await haStates(['lock', 'binary_sensor', 'cover'])
