@@ -1925,8 +1925,8 @@
     flows.innerHTML='';
     disc.forEach(f=>{
       const row=document.createElement('div'); row.className='set-item';
-      row.innerHTML=`<div class="grow"><div class="t">${esc(f.title||f.handler)}</div><div class="s">${f.covered?esc(f.covered)+' — HA setup is optional (deep control only)':'found on your network'}</div></div>`;
-      const setup=document.createElement('button'); setup.className=f.covered?'set-btn ghost':'set-btn'; setup.textContent='Set up';
+      row.innerHTML=`<div class="grow"><div class="t">${esc(f.title||f.handler)}</div><div class="s">found on your network</div></div>`;
+      const setup=document.createElement('button'); setup.className='set-btn'; setup.textContent='Set up';
       const dismiss=document.createElement('button'); dismiss.className='set-btn ghost'; dismiss.textContent='Dismiss';
       const formBox=document.createElement('div'); formBox.className='ha-flow-box'; formBox.style.display='none';
       setup.onclick=async()=>{
@@ -1952,11 +1952,19 @@
       entries.appendChild(row);
     });
     // Devices — the clean set the orb actually controls, grouped by area.
+    // A device the bridge reaches directly (same speaker/TV via AirPlay) is
+    // listed ONCE, in "On your network" — never twice.
     devs.innerHTML='<div class="set-muted">Loading…</div>';
     try{
-      const dd=await (await fetch('/v1/home/devices',{credentials:'same-origin'})).json();
-      const cards=dd.devices||[];
-      devs.innerHTML=cards.length?'':'<div class="set-muted">No devices yet — set up an integration above.</div>';
+      const [dd,bd]=await Promise.all([
+        (await fetch('/v1/home/devices',{credentials:'same-origin'})).json(),
+        (await fetch('/v1/bridge/devices',{credentials:'same-origin'})).json().catch(()=>({})),
+      ]);
+      const norm=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+      const directNames=new Set((bd&&bd.speakers||[]).map(s=>norm(s.name)));
+      const isDirect=c=>{ const n=norm(c.name); return (c.domain==='media_player'||!c.domain) && [...directNames].some(d=>d&&(d===n||d.includes(n)||n.includes(d))); };
+      const cards=(dd.devices||[]).filter(c=>!isDirect(c));
+      devs.innerHTML=cards.length?'':'<div class="set-muted">No devices yet — speakers, TVs and printers live under "On your network" above.</div>';
       const byArea={};
       cards.forEach(c=>{ (byArea[c.area||'Elsewhere']=byArea[c.area||'Elsewhere']||[]).push(c); });
       Object.keys(byArea).sort().forEach(area=>{
@@ -2046,8 +2054,44 @@
     // Registered device URL (real cert), when this box is enrolled.
     try{ const info=await (await fetch('/v1/info',{credentials:'same-origin'})).json();
       if(info.device_url){ const c=$('#devUrlCard'), a=$('#setDeviceUrl');
-        if(c&&a){ c.style.display=''; a.textContent=info.device_url.replace(/^https:\/\//,''); a.href=info.device_url; } }
+        if(c&&a){ c.style.display=''; a.textContent=info.device_url.replace(/^https:\/\//,''); a.href=info.device_url; loadRemoteMode(); } }
     }catch{}
+  }
+  // ── Device-URL remote mode: home-network A record vs DynDNS + router port ──
+  async function loadRemoteMode(){
+    const lanB=$('#rmLan'), dirB=$('#rmDirect'), st=$('#rmStatus');
+    if(!lanB) return;
+    let mode='lan';
+    try{ mode=(await (await fetch('/v1/remote/status',{credentials:'same-origin'})).json()).mode||'lan'; }catch{}
+    const paint=()=>{ lanB.className='set-btn'+(mode==='lan'?'':' ghost'); dirB.className='set-btn'+(mode==='direct'?'':' ghost'); };
+    paint();
+    const describe=(d)=>{
+      if(!d||d.enabled===false){ st.textContent=''; return; }
+      const bits=[];
+      if(d.mode==='direct'){
+        if(d.wan_ip) bits.push('public IP '+d.wan_ip);
+        if(d.upnp&&d.upnp.ok) bits.push('router port opened automatically');
+        else if(d.router&&d.router.steps) bits.push('router needs a one-time manual step: '+d.router.steps);
+        if(d.probe) bits.push(d.probe.ok?'✓ verified reachable from the internet':'not reachable from the internet yet'+(d.probe.error?' ('+d.probe.error+')':''));
+      } else bits.push('pointing at this home network');
+      st.textContent=bits.join(' · ');
+    };
+    const set=async(m)=>{
+      if(m===mode) return;
+      if(m==='direct' && !confirm('Point your device URL at the internet? Sign-in stays required. Your router must forward port 9444 — the orb will try to open it automatically.')) return;
+      st.textContent='Applying…';
+      try{
+        const r=await fetch('/v1/remote/mode',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({mode:m})});
+        const d=await r.json();
+        if(r.ok){ mode=m; paint(); describe(d); toast(m==='direct'?'Direct mode on':'Back to home-network mode'); }
+        else toast(d.error||'Failed');
+      }catch{ toast('Failed'); st.textContent=''; }
+    };
+    lanB.onclick=()=>set('lan');
+    dirB.onclick=()=>set('direct');
+    if(mode==='direct'){
+      try{ describe(await (await fetch('/v1/remote/status?check=1',{credentials:'same-origin'})).json()); }catch{}
+    }
   }
   async function tailscaleUp(){
     const key=($('#tsAuthKey').value||'').trim(); const msg=$('#tsMsg');

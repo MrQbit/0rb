@@ -69,6 +69,19 @@ export async function bridgePrint(id: string, doc: Uint8Array, format: string, n
   return body
 }
 
+// UPnP (router) — the bridge does the SSDP/SOAP legwork on the host network.
+export async function bridgeUpnpStatus(): Promise<{ gateway: boolean; external_ip?: string | null }> {
+  return call('/upnp')
+}
+export async function bridgeUpnpMap(port: number, internalIp?: string): Promise<{ ok: boolean; error?: string }> {
+  const res = await fetch(`${bridgeUrl()}/upnp/map`, {
+    method: 'POST', headers: headers({ 'content-type': 'application/json' }),
+    body: JSON.stringify({ port, ...(internalIp && { internal_ip: internalIp }) }),
+    signal: AbortSignal.timeout(20_000),
+  })
+  return await res.json().catch(() => ({ ok: false, error: `bridge ${res.status}` })) as any
+}
+
 /** Resolve a speaker/printer by fuzzy name ("living room" → Living Room). */
 export function bridgeResolve<T extends { name: string }>(devices: T[], query: string): T | undefined {
   const q = query.trim().toLowerCase()

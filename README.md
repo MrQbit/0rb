@@ -84,23 +84,26 @@ Raspberry Pi) are in **[DEPLOYMENT.md](DEPLOYMENT.md)**.
 
 ### Smart home
 
-Home Assistant ships in the stack and 0rb treats it as a backend:
+**Direct first.** 0rb's LAN bridge discovers AirPlay speakers/TVs and network
+(IPP) printers and uses them **directly — zero setup**: speak or stream audio
+on any AirPlay device, print without drivers. Devices the bridge serves are
+never duplicated into Home Assistant; its pending-setup queue is scrubbed
+automatically so HA stays clean. The bridge also advertises the console over
+mDNS so the native apps find the server by themselves.
 
-- **Control** — lights, media, climate, locks, covers, vacuums, plugs, scenes,
+**Home Assistant for deep control.** HA ships in the stack for everything
+beyond playback and printing:
+
+- **Control** — lights, climate, locks, covers, vacuums, plugs, scenes,
   cameras (live MJPEG), 3D printers — each with a purpose-built widget.
 - **Organize** — the agent assigns areas, renames entities, hides duplicates,
   and filters diagnostic noise so only real devices surface.
-- **Set up devices itself** — it drives HA's pairing config-flows (a webOS TV,
-  a Roomba, a Bambu Lab printer) and proactively nudges you when something new
-  appears on the network.
+- **Set up devices itself** — it drives HA's pairing config-flows with the
+  same human-readable forms HA's own UI shows, and nudges you when something
+  new appears that direct access doesn't already cover.
 - **Watch the house** — house modes (home / away / night), arrival routines,
   instant safety alerts (smoke, water, locks), and device-health checks, all
   mode-aware so you're not spammed.
-- **Beyond HA: the LAN bridge** — AirPlay speakers/TVs and network (IPP)
-  printers are discovered and used **directly**: speak or stream audio on any
-  AirPlay device, print without drivers — zero setup, even for devices Home
-  Assistant doesn't know. The bridge also advertises the console over mDNS so
-  the native apps find the server automatically.
 
 ### Household
 
@@ -180,6 +183,7 @@ all services on one network, each with a healthcheck and restart policy:
 | `orb2-api` | the agent (Bun) — the heart of the system | |
 | `whatsapp` | WhatsApp Web bridge (Baileys, :8995) | |
 | `searxng` | private web-search backend for the WebSearch tool | |
+| `bridge` | LAN bridge (host net) — direct AirPlay + IPP printing, mDNS advertising, router (UPnP) assist | |
 | `homeassistant` | Home Assistant (host networking for discovery, console :8123) | |
 | `ui` | nginx console — front door (HTTP :9080, HTTPS :9443) | |
 | `watchdog` | restarts any service that goes unhealthy | |
@@ -198,8 +202,10 @@ Brave), NewsSearch, YouTube, Music (Spotify), Weather (defaults to your home
 location, auto-resolved from Home Assistant), Geocode/Directions (map widget
 with server-side coordinate validation), Docker/DockerOps, Blender (3D →
 glTF), Publish, Vision, RecallMemory, Vault, Concierge, Timer, Shopping,
-Wallet (payment-method **metadata only** — label, brand, last4), Home +
-HomeAdmin (control, organize, and pair smart-home devices), Family (notes,
+Wallet (payment-method **metadata only** — label, brand, last4), AirPlay
+(speak/stream on any AirPlay speaker or TV, directly), Print (driverless IPP
+printing), Home + HomeAdmin (control, organize, and pair smart-home devices
+through HA), Family (notes,
 reminders, calendar, chores, announcements, briefings), Settings (the agent
 reads and changes its own whitelisted settings live), CreateWidget, and the
 self-evolution suite.
@@ -229,19 +235,24 @@ log — see [SECURITY.md](SECURITY.md).
 
 ## Remote access
 
-Remote mic/camera need a secure context (real HTTPS). Two paths:
+Remote mic/camera need a secure context (real HTTPS). Pick your mechanism in
+**Settings → System → Remote access** — everything stays behind 0rb's OTP
+auth either way:
 
-```bash
-bash scripts/setup-tailscale.sh            # tailnet-only
-bash scripts/setup-tailscale.sh --funnel   # also public
-```
+- **Tailscale** — private tailnet by default; one click turns on **public
+  access** (Funnel) so the URL works from anywhere without the Tailscale app.
+  ```bash
+  bash scripts/setup-tailscale.sh
+  ```
+- **Direct (DynDNS)** — the box's registered hostname
+  (`<id>.device.orb2.app`, real Let's Encrypt cert via the hosted device-DNS
+  relay) can follow your **public IP**, refreshed outbound every 10 minutes.
+  The orb opens the router port itself where UPnP is available, detects your
+  router brand and shows exact manual steps where it isn't, and then verifies
+  reachability **from the internet** before claiming success.
 
-Then set `ORB2_PUBLIC_URL` to your `https://<machine>.<tailnet>.ts.net` URL.
-
-A zero-config alternative is being finalized: per-device hostnames
-(`<id>.device.orb2.app`) with real Let's Encrypt certificates via a hosted
-device-DNS relay — see [DEPLOYMENT.md](DEPLOYMENT.md). Either way, everything
-stays behind 0rb's OTP auth.
+The AirPlay/printer tools and per-function widgets also mean the native apps
+auto-discover the server at home (mDNS) and fail over to the remote URL away.
 
 ## Repository layout
 
@@ -249,7 +260,7 @@ stays behind 0rb's OTP auth.
 docker-compose.spark.yml   the stack (model revisions pinned here)
 .env.example               configuration template
 scripts/                   install.sh, orb2-stack.sh, preflight, watchdog, tailscale, self-evolve
-services/                  tts stt embed blender av-webrtc whatsapp searxng (Dockerfiles)
+services/                  tts stt embed blender av-webrtc whatsapp searxng bridge (Dockerfiles)
 src/api/                   the agent API (auth, voice, family, channels, memory, vision, home, widgets, connectors)
 web/public/                the orb console (index.html, orb.css, orb-shell.js)
 docs/                      widget-plugin contract and other docs

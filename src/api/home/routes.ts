@@ -92,16 +92,21 @@ export async function tryHandleHomeRoute(method: string, pathname: string, req: 
       const INTERNAL = new Set(['sun', 'analytics', 'backup', 'go2rtc', 'hassio', 'onboarding', 'hardware', 'usb',
         'shopping_list', 'google_translate', 'met', 'radio_browser', 'zone', 'person', 'update'])
       const visible = entries.filter(e => e.state !== 'loaded' || !INTERNAL.has(e.domain))
-      // Human names for discovered handlers ("brother" → "Brother Printer").
-      // Direct-first policy: devices the LAN bridge already covers (printers,
-      // AirPlay audio) are marked so the UI can say "works already — HA setup
-      // is optional deep control", keeping HA free of noise.
+      // Direct-first policy, hard form: devices the LAN bridge already serves
+      // (printers, AirPlay audio) are DISMISSED from HA's pending queue —
+      // they work with zero setup, so a pending HA flow is pure duplicate
+      // noise. HA re-discovers after restarts; we re-dismiss, cheaply.
       const { bridgeEnabled } = await import('../connectors/bridge.js')
-      const COVERED: Record<string, string> = bridgeEnabled()
-        ? { ipp: 'printing works directly', brother: 'printing works directly', apple_tv: 'audio streaming works directly' }
-        : {}
-      const named = await Promise.all(discovered.map(async f => ({
-        ...f, title: await haIntegrationName(f.handler), covered: COVERED[f.handler] ?? null,
+      const COVERED = new Set(['ipp', 'brother', 'apple_tv'])
+      let remaining = discovered
+      if (bridgeEnabled()) {
+        const scrub = discovered.filter(f => COVERED.has(f.handler))
+        remaining = discovered.filter(f => !COVERED.has(f.handler))
+        for (const f of scrub) haFlowDismiss(f.flow_id).catch(() => { /* best effort */ })
+      }
+      // Human names for what's left ("matter" → "Matter").
+      const named = await Promise.all(remaining.map(async f => ({
+        ...f, title: await haIntegrationName(f.handler),
       })))
       return jsonResponse(200, { configured: true, entries: visible, discovered: named })
     } catch (e) {

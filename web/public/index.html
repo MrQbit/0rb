@@ -258,7 +258,14 @@
           </div>
           <div class="set-card" id="devUrlCard" style="display:none;">
             <div class="set-kv"><span>Device URL</span><a id="setDeviceUrl" target="_blank" rel="noopener" class="set-url">—</a></div>
-            <p class="set-muted small">This box's registered name with a real certificate — works on your home network (its address points at this house's LAN).</p>
+            <p class="set-muted small" id="devUrlHint">This box's registered name with a real certificate.</p>
+            <div class="set-row" style="margin-top:10px;">
+              <div class="info-label" style="color:var(--ink);">Where it points</div>
+              <button id="rmLan" class="set-btn ghost">Home network</button>
+              <button id="rmDirect" class="set-btn ghost">Internet (DynDNS)</button>
+            </div>
+            <p class="set-muted small">Home network = zero-warning HTTPS at home; use Tailscale when away. Internet = the address follows your public IP (refreshed every 10 minutes) and your router forwards port 9444 — the orb opens it itself when the router allows (UPnP), or shows exact steps for yours.</p>
+            <div id="rmStatus" class="set-muted small"></div>
           </div>
           <div class="set-card"><div class="set-kv"><span>Local HTTPS</span><code id="setLanUrl">—</code></div><p class="set-muted small">Self-signed — accept the cert once for camera/mic on the LAN.</p></div>
           <h4 class="set-h4">Services</h4>

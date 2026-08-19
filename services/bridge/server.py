@@ -240,6 +240,144 @@ async def ipp_call(p: dict, op: int, extra: list, doc: bytes = b"") -> dict:
 PRINTER_STATES = {3: "idle", 4: "printing", 5: "stopped"}
 
 
+# ── UPnP IGD: find the router, read its external IP, open/close a port ───
+# The "router assistant" half of direct-remote mode. Sync helpers run in a
+# thread; SSDP + one XML fetch + one SOAP call are all sub-second on a LAN.
+import re as _re
+import urllib.request as _url
+
+_igd: dict = {"control": None, "service": None, "at": 0.0}
+
+
+def _upnp_find_sync():
+    msg = (
+        "M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\n"
+        'MAN: "ssdp:discover"\r\nMX: 2\r\n'
+        "ST: urn:schemas-upnp-org:device:InternetGatewayDevice:1\r\n\r\n"
+    ).encode()
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.settimeout(2.5)
+    locations = []
+    try:
+        s.sendto(msg, ("239.255.255.250", 1900))
+        while True:
+            data, _ = s.recvfrom(4096)
+            m = _re.search(rb"(?i)location:\s*(\S+)", data)
+            if m:
+                loc = m.group(1).decode()
+                if loc not in locations:
+                    locations.append(loc)
+    except socket.timeout:
+        pass
+    finally:
+        s.close()
+    for loc in locations:
+        try:
+            xml = _url.urlopen(loc, timeout=4).read().decode("utf-8", "replace")
+        except Exception:
+            continue
+        for svc in ("WANIPConnection:2", "WANIPConnection:1", "WANPPPConnection:1"):
+            st = f"urn:schemas-upnp-org:service:{svc}"
+            i = xml.find(st)
+            if i < 0:
+                continue
+            m = _re.search(r"<controlURL>([^<]+)</controlURL>", xml[i:i + 3000])
+            if not m:
+                continue
+            base = _re.match(r"(https?://[^/]+)", loc)
+            ctrl = m.group(1) if m.group(1).startswith("http") else (base.group(1) + m.group(1))
+            return {"control": ctrl, "service": st}
+    return None
+
+
+def _soap_sync(ctrl: str, service: str, action: str, args_xml: str) -> str:
+    body = (
+        '<?xml version="1.0"?>'
+        '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" '
+        's:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body>'
+        f'<u:{action} xmlns:u="{service}">{args_xml}</u:{action}>'
+        "</s:Body></s:Envelope>"
+    )
+    req = _url.Request(ctrl, data=body.encode(), headers={
+        "Content-Type": 'text/xml; charset="utf-8"',
+        "SOAPAction": f'"{service}#{action}"',
+    })
+    return _url.urlopen(req, timeout=6).read().decode("utf-8", "replace")
+
+
+async def upnp_gateway(force: bool = False):
+    if _igd["control"] and not force and time.time() - _igd["at"] < 3600:
+        return _igd
+    found = await asyncio.to_thread(_upnp_find_sync)
+    if found:
+        _igd.update(found)
+        _igd["at"] = time.time()
+    else:
+        _igd["control"] = None
+    return _igd if _igd["control"] else None
+
+
+async def h_upnp(req):
+    check_token(req)
+    gw = await upnp_gateway("force" in req.query)
+    if not gw:
+        return web.json_response({"gateway": False})
+    try:
+        xml = await asyncio.to_thread(_soap_sync, gw["control"], gw["service"], "GetExternalIPAddress", "")
+        m = _re.search(r"<NewExternalIPAddress>([^<]+)</NewExternalIPAddress>", xml)
+        return web.json_response({"gateway": True, "external_ip": m.group(1) if m else None})
+    except Exception as e:
+        return web.json_response({"gateway": True, "external_ip": None, "error": str(e)[:120]})
+
+
+async def h_upnp_map(req):
+    check_token(req)
+    b = await req.json()
+    port = int(b.get("port", 0))
+    if not (0 < port < 65536):
+        raise web.HTTPBadRequest(text="port required")
+    internal = str(b.get("internal_ip") or lan_ip())
+    gw = await upnp_gateway()
+    if not gw:
+        return web.json_response({"ok": False, "error": "no UPnP gateway — forward the port on the router manually"}, status=502)
+    args = (
+        "<NewRemoteHost></NewRemoteHost>"
+        f"<NewExternalPort>{port}</NewExternalPort>"
+        "<NewProtocol>TCP</NewProtocol>"
+        f"<NewInternalPort>{port}</NewInternalPort>"
+        f"<NewInternalClient>{internal}</NewInternalClient>"
+        "<NewEnabled>1</NewEnabled>"
+        "<NewPortMappingDescription>orb2 remote</NewPortMappingDescription>"
+        "<NewLeaseDuration>0</NewLeaseDuration>"
+    )
+    try:
+        await asyncio.to_thread(_soap_sync, gw["control"], gw["service"], "AddPortMapping", args)
+        log.info("upnp: mapped TCP %d -> %s:%d", port, internal, port)
+        return web.json_response({"ok": True, "port": port, "internal": internal})
+    except Exception as e:
+        return web.json_response({"ok": False, "error": str(e)[:200]}, status=502)
+
+
+async def h_upnp_unmap(req):
+    check_token(req)
+    b = await req.json()
+    port = int(b.get("port", 0))
+    gw = await upnp_gateway()
+    if not gw:
+        return web.json_response({"ok": False, "error": "no UPnP gateway"}, status=502)
+    args = (
+        "<NewRemoteHost></NewRemoteHost>"
+        f"<NewExternalPort>{port}</NewExternalPort>"
+        "<NewProtocol>TCP</NewProtocol>"
+    )
+    try:
+        await asyncio.to_thread(_soap_sync, gw["control"], gw["service"], "DeletePortMapping", args)
+        log.info("upnp: unmapped TCP %d", port)
+        return web.json_response({"ok": True})
+    except Exception as e:
+        return web.json_response({"ok": False, "error": str(e)[:200]}, status=502)
+
+
 # ── HTTP API ─────────────────────────────────────────────────────────────
 def check_token(req: web.Request):
     if TOKEN and req.headers.get("X-Bridge-Token") != TOKEN:
@@ -409,6 +547,9 @@ async def main():
     app.router.add_post("/announce", h_announce)
     app.router.add_get("/printer", h_printer)
     app.router.add_post("/print", h_print)
+    app.router.add_get("/upnp", h_upnp)
+    app.router.add_post("/upnp/map", h_upnp_map)
+    app.router.add_post("/upnp/unmap", h_upnp_unmap)
     runner = web.AppRunner(app)
     await runner.setup()
     await web.TCPSite(runner, "0.0.0.0", PORT).start()

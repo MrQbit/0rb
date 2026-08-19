@@ -568,6 +568,10 @@ export async function startApiServer(config: ApiServerConfig) {
   void import('./devicecert/serve.js')
     .then(m => m.startDeviceTls(serveOpts, store))
     .catch(err => log.warn('device_tls_init_failed', { error: (err as Error).message }))
+  // Keep the device A record honest (direct mode follows the WAN IP).
+  void import('./devicecert/remote.js')
+    .then(m => m.startRemoteRefresh(store))
+    .catch(() => { /* best effort */ })
 
   // ── Free HTTPS via Tailscale (https://<node>.ts.net) ──
   // Best-effort, in the background; no-op unless this box is already on a
@@ -1612,6 +1616,20 @@ async function dispatch(
   // ─── Home (device dashboard refresh + tap-to-control via Home Assistant) ───
   const homeResp = await tryHandleHomeRoute(method, pathname, req, ctx.store)
   if (homeResp) return homeResp
+  // ─── Remote mode: lan (tailnet for away) vs direct (DynDNS + router port) ───
+  if (pathname === '/v1/remote/status' && method === 'GET') {
+    const { getRemoteMode, applyRemote } = await import('./devicecert/remote.js')
+    const full = new URL(req.url).searchParams.get('check') === '1'
+    if (full) return jsonResponse(200, await applyRemote(ctx.store))
+    return jsonResponse(200, { mode: await getRemoteMode(ctx.store) })
+  }
+  if (pathname === '/v1/remote/mode' && method === 'POST') {
+    const b = await req.json().catch(() => ({})) as any
+    const mode = String(b?.mode || '')
+    if (mode !== 'lan' && mode !== 'direct') return jsonResponse(400, { error: "mode must be 'lan' or 'direct'" })
+    const { setRemoteMode } = await import('./devicecert/remote.js')
+    return jsonResponse(200, await setRemoteMode(ctx.store, mode))
+  }
   // ─── LAN bridge (Settings → Smart home: devices seen directly, no HA) ───
   if (method === 'GET' && pathname === '/v1/bridge/devices') {
     const { bridgeEnabled, bridgeDevices } = await import('./connectors/bridge.js')
