@@ -29,7 +29,7 @@ export const SETTINGS_KEYS = [
   // Model router — default local; route by intent to OpenRouter when enabled.
   'ORB2_ROUTER_ENABLED', 'ORB2_OPENROUTER_KEY', 'ORB2_ROUTER_STRONG_MODEL',
   // Connected apps (set from Settings → Apps; enable the matching tools live)
-  'ORB2_YOUTUBE_API_KEY', 'ORB2_SPOTIFY_CLIENT_ID', 'ORB2_SPOTIFY_CLIENT_SECRET',
+  'ORB2_YOUTUBE_API_KEY', 'ORB2_SPOTIFY_CLIENT_ID', 'ORB2_SPOTIFY_CLIENT_SECRET', 'ORB2_BRAVE_API_KEY',
   'ORB2_NEWSAPI_KEY', 'ORB2_VERCEL_TOKEN', 'ORB2_VERCEL_TEAM_ID',
   // Cloud Storage (Google Drive + Microsoft OneDrive) — OAuth client creds
   'ORB2_GOOGLE_CLIENT_ID', 'ORB2_GOOGLE_CLIENT_SECRET',
