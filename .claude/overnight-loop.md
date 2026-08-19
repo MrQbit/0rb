@@ -25,7 +25,7 @@ medication reminders, package tracking, meal planning, sleep sounds,
 guest mode, vacation mode, plant care, pet feeding, laundry timer flow.
 
 ## Loop B — UI scrutiny (details: every widget/button/icon/motion)
-Clean checks: 0/3 (pass-7 found: B15 panel brand + chevron)
+Clean checks: 1/3 (pass-8 clean: glyph/contrast/aria/empty-state sweep across all renderers found nothing code-verifiable)
 Done:
 - B1 SVG close buttons + resize grip cue b400e78
 - B2 stacking toasts (no more lost messages) dfd9775
