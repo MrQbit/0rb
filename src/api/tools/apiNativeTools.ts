@@ -1101,11 +1101,24 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
         if (result?.type === 'abort') return `${handler} setup aborted: ${result.reason || 'unknown'}. ${result.reason === 'already_configured' ? 'It is already set up.' : ''}`
         if (result?.type === 'form') {
           const errs = result.errors && Object.keys(result.errors).length ? ` Errors: ${JSON.stringify(result.errors)}.` : ''
-          const asks = (result.data_schema || []).map((f: any) => f.name).filter(Boolean)
+          // Describe each field the flow asks for — type, required, and any
+          // dropdown options — so the agent can collect answers accurately.
+          const asks = (result.data_schema || []).map((f: any) => {
+            if (!f?.name) return ''
+            const bits: string[] = []
+            if (f.required) bits.push('required')
+            if (f.type) bits.push(String(f.type))
+            const sel = f.selector && typeof f.selector === 'object' ? f.selector : null
+            const opts = sel?.select?.options
+            if (Array.isArray(opts)) bits.push(`options: ${opts.map((o: any) => typeof o === 'object' ? o.value : o).slice(0, 12).join('|')}`)
+            return `${f.name}${bits.length ? ` (${bits.join(', ')})` : ''}`
+          }).filter(Boolean)
           const hint = handler === 'webostv' && errs.includes('error_pairing')
             ? ' The TV must be ON and reachable; when it shows the pairing prompt the user must ACCEPT it on screen with the remote, then run pair again.'
             : ''
-          return `${handler} setup is at step "${result.step_id}".${asks.length ? ` It needs: ${asks.join(', ')} — pass them via fields:{...}.` : ''}${errs}${hint}`
+          const desc = result.description_placeholders && Object.keys(result.description_placeholders).length
+            ? ` Context: ${JSON.stringify(result.description_placeholders).slice(0, 200)}.` : ''
+          return `${handler} setup is at step "${result.step_id}".${asks.length ? ` It needs: ${asks.join('; ')} — pass answers via fields:{...}.` : ' Advance again to confirm, or check the device.'}${errs}${desc}${hint}`
         }
         return `Flow state: ${JSON.stringify(result).slice(0, 200)}`
       }

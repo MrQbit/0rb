@@ -14,7 +14,7 @@
  * Notifications go to Telegram (ORB2_TELEGRAM_BOT_TOKEN + _OWNER_ID) when set;
  * otherwise they're logged (and surface in the audit trail).
  */
-import { haEnabled, haStates, type HaEntity } from '../connectors/homeAssistant.js'
+import { haEnabled, haStates, haDiscoveredFlows, type HaEntity } from '../connectors/homeAssistant.js'
 import { sendPush } from '../push/fcm.js'
 import type { Store } from '../store/store.js'
 import { log } from '../log.js'
@@ -85,7 +85,43 @@ async function notifyOwner(text: string): Promise<void> {
   if (!delivered) log.info('home_alert', { text })
 }
 
+// ── Discovery watcher: "I found a new device on your network" ──────────
+// HA discovers devices via mDNS/SSDP and parks them in a pending-flows
+// queue that nobody looks at. Orb checks it and tells the owner, who can
+// then just SAY "set it up" — the agent drives the pairing (HomeAdmin).
+const SEEN_KEY = 'home:discovery:seen'
+const seenFlows = new Set<string>()
+let seenLoaded = false
+let discoveryTicks = 0
+
+/** Friendly names for common discovery handlers. */
+const NICE: Record<string, string> = {
+  webostv: 'an LG webOS TV', roomba: 'an iRobot Roomba', sonos: 'a Sonos speaker',
+  hue: 'a Philips Hue bridge', cast: 'a Google Cast device', esphome: 'an ESPHome device',
+  homekit_controller: 'a HomeKit device', shelly: 'a Shelly device', tplink: 'a TP-Link device',
+  ipp: 'a network printer', brother: 'a Brother printer', wled: 'a WLED light controller',
+  zwave_js: 'a Z-Wave controller', zha: 'a Zigbee controller', matter: 'a Matter device',
+}
+function nice(handler: string): string { return NICE[handler] || `a "${handler}" device` }
+
+async function checkDiscoveries(): Promise<void> {
+  const flows = await haDiscoveredFlows().catch(() => [] as Awaited<ReturnType<typeof haDiscoveredFlows>>)
+  if (!seenLoaded && pushStore) {
+    try { for (const id of JSON.parse((await pushStore.getKv(SEEN_KEY)) || '[]')) seenFlows.add(id) } catch { /* fresh */ }
+    seenLoaded = true
+  }
+  const fresh = flows.filter(f => !seenFlows.has(f.flow_id))
+  if (!fresh.length) return
+  for (const f of fresh) seenFlows.add(f.flow_id)
+  if (pushStore) { try { await pushStore.putKv(SEEN_KEY, JSON.stringify([...seenFlows]), 0) } catch { /* best effort */ } }
+  const what = [...new Set(fresh.map(f => nice(f.handler)))].join(' and ')
+  await notifyOwner(`I spotted something new on the network: ${what}. Want me to set it up? Just ask — e.g. "set up the ${fresh[0]!.handler === 'webostv' ? 'TV' : fresh[0]!.handler}".`)
+  log.info('home_discovery_nudge', { handlers: fresh.map(f => f.handler) })
+}
+
 async function tick(): Promise<void> {
+  // Discovery queue changes rarely — check every 5th poll (~5 min default).
+  if (discoveryTicks++ % 5 === 0) await checkDiscoveries().catch(() => { /* best effort */ })
   let entities: HaEntity[]
   try {
     entities = await haStates(['lock', 'binary_sensor', 'cover'])

@@ -118,6 +118,12 @@ Run 0rb at login via a LaunchAgent that runs `docker compose up -d`.
 - **Without →** Mode 2 (Docker Desktop + cloud brain, voice off).
 Start at login via Task Scheduler (or Docker Desktop "start on login").
 
+> **Device discovery caveat (Mac / Windows):** Docker Desktop cannot give the
+> Home Assistant container host networking, so automatic mDNS/SSDP discovery
+> of devices (Cast, Sonos, ESPHome, printers…) is limited there. Devices can
+> still be added by IP address — ask Orb to "set up <integration>" and it
+> walks the flow. On Linux and Raspberry Pi discovery works fully.
+
 ### Raspberry Pi
 **Mode 2** (64-bit OS + Docker). The app tier is light; give it a Pi 4/5 with
 4 GB+ and keep the brain in the cloud. Voice off.
