@@ -461,8 +461,11 @@ body {
 .set-navi {
   text-align:left; background:none; border:1px solid transparent; color:var(--ink-dim);
   padding:10px 12px; border-radius:10px; font:inherit; font-size:14px; cursor:pointer;
-  transition: all .15s var(--ease); text-decoration:none; display:block;
+  transition: all .15s var(--ease); text-decoration:none;
+  display:flex; align-items:center; gap:9px;
 }
+.set-navi svg { width:15px; height:15px; flex:none; opacity:.85; }
+.set-navi.active svg { color:var(--nv); opacity:1; }
 .set-navi:hover { color:var(--ink); background:rgba(118,185,0,.06); }
 .set-navi.active { color:var(--nv); background:rgba(118,185,0,.12); border-color:var(--glass-edge); }
 .set-advanced { margin-top:auto; color:var(--ink-dim); font-size:13px; }

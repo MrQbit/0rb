@@ -109,6 +109,43 @@ async function haWsCommand(type: string, payload: Record<string, any> = {}): Pro
   })
 }
 
+// ── Integration / config-flow admin (agent-driven device setup) ────────
+export interface HaConfigEntry { entry_id: string; domain: string; title: string; state: string }
+
+export async function haConfigEntries(): Promise<HaConfigEntry[]> {
+  const r = (await haWsCommand('config_entries/get')) as any[]
+  return r.map(e => ({ entry_id: e.entry_id, domain: e.domain, title: e.title, state: e.state }))
+}
+
+export interface HaFlow { flow_id: string; handler: string; step_id?: string }
+
+/** Discovered-but-unconfigured devices (HA's "found on your network" queue). */
+export async function haDiscoveredFlows(): Promise<HaFlow[]> {
+  const r = (await haWsCommand('config_entries/flow/progress')) as any[]
+  return r.map(f => ({ flow_id: f.flow_id, handler: f.handler, step_id: f.context?.source }))
+}
+
+/** Advance a config flow one step (empty data = confirm). Returns HA's raw
+ *  flow result: { type: 'form'|'create_entry'|'abort', step_id?, errors?,
+ *  data_schema?, reason? }. */
+export async function haFlowAdvance(flowId: string, data: Record<string, any> = {}): Promise<any> {
+  return await haFetch(`/config/config_entries/flow/${flowId}`, {
+    method: 'POST', body: JSON.stringify(data),
+  })
+}
+
+/** Current form/step of a flow (fields it is asking for). */
+export async function haFlowStatus(flowId: string): Promise<any> {
+  return await haFetch(`/config/config_entries/flow/${flowId}`)
+}
+
+/** Start a brand-new integration setup flow (e.g. handler 'roomba'). */
+export async function haFlowStart(handler: string): Promise<any> {
+  return await haFetch('/config/config_entries/flow', {
+    method: 'POST', body: JSON.stringify({ handler, show_advanced_options: false }),
+  })
+}
+
 export interface HaArea { area_id: string; name: string }
 export interface HaRegistryEntry { entity_id: string; area_id: string | null; name: string | null; hidden_by: string | null }
 

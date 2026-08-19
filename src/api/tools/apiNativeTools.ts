@@ -39,7 +39,7 @@ import { vercelEnabled, deployToVercel } from '../connectors/vercel.js'
 import { cloudStorageEnabled, searchCloud, downloadCloudFile, connectedProviders } from '../connectors/cloudStorage.js'
 import { geocode, route as geoRoute, weather, reverseGeocode } from '../connectors/geo.js'
 import { webSearch, webSearchEnabled } from '../connectors/websearch.js'
-import { haConfig, haAreas, haCreateArea, haUpdateEntity, haAreaByEntity, haJoinAreas, toDeviceCard, prettyDomain, describeAttrs } from '../connectors/homeAssistant.js'
+import { haConfig, haAreas, haCreateArea, haUpdateEntity, haAreaByEntity, haJoinAreas, toDeviceCard, prettyDomain, describeAttrs, haConfigEntries, haDiscoveredFlows, haFlowAdvance, haFlowStart } from '../connectors/homeAssistant.js'
 import { dockerEnabled, dockerList, dockerControl } from '../connectors/dockerc.js'
 import { haEnabled, haStates, haResolve, haCallService, HOME_DOMAINS, type HaEntity } from '../connectors/homeAssistant.js'
 import { onlineOptions, nearbyStores } from '../connectors/shopping.js'
@@ -422,7 +422,7 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
       name: 'Home',
       description: "Control and check the home's devices through Home Assistant — lights, switches/plugs, thermostats (climate), locks, window shades/blinds (cover), TVs & speakers (media_player), robot vacuums, fans, and door/window & motion sensors. This is how Orb acts as the house. Use op:'list' to see what's available (optionally a `type`), op:'status' to check a device by name, and op:'control' to change one: action on/off/toggle for lights/plugs/switches; lock/unlock for locks; open/close (or set with `value` 0-100) for shades; set with `value` for a thermostat's target temperature; play/pause/on/off (or set volume with `value` 0-100) for media; start/stop/dock for a vacuum. Always refer to devices by their friendly name (e.g. \"kitchen lights\", \"front door\").",
       input_schema: { type: 'object', properties: {
-        op: { type: 'string', enum: ['list', 'status', 'control', 'media', 'lights', 'climate'], description: "list = overview dashboard; status/control = one device; media = show a media REMOTE widget for TVs/speakers; lights = show the room-grouped LIGHTS widget; climate = show thermostat widgets. Prefer the function widgets (media/lights/climate) when the user is focused on one kind of device." },
+        op: { type: 'string', enum: ['list', 'status', 'control', 'media', 'lights', 'climate', 'vacuum'], description: "list = overview dashboard; status/control = one device; media = show a media REMOTE widget for TVs/speakers; lights = show the room-grouped LIGHTS widget; climate = show thermostat widgets. Prefer the function widgets (media/lights/climate) when the user is focused on one kind of device." },
         query: { type: 'string', description: "Device name for status/control (e.g. 'living room lights', 'front door', 'bedroom thermostat')." },
         type: { type: 'string', enum: ['light', 'switch', 'climate', 'lock', 'cover', 'media_player', 'vacuum', 'fan', 'sensor', 'camera'], description: 'Optional device type filter for list.' },
         action: { type: 'string', enum: ['on', 'off', 'toggle', 'lock', 'unlock', 'open', 'close', 'play', 'pause', 'start', 'stop', 'dock', 'set'], description: 'What to do for op:control.' },
@@ -432,15 +432,28 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
     },
     {
       name: 'HomeAdmin',
-      description: "Organize the smart home's structure in Home Assistant — use when the user wants rooms/areas set up, devices renamed to friendly names, devices assigned to rooms, or clutter entities hidden. op:'areas' lists rooms with device counts. op:'create_area' {name} makes a room. op:'assign' {query, area} puts a device in a room (creates the room if needed). op:'rename' {query, name} sets a device's display name. op:'hide' {query, hidden} hides/unhides an entity from dashboards. Refer to devices by their current name (e.g. 'living room tv').",
+      description: "Organize AND configure the smart home in Home Assistant. Structure: op:'areas' lists rooms; op:'create_area' {name}; op:'assign' {query, area}; op:'rename' {query, name}; op:'hide' {query, hidden}. Device setup: op:'integrations' lists installed integrations + devices HA has DISCOVERED on the network but not set up yet; op:'pair' {integration} advances a discovered device's setup (e.g. integration:'webostv' makes the TV show its pairing prompt — the device must be ON and the user must accept on its screen); op:'setup' {integration, fields?} starts a NEW integration from scratch (e.g. 'roomba') and reports what fields it needs — pass them in `fields` on the next call; op:'diagnose' {query} explains why a device is failing (state, availability, which integration). Use these to actively FIX devices the user can't control instead of telling them to open HA.",
       input_schema: { type: 'object', properties: {
-        op: { type: 'string', enum: ['areas', 'create_area', 'assign', 'rename', 'hide'] },
+        op: { type: 'string', enum: ['areas', 'create_area', 'assign', 'rename', 'hide', 'integrations', 'pair', 'setup', 'diagnose'] },
         query: { type: 'string', description: 'Device to act on, by name.' },
         area: { type: 'string', description: "Room name for op:'assign'." },
         name: { type: 'string', description: "New display name for op:'rename' / op:'create_area'." },
         hidden: { type: 'boolean', description: "op:'hide': true hides, false unhides." },
+        integration: { type: 'string', description: "Integration handler for pair/setup, e.g. 'webostv', 'roomba', 'sonos'." },
+        fields: { type: 'object', description: "op:'setup': answers for the fields the flow asked for (e.g. {host:'192.168.1.20'})." },
       }, required: ['op'] },
       available: haEnabled(),
+    },
+    {
+      name: 'Settings',
+      description: "Read and change Orb's own settings, and open the Settings panel for the user. op:'open' {section?} opens the panel (sections: access, users, channels, voice, apps, files, integrations, system). op:'get' {key?} reads current settings (secret values are shown only as set/unset). op:'set' {key, value} changes a setting live (e.g. OPENAI_MODEL, ORB2_TTS_VOICE, ORB2_HOME_LOCATION, OPENAI_BASE_URL for a cloud brain). Use when the user asks to change how Orb works — do it for them instead of describing where to click. Endpoint/key changes may need a restart to fully apply.",
+      input_schema: { type: 'object', properties: {
+        op: { type: 'string', enum: ['open', 'get', 'set'] },
+        section: { type: 'string', description: "Panel section for op:'open'." },
+        key: { type: 'string', description: 'Setting key (ORB2_* / OPENAI_*).' },
+        value: { type: 'string', description: "New value for op:'set'." },
+      }, required: ['op'] },
+      available: true,
     },
     {
       name: 'Shopping',
@@ -886,6 +899,16 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
         }
         return `Showed media remote${players.length > 1 ? 's' : ''} for: ${players.slice(0, 4).map(p => p.name).join(', ')}.`
       }
+      if (op === 'vacuum') {
+        const vs = await haJoinAreas(await haStates(['vacuum']))
+        if (!vs.length) return "No vacuum in Home Assistant yet. A Roomba can be added: HomeAdmin op:'setup' integration:'roomba' (it will ask for host/blid/password)."
+        for (const e of vs.slice(0, 3)) emitWidget(ctx.sessionId, {
+          id: `vacuum-${e.entity_id}`, type: 'vacuum', title: e.name,
+          entity_id: e.entity_id, name: e.name, area: e.area, state: e.state,
+          battery: e.attributes.battery_level, fan: e.attributes.fan_speed,
+        } as any)
+        return `Showed vacuum widget: ${vs.map(v => `${v.name} (${v.state}${v.attributes.battery_level != null ? `, ${v.attributes.battery_level}%` : ''})`).join(', ')}.`
+      }
       if (op === 'climate') {
         const cl = await haJoinAreas(await haStates(['climate']))
         if (!cl.length) return 'No thermostats found.'
@@ -941,6 +964,58 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
         const a = await haCreateArea(name)
         return `Created area "${a.name}".`
       }
+      if (op === 'integrations') {
+        const [entries, flows] = await Promise.all([haConfigEntries(), haDiscoveredFlows()])
+        const bad = entries.filter(e => e.state !== 'loaded')
+        let out = 'Installed: ' + entries.map(e => `${e.title} (${e.domain}${e.state !== 'loaded' ? ` — ${e.state}` : ''})`).join(' · ')
+        if (flows.length) out += `\nDISCOVERED, awaiting setup: ${flows.map(f => f.handler).join(', ')} — use op:'pair' {integration:'<handler>'} to set one up.`
+        if (bad.length) out += `\nProblems: ${bad.map(e => `${e.domain} is ${e.state}`).join('; ')}.`
+        return out
+      }
+      if (op === 'pair' || op === 'setup') {
+        const handler = String(args?.integration || '').trim().toLowerCase()
+        if (!handler) return "Which integration? e.g. integration:'webostv' or 'roomba'."
+        let flow: any = null
+        if (op === 'pair') {
+          const flows = await haDiscoveredFlows()
+          flow = flows.find(f => f.handler === handler)
+        }
+        const fields = (args?.fields && typeof args.fields === 'object') ? args.fields : {}
+        let result: any
+        if (flow) result = await haFlowAdvance(flow.flow_id, fields)
+        else {
+          result = await haFlowStart(handler)
+          if (result?.flow_id && Object.keys(fields).length) result = await haFlowAdvance(result.flow_id, fields)
+        }
+        if (result?.type === 'create_entry') return `Done — ${handler} is set up ("${result.title || handler}"). Its devices will appear shortly.`
+        if (result?.type === 'abort') return `${handler} setup aborted: ${result.reason || 'unknown'}. ${result.reason === 'already_configured' ? 'It is already set up.' : ''}`
+        if (result?.type === 'form') {
+          const errs = result.errors && Object.keys(result.errors).length ? ` Errors: ${JSON.stringify(result.errors)}.` : ''
+          const asks = (result.data_schema || []).map((f: any) => f.name).filter(Boolean)
+          const hint = handler === 'webostv' && errs.includes('error_pairing')
+            ? ' The TV must be ON and reachable; when it shows the pairing prompt the user must ACCEPT it on screen with the remote, then run pair again.'
+            : ''
+          return `${handler} setup is at step "${result.step_id}".${asks.length ? ` It needs: ${asks.join(', ')} — pass them via fields:{...}.` : ''}${errs}${hint}`
+        }
+        return `Flow state: ${JSON.stringify(result).slice(0, 200)}`
+      }
+      if (op === 'diagnose') {
+        const q = String(args?.query || '').trim()
+        if (!q) return 'Which device should I diagnose?'
+        const entities = await haStates()
+        const m = haResolve(entities, q)
+        if (!m.length) return `No entity matching "${q}". It may not be set up — check op:'integrations' for discovered devices.`
+        const t = m[0]!
+        const entries = await haConfigEntries().catch(() => [])
+        const guessDomain = t.entity_id.includes('webos') || (t.attributes.friendly_name || '').toLowerCase().includes('webos') ? 'webostv' : undefined
+        const entry = entries.find(e => guessDomain ? e.domain === guessDomain : (t.attributes.attribution || '').toLowerCase().includes(e.domain))
+        let out = `${t.name} (${t.entity_id}): state "${t.state}".`
+        if (t.state === 'unavailable') out += ' UNAVAILABLE means HA cannot reach it — usually powered off, network changed, or the integration lost auth.'
+        if (entry) out += ` Integration: ${entry.domain} (${entry.state}).`
+        else if (guessDomain) out += ` No ${guessDomain} integration is configured — this entity likely comes from Google Cast, which gives only limited control. Set up the real integration with op:'pair'.`
+        return out
+      }
+
       // Remaining ops act on one device resolved by name.
       const query = String(args?.query || '').trim()
       if (!query) return "Tell me which device — e.g. 'living room tv'."
@@ -972,6 +1047,36 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
     } catch (e) {
       return `[Home Assistant] ${(e as Error).message}`
     }
+  })
+  add('Settings', {}, async args => {
+    const op = String(args?.op || 'open')
+    const { SETTINGS_KEYS, SETTINGS_PLAINTEXT_KEYS } = await import('../settingsKeys.js')
+    if (op === 'open') {
+      const section = String(args?.section || '').trim().toLowerCase()
+      emitWidget(ctx.sessionId, { id: 'ui-settings', type: 'ui-settings', section } as any)
+      return `Opened the Settings panel${section ? ` at "${section}"` : ''}.`
+    }
+    if (op === 'get') {
+      const want = String(args?.key || '').trim()
+      const keys = want ? (SETTINGS_KEYS as readonly string[]).filter(k => k === want) : (SETTINGS_KEYS as readonly string[])
+      if (want && !keys.length) return `"${want}" is not a configurable setting. Known keys: ${SETTINGS_KEYS.join(', ')}`
+      const rows = await Promise.all(keys.map(async k => {
+        const v = process.env[k] ?? (await ctx.store.getKv(`setting:${k}`)) ?? ''
+        const shown = !v ? '(unset)' : SETTINGS_PLAINTEXT_KEYS.has(k) ? v : '•set•'
+        return `${k}=${shown}`
+      }))
+      return rows.join('\n')
+    }
+    if (op === 'set') {
+      const key = String(args?.key || '').trim()
+      const value = String(args?.value ?? '').trim()
+      if (!(SETTINGS_KEYS as readonly string[]).includes(key)) return `"${key}" is not a settable key. Known keys: ${SETTINGS_KEYS.join(', ')}`
+      if (!value) return 'Provide a value.'
+      await ctx.store.putKv(`setting:${key}`, value, 0)
+      process.env[key] = value
+      return `Set ${key}${SETTINGS_PLAINTEXT_KEYS.has(key) ? ` = ${value}` : ''} (live).${/BASE_URL|API_KEY/.test(key) ? ' A restart may be needed for the brain endpoint to fully switch.' : ''}`
+    }
+    return `Unknown op "${op}".`
   })
   add('Shopping', {}, async args => {
     const op = String(args?.op || 'show')

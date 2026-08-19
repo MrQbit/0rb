@@ -49,7 +49,17 @@ if [ ! -f .env ]; then
     sed -i "0,/REPLACE_WITH_RANDOM_SECRET/s//$(openssl rand -hex 32)/" .env
   done
   sed -i "s|/home/youruser/orb2|$REPO|" .env
-  warn "Edit .env to set ORB2_AUTH_ALLOWED_EMAILS, SMTP, and (optionally) Telegram/WhatsApp."
+  # First sign-in needs a real owner email on the allowlist. Codes are
+  # delivered via the hosted relay by default, so email just works.
+  if [ -t 0 ]; then
+    read -rp "Owner email for sign-in (you@example.com): " OWNER_EMAIL || true
+    if [ -n "${OWNER_EMAIL:-}" ]; then
+      sed -i "s|ORB2_AUTH_ALLOWED_EMAILS=you@example.com|ORB2_AUTH_ALLOWED_EMAILS=$OWNER_EMAIL|" .env
+    fi
+  fi
+  grep -q 'ORB2_AUTH_ALLOWED_EMAILS=you@example.com' .env && \
+    warn "Edit .env: set ORB2_AUTH_ALLOWED_EMAILS to YOUR email or sign-in will be impossible."
+  warn "Optional in .env: your own SMTP, Telegram/WhatsApp channels."
 fi
 
 # ── 3b. model cache dir (pre-create so Docker doesn't make it root-owned) ──

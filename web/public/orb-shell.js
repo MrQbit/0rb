@@ -352,6 +352,11 @@
 
   function spawnWidget(spec){
     if(!spec || !spec.type || !widgetLayer) return;
+    // Control events from the agent (not widgets): open the Settings panel.
+    if(spec.type==='ui-settings'){
+      try{ openSettings(); if(spec.section){ const b=document.querySelector(`.set-navi[data-sec="${CSS.escape(spec.section)}"]`); if(b) b.click(); } }catch{}
+      return;
+    }
     // Update in place if a widget with this id already exists (the agent
     // re-emits the same id to "update the widget", not make a new one).
     if(spec.id && widgets.has(spec.id)){
@@ -391,6 +396,7 @@
     else if(spec.type==='media'){ wg.style.width='380px'; wg.style.height='320px'; }
     else if(spec.type==='climate'){ wg.style.width='300px'; wg.style.height='300px'; }
     else if(spec.type==='shopping'){ wg.style.width='420px'; wg.style.height='480px'; }
+    else if(spec.type==='vacuum'){ wg.style.width='300px'; wg.style.height='300px'; }
     else if(spec.type==='document'){ wg.style.width='560px'; wg.style.height='520px'; }
     else if(spec.type==='wallet'){ wg.style.width='380px'; wg.style.height='400px'; }
     else if(spec.type==='lights'){ wg.style.width='400px'; wg.style.height='440px'; }
@@ -506,7 +512,7 @@
     }
   }, 15000);
 
-  function titleFor(s){ return ({chart:'Chart',results:'Results',video:'Video',music:'Music',table:'Table',stats:'Stats',gallery:'Gallery',image:'Image',embed:'Embed',model:'3D model',calculator:'Calculator',weather:'Weather',calendar:'Calendar',code:'Code',mail:'Mail',vercel:'Vercel',map:'Map',docker:'Docker',app:'App',html:'HTML',note:'Note',document:'Document',wallet:'Wallet',lights:'Lights',media:'Media',climate:'Climate',todo:'Tasks',home:'Home'})[s.type]||(s.type?String(s.type):'Note'); }
+  function titleFor(s){ return ({chart:'Chart',results:'Results',video:'Video',music:'Music',table:'Table',stats:'Stats',gallery:'Gallery',image:'Image',embed:'Embed',model:'3D model',calculator:'Calculator',weather:'Weather',calendar:'Calendar',code:'Code',mail:'Mail',vercel:'Vercel',map:'Map',docker:'Docker',app:'App',html:'HTML',note:'Note',vacuum:'Vacuum',document:'Document',wallet:'Wallet',lights:'Lights',media:'Media',climate:'Climate',todo:'Tasks',home:'Home'})[s.type]||(s.type?String(s.type):'Note'); }
 
   // ── widget placement: free-floating, but flow without >15% overlap; when the
   //    visible band is full, drop below + scroll there (the orb follows). ──
@@ -569,6 +575,7 @@
     else if(spec.type==='media') renderMedia(body, spec, wg);
     else if(spec.type==='climate') renderClimate(body, spec);
     else if(spec.type==='shopping') renderShopping(body, spec);
+    else if(spec.type==='vacuum') renderVacuum(body, spec);
     else if(_plugins[spec.type]) renderPlugin(body, spec, _plugins[spec.type]);
     else {
       // Freshly-minted custom widget? (CreateWidget installs plugins at
@@ -778,6 +785,22 @@
         else toast('Failed'); }catch{ toast('Failed'); } };
     form.querySelector('#shopAddBtn').onclick=doAdd;
     form.querySelector('#shopAdd').onkeydown=e=>{ if(e.key==='Enter') doAdd(); };
+  }
+
+  // ── vacuum: robot control ──
+  function renderVacuum(body, spec){
+    const wrap=document.createElement('div'); wrap.className='wg-climate'; body.appendChild(wrap);
+    const ic=document.createElement('div'); ic.style.cssText='color:var(--nv);'; ic.innerHTML=homeIcon('vacuum'); wrap.appendChild(ic);
+    const st=document.createElement('div'); st.className='cur'; st.style.fontSize='22px'; st.textContent=spec.state||'unknown'; wrap.appendChild(st);
+    const lbl=document.createElement('div'); lbl.className='lbl';
+    lbl.textContent=[spec.area, spec.battery!=null?('battery '+spec.battery+'%'):null, spec.fan].filter(Boolean).join(' · '); wrap.appendChild(lbl);
+    const row=document.createElement('div'); row.className='tgt';
+    const act=(txt,action)=>{ const b=document.createElement('button'); b.className='wg-med-btn'; b.textContent=txt; b.style.width='auto'; b.style.padding='0 14px';
+      b.onclick=async()=>{ try{ const r=await fetch('/v1/home/control',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({entity_id:spec.entity_id,action})});
+        if(r.ok){ st.textContent=action==='start'?'cleaning':action==='dock'?'returning':'paused'; } else toast('Failed'); }catch{ toast('Failed'); } };
+      return b; };
+    row.appendChild(act('Clean','start')); row.appendChild(act('Pause','stop')); row.appendChild(act('Dock','dock'));
+    wrap.appendChild(row);
   }
 
   // ── climate: thermostat ──
