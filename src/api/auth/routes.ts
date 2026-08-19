@@ -77,6 +77,15 @@ export async function handleAuthRoutes(
       try { body = (await req.json()) as any } catch { return json(400, { error: 'invalid JSON' }) }
       if (!body.email) return json(400, { error: 'email required' })
       if (body.role !== undefined && !['owner', 'member'].includes(body.role)) return json(400, { error: 'role must be owner|member' })
+      // Role changes on EXISTING users go through setRole (last-owner guard).
+      const existing = await getUsers(store)
+      const known = existing.some(u => u.email === (body.email || '').trim().toLowerCase())
+      if (known && body.role !== undefined) {
+        const r = await (await import('./otp.js')).setRole(store, body.email!, body.role)
+        if (!r.ok) return json(400, { error: r.error })
+        const users = await addUser(store, { email: body.email!, telegram_chat_id: body.telegram_chat_id, label: body.label, person_entity: body.person_entity })
+        return json(200, { ok: true, users })
+      }
       const users = await addUser(store, { email: body.email, telegram_chat_id: body.telegram_chat_id, label: body.label, role: body.role, person_entity: body.person_entity })
       return json(200, { ok: true, users })
     }

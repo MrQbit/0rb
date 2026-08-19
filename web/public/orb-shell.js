@@ -409,6 +409,7 @@
     else if(spec.type==='printer3d'){ wg.style.width='480px'; wg.style.height='560px'; }
     else if(spec.type==='familyboard'){ wg.style.width='420px'; wg.style.height='440px'; }
     else if(spec.type==='briefing'){ wg.style.width='420px'; wg.style.height='460px'; }
+    else if(spec.type==='housemode'){ wg.style.width='340px'; wg.style.height='240px'; }
     else if(spec.type==='document'){ wg.style.width='560px'; wg.style.height='520px'; }
     else if(spec.type==='wallet'){ wg.style.width='380px'; wg.style.height='400px'; }
     else if(spec.type==='lights'){ wg.style.width='400px'; wg.style.height='440px'; }
@@ -525,7 +526,7 @@
     }
   }, 15000);
 
-  function titleFor(s){ return ({chart:'Chart',results:'Results',video:'Video',music:'Music',table:'Table',stats:'Stats',gallery:'Gallery',image:'Image',embed:'Embed',model:'3D model',calculator:'Calculator',weather:'Weather',calendar:'Calendar',code:'Code',mail:'Mail',vercel:'Vercel',map:'Map',docker:'Docker',app:'App',html:'HTML',note:'Note',vacuum:'Vacuum',covers:'Shades',security:'Security',plugs:'Plugs',scenes:'Scenes',sensors:'Readings',camera:'Camera',timers:'Timers',presence:"Who's home",automations:'Automations',printer3d:'Printer',familyboard:'Family board',briefing:'Today',document:'Document',wallet:'Wallet',lights:'Lights',media:'Media',climate:'Climate',todo:'Tasks',home:'Home'})[s.type]||(s.type?String(s.type):'Note'); }
+  function titleFor(s){ return ({chart:'Chart',results:'Results',video:'Video',music:'Music',table:'Table',stats:'Stats',gallery:'Gallery',image:'Image',embed:'Embed',model:'3D model',calculator:'Calculator',weather:'Weather',calendar:'Calendar',code:'Code',mail:'Mail',vercel:'Vercel',map:'Map',docker:'Docker',app:'App',html:'HTML',note:'Note',vacuum:'Vacuum',covers:'Shades',security:'Security',plugs:'Plugs',scenes:'Scenes',sensors:'Readings',camera:'Camera',timers:'Timers',presence:"Who's home",automations:'Automations',printer3d:'Printer',familyboard:'Family board',briefing:'Today',housemode:'House mode',document:'Document',wallet:'Wallet',lights:'Lights',media:'Media',climate:'Climate',todo:'Tasks',home:'Home'})[s.type]||(s.type?String(s.type):'Note'); }
 
   // ── widget placement: free-floating, but flow without >15% overlap; when the
   //    visible band is full, drop below + scroll there (the orb follows). ──
@@ -601,6 +602,7 @@
     else if(spec.type==='printer3d') renderPrinter3d(body, spec, wg);
     else if(spec.type==='familyboard') renderFamilyBoard(body, spec);
     else if(spec.type==='briefing') renderBriefing(body, spec);
+    else if(spec.type==='housemode') renderHouseMode(body, spec);
     else if(_plugins[spec.type]) renderPlugin(body, spec, _plugins[spec.type]);
     else {
       // Freshly-minted custom widget? (CreateWidget installs plugins at
@@ -930,6 +932,30 @@
     bust(); body.appendChild(img);
     if(wg){ if(wg._camTimer) clearInterval(wg._camTimer);
       wg._camTimer=setInterval(()=>{ if(!document.contains(wg)){ clearInterval(wg._camTimer); return; } if(wg._state==='active') bust(); },10000); }
+  }
+
+  // ── house mode: one-tap posture switch ──
+  function renderHouseMode(body, spec){
+    const wrap=document.createElement('div'); wrap.className='wg-mode'; body.appendChild(wrap);
+    const MODES=[
+      {id:'home',label:'Home',desc:'gentle nudges',icon:homeIcon('light')},
+      {id:'away',label:'Away',desc:'instant alerts + motion',icon:homeIcon('lock')},
+      {id:'vacation',label:'Vacation',desc:'armed + daily check-ins',icon:homeIcon('scene')},
+      {id:'guest',label:'Guests',desc:'door nudges muted',icon:homeIcon('media_player')},
+    ];
+    let cur=spec.mode||'home';
+    MODES.forEach(m=>{
+      const b=document.createElement('button'); b.className='wg-mode-chip'+(m.id===cur?' on':''); b.setAttribute('role','radio');
+      b.innerHTML=`<span class="ic">${m.icon}</span><span class="l">${esc2(m.label)}</span><span class="d">${esc2(m.desc)}</span>`;
+      b.onclick=async()=>{
+        try{
+          const r=await fetch('/v1/home/mode',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({mode:m.id})});
+          if(r.ok){ cur=m.id; wrap.querySelectorAll('.wg-mode-chip').forEach(c=>c.classList.remove('on')); b.classList.add('on'); toast('House mode: '+m.label); }
+          else toast('Failed');
+        }catch{ toast('Failed'); }
+      };
+      wrap.appendChild(b);
+    });
   }
 
   // ── briefing: the day at a glance ──
@@ -2093,11 +2119,20 @@
     try{ const d=await (await fetch('/v1/auth/users',{credentials:'same-origin'})).json(); const us=d.users||[];
       if(!us.length){ list.innerHTML='<div class="set-muted">No users yet.</div>'; return; }
       list.innerHTML='';
-      us.forEach(u=>{ const it=document.createElement('div'); it.className='set-item';
-        it.innerHTML=`<div class="grow"><div class="t">${esc(u.email)}${u.label?` · <span class="set-muted">${esc(u.label)}</span>`:''}</div><div class="s">${u.telegram_chat_id?'Telegram: '+esc(u.telegram_chat_id):'email only'}</div></div>`;
+      us.forEach((u,i)=>{ const it=document.createElement('div'); it.className='set-item';
+        const role=u.role||(i===0?'owner':'member');
+        it.innerHTML=`<div class="grow"><div class="t">${esc(u.email)}${u.label?` · <span class="set-muted">${esc(u.label)}</span>`:''} <span class="role-badge${role==='owner'?' owner':''}">${esc(role)}</span></div>`+
+          `<div class="s">${u.telegram_chat_id?'Telegram: '+esc(u.telegram_chat_id):'email only'}${u.person_entity?' · presence: '+esc(u.person_entity):''}</div></div>`;
+        const rl=document.createElement('button'); rl.className='set-btn ghost'; rl.textContent=role==='owner'?'Make member':'Make owner';
+        rl.onclick=async()=>{
+          const r=await fetch('/v1/auth/users',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({email:u.email,role:role==='owner'?'member':'owner'})});
+          if(r.ok) loadUsers(); else toast((await r.json().catch(()=>({}))).error||'Owner-only action');
+        };
         const del=document.createElement('button'); del.className='set-btn danger'; del.textContent='Remove';
-        del.onclick=async()=>{ if(!confirm('Remove '+u.email+'?'))return; await fetch('/v1/auth/users',{method:'DELETE',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({email:u.email})}); loadUsers(); };
-        it.appendChild(del); list.appendChild(it);
+        del.onclick=async()=>{ if(!confirm('Remove '+u.email+'?'))return;
+          const r=await fetch('/v1/auth/users',{method:'DELETE',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({email:u.email})});
+          if(r.ok) loadUsers(); else toast('Owner-only action'); };
+        it.appendChild(rl); it.appendChild(del); list.appendChild(it);
       });
     }catch{ list.innerHTML='<div class="set-muted">Failed to load.</div>'; }
   }

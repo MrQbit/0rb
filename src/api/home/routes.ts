@@ -75,7 +75,7 @@ function serviceFor(domain: string, action: string, value?: number): { service: 
   }
 }
 
-export async function tryHandleHomeRoute(method: string, pathname: string, req: Request): Promise<Response | null> {
+export async function tryHandleHomeRoute(method: string, pathname: string, req: Request, store?: import('../store/store.js').Store): Promise<Response | null> {
   if (!pathname.startsWith('/v1/home')) return null
   if (!haEnabled()) return jsonResponse(503, { error: 'Home Assistant not configured', code: 'HA_DISABLED' })
 
@@ -90,6 +90,17 @@ export async function tryHandleHomeRoute(method: string, pathname: string, req: 
       if (!r.ok) return jsonResponse(502, { error: `HA ${r.status}` })
       return new Response(r.body, { status: 200, headers: { 'content-type': r.headers.get('content-type') || 'image/jpeg', 'cache-control': 'private, max-age=30' } })
     } catch (e) { return jsonResponse(502, { error: (e as Error).message }) }
+  }
+  if (pathname === '/v1/home/mode' && store) {
+    const { getMode, setMode } = await import('./mode.js')
+    if (method === 'GET') return jsonResponse(200, { mode: await getMode(store) })
+    if (method === 'POST') {
+      const b = await readJson(req)
+      const m = String(b?.mode || '')
+      if (!['home', 'away', 'vacation', 'guest'].includes(m)) return jsonResponse(400, { error: 'mode must be home|away|vacation|guest' })
+      await setMode(store, m as any)
+      return jsonResponse(200, { mode: m })
+    }
   }
   if (method === 'GET' && pathname === '/v1/home/devices') {
     try {

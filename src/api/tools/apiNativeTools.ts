@@ -1079,10 +1079,14 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
       if (op === 'mode') {
         const { getMode, setMode } = await import('../home/mode.js')
         const want = String(args?.mode || '').toLowerCase()
+        const emitMode = (m: string) => emitWidget(ctx.sessionId, { id: 'housemode', type: 'housemode', title: 'House mode', mode: m } as any)
         if (!['home', 'away', 'vacation', 'guest'].includes(want)) {
-          return `House mode is "${await getMode(ctx.store)}". Set with mode:'home'|'away'|'vacation'|'guest'.`
+          const cur = await getMode(ctx.store)
+          emitMode(cur)
+          return `House mode is "${cur}" (widget shown). Set with mode:'home'|'away'|'vacation'|'guest'.`
         }
         await setMode(ctx.store, want as any)
+        emitMode(want)
         const did: string[] = []
         if (args?.secure === true && (want === 'away' || want === 'vacation')) {
           const [locks, lights] = await Promise.all([haStates(['lock']), haStates(['light'])])

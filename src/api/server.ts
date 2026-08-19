@@ -1610,7 +1610,7 @@ async function dispatch(
   const obsResp = await tryHandleObservabilityRoute(req, pathname, identity, ctx, isAdmin)
   if (obsResp) return obsResp
   // ─── Home (device dashboard refresh + tap-to-control via Home Assistant) ───
-  const homeResp = await tryHandleHomeRoute(method, pathname, req)
+  const homeResp = await tryHandleHomeRoute(method, pathname, req, ctx.store)
   if (homeResp) return homeResp
   // ─── Push registration for the 0rb apps ───
   const pushResp = await tryHandlePushRoute(method, pathname, req, ctx.store)
