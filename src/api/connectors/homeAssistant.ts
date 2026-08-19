@@ -139,6 +139,17 @@ export async function haFlowStatus(flowId: string): Promise<any> {
   return await haFetch(`/config/config_entries/flow/${flowId}`)
 }
 
+/** Create (or replace) an automation via HA's config API. */
+export async function haCreateAutomation(autoId: string, body: Record<string, any>): Promise<void> {
+  await haFetch(`/config/automation/config/${autoId}`, { method: 'POST', body: JSON.stringify(body) })
+}
+
+/** Dismiss a pending discovered flow (e.g. the generic-IPP twin of a
+ *  printer already set up natively). HA re-discovers if it reappears. */
+export async function haFlowDismiss(flowId: string): Promise<void> {
+  await haFetch(`/config/config_entries/flow/${flowId}`, { method: 'DELETE' })
+}
+
 /** Start a brand-new integration setup flow (e.g. handler 'roomba'). */
 export async function haFlowStart(handler: string): Promise<any> {
   return await haFetch('/config/config_entries/flow', {

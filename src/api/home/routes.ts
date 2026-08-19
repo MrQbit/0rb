@@ -61,6 +61,12 @@ function serviceFor(domain: string, action: string, value?: number): { service: 
     case 'scene':
       if (action === 'on' || action === 'toggle' || action === 'activate') return { service: 'turn_on', data: {} }
       return null
+    case 'automation':
+      if (action === 'on') return { service: 'turn_on', data: {} }
+      if (action === 'off') return { service: 'turn_off', data: {} }
+      if (action === 'toggle') return { service: 'toggle', data: {} }
+      if (action === 'run' || action === 'trigger') return { service: 'trigger', data: {} }
+      return null
     default:
       return null
   }

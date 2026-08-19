@@ -56,7 +56,7 @@ function phrase(e: HaEntity, label: string, mins: number): string {
   return `Heads up — the ${e.name} has been open for ${dur}.`
 }
 
-async function notifyOwner(text: string): Promise<void> {
+export async function notifyOwner(text: string): Promise<void> {
   let delivered = false
 
   // Push to the 0rb apps (lock-screen notification, even when closed).
@@ -114,8 +114,16 @@ async function checkDiscoveries(): Promise<void> {
   if (!fresh.length) return
   for (const f of fresh) seenFlows.add(f.flow_id)
   if (pushStore) { try { await pushStore.putKv(SEEN_KEY, JSON.stringify([...seenFlows]), 0) } catch { /* best effort */ } }
-  const what = [...new Set(fresh.map(f => nice(f.handler)))].join(' and ')
-  await notifyOwner(`I spotted something new on the network: ${what}. Want me to set it up? Just ask — e.g. "set up the ${fresh[0]!.handler === 'webostv' ? 'TV' : fresh[0]!.handler}".`)
+  // One physical device often shows up under a native handler AND a generic
+  // one (a Brother printer → 'brother' + 'ipp'). Collapse those in the nudge.
+  const GENERIC_TWINS: Record<string, string[]> = { brother: ['ipp'], hue: ['homekit_controller'], sonos: ['dlna_dmr', 'cast'] }
+  const handlers = new Set(fresh.map(f => f.handler))
+  for (const [native, twins] of Object.entries(GENERIC_TWINS)) {
+    if (handlers.has(native)) for (const t of twins) handlers.delete(t)
+  }
+  const what = [...handlers].map(nice).join(' and ')
+  const first = [...handlers][0] || fresh[0]!.handler
+  await notifyOwner(`I spotted something new on the network: ${what}. Want me to set it up? Just ask — e.g. "set up the ${first === 'webostv' ? 'TV' : first}".`)
   log.info('home_discovery_nudge', { handlers: fresh.map(f => f.handler) })
 }
 
@@ -154,6 +162,8 @@ async function tick(): Promise<void> {
 /** Start the proactive loop. Idempotent; no-op unless HA + proactive are on.
  *  Pass the store so nudges can also push to the 0rb apps via FCM. */
 export function startHomeWatcher(store?: Store): void {
+  // Timers ride the same store + notification channel.
+  if (store) { import('./timers.js').then(m => m.startTimerLoop(store, notifyOwner)).catch(() => { /* optional */ }) }
   if (store) pushStore = store
   if (timer || !enabled()) return
   timer = setInterval(() => { void tick() }, intervalMs())

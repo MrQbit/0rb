@@ -61,6 +61,9 @@ export const WIDGET_CATALOG: WidgetDef[] = [
   { id: 'scenes', name: 'Scenes', desc: 'One-tap scenes.', category: 'Home', setup: 'none', icon: '✨', envKeys: ['ORB2_HA_TOKEN'] },
   { id: 'sensors', name: 'Readings', desc: 'Temperature, humidity, battery, energy.', category: 'Home', setup: 'none', icon: '📊', envKeys: ['ORB2_HA_TOKEN'] },
   { id: 'camera', name: 'Cameras', desc: 'Camera snapshots.', category: 'Home', setup: 'none', icon: '📷', envKeys: ['ORB2_HA_TOKEN'] },
+  { id: 'timers', name: 'Timers', desc: 'Kitchen timers, alarms, reminders — with countdowns.', category: 'Productivity', setup: 'none', icon: '⏱️' },
+  { id: 'presence', name: "Who's home", desc: 'Family presence at a glance.', category: 'Home', setup: 'none', icon: '🧑‍🤝‍🧑', envKeys: ['ORB2_HA_TOKEN'] },
+  { id: 'automations', name: 'Automations', desc: 'House rules — Orb writes them, you approve.', category: 'Home', setup: 'none', icon: '🪄', envKeys: ['ORB2_HA_TOKEN'] },
 
   // ── Info (free, keyless data) ──
   { id: 'weather', name: 'Weather', desc: 'Current conditions + 5-day forecast for any place.', category: 'Info', setup: 'none', icon: '☀️' },

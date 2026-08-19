@@ -422,7 +422,7 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
       name: 'Home',
       description: "Control and check the home's devices through Home Assistant — lights, switches/plugs, thermostats (climate), locks, window shades/blinds (cover), TVs & speakers (media_player), robot vacuums, fans, and door/window & motion sensors. This is how Orb acts as the house. Use op:'list' to see what's available (optionally a `type`), op:'status' to check a device by name, and op:'control' to change one: action on/off/toggle for lights/plugs/switches; lock/unlock for locks; open/close (or set with `value` 0-100) for shades; set with `value` for a thermostat's target temperature; play/pause/on/off (or set volume with `value` 0-100) for media; start/stop/dock for a vacuum. Always refer to devices by their friendly name (e.g. \"kitchen lights\", \"front door\").",
       input_schema: { type: 'object', properties: {
-        op: { type: 'string', enum: ['list', 'status', 'control', 'media', 'lights', 'climate', 'vacuum', 'covers', 'security', 'plugs', 'scenes', 'sensors', 'camera'], description: "list = overview dashboard; status/control = one device; each FUNCTION op shows a focused widget: media (TV/speaker remote), lights (room-grouped), climate (thermostats), vacuum, covers (shades/blinds), security (locks + door/window/motion sensors), plugs (switches/outlets), scenes, sensors (readings: temperature/humidity/battery), camera (snapshots). ALWAYS prefer the function widget matching what the user is focused on — the overview dashboard (list) is for 'show me everything'." },
+        op: { type: 'string', enum: ['list', 'status', 'control', 'media', 'lights', 'climate', 'vacuum', 'covers', 'security', 'plugs', 'scenes', 'sensors', 'camera', 'presence', 'automations'], description: "list = overview dashboard; status/control = one device; each FUNCTION op shows a focused widget: media (TV/speaker remote), lights (room-grouped), climate (thermostats), vacuum, covers (shades/blinds), security (locks + door/window/motion sensors), plugs (switches/outlets), scenes, sensors (readings: temperature/humidity/battery), camera (snapshots), presence (who's home/away), automations (list HA automations with on/off + run). ALWAYS prefer the function widget matching what the user is focused on — the overview dashboard (list) is for 'show me everything'." },
         query: { type: 'string', description: "Device name for status/control (e.g. 'living room lights', 'front door', 'bedroom thermostat')." },
         type: { type: 'string', enum: ['light', 'switch', 'climate', 'lock', 'cover', 'media_player', 'vacuum', 'fan', 'sensor', 'camera'], description: 'Optional device type filter for list.' },
         action: { type: 'string', enum: ['on', 'off', 'toggle', 'lock', 'unlock', 'open', 'close', 'play', 'pause', 'start', 'stop', 'dock', 'set'], description: 'What to do for op:control.' },
@@ -432,15 +432,19 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
     },
     {
       name: 'HomeAdmin',
-      description: "Organize AND configure the smart home in Home Assistant. Structure: op:'areas' lists rooms; op:'create_area' {name}; op:'assign' {query, area}; op:'rename' {query, name}; op:'hide' {query, hidden}. Device setup: op:'integrations' lists installed integrations + devices HA has DISCOVERED on the network but not set up yet; op:'pair' {integration} advances a discovered device's setup (e.g. integration:'webostv' makes the TV show its pairing prompt — the device must be ON and the user must accept on its screen); op:'setup' {integration, fields?} starts a NEW integration from scratch (e.g. 'roomba') and reports what fields it needs — pass them in `fields` on the next call; op:'diagnose' {query} explains why a device is failing (state, availability, which integration). op:'cleanup' hides duplicate entities when one physical device was registered by several integrations (Sonos/TVs often triple-register via Cast/DLNA — native wins). Use these to actively FIX devices instead of telling the user to open HA. HYGIENE: after pairing a new device, always (1) rename it to a clean human name, (2) assign it to its room, (3) run cleanup.",
+      description: "Organize AND configure the smart home in Home Assistant. Structure: op:'areas' lists rooms; op:'create_area' {name}; op:'assign' {query, area}; op:'rename' {query, name}; op:'hide' {query, hidden}. Device setup: op:'integrations' lists installed integrations + devices HA has DISCOVERED on the network but not set up yet; op:'pair' {integration} advances a discovered device's setup (e.g. integration:'webostv' makes the TV show its pairing prompt — the device must be ON and the user must accept on its screen); op:'setup' {integration, fields?} starts a NEW integration from scratch (e.g. 'roomba') and reports what fields it needs — pass them in `fields` on the next call; op:'diagnose' {query} explains why a device is failing (state, availability, which integration). op:'dismiss' {integration} clears a discovered-device suggestion you don't want (e.g. the generic 'ipp' twin of an already-set-up printer). op:'automate' {alias, triggers, actions, conditions?} CREATES a Home Assistant automation from JSON you write (HA automation schema: triggers like {trigger:'time',at:'22:00'} or {trigger:'state',entity_id,to}, actions like {action:'light.turn_off',target:{entity_id}}) — confirm the plan with the user BEFORE creating. op:'cleanup' hides duplicate entities when one physical device was registered by several integrations (Sonos/TVs often triple-register via Cast/DLNA — native wins). Use these to actively FIX devices instead of telling the user to open HA. HYGIENE: after pairing a new device, always (1) rename it to a clean human name, (2) assign it to its room, (3) run cleanup.",
       input_schema: { type: 'object', properties: {
-        op: { type: 'string', enum: ['areas', 'create_area', 'assign', 'rename', 'hide', 'integrations', 'pair', 'setup', 'diagnose', 'cleanup'] },
+        op: { type: 'string', enum: ['areas', 'create_area', 'assign', 'rename', 'hide', 'integrations', 'pair', 'setup', 'diagnose', 'cleanup', 'dismiss', 'automate'] },
         query: { type: 'string', description: 'Device to act on, by name.' },
         area: { type: 'string', description: "Room name for op:'assign'." },
         name: { type: 'string', description: "New display name for op:'rename' / op:'create_area'." },
         hidden: { type: 'boolean', description: "op:'hide': true hides, false unhides." },
-        integration: { type: 'string', description: "Integration handler for pair/setup, e.g. 'webostv', 'roomba', 'sonos'." },
+        integration: { type: 'string', description: "Integration handler for pair/setup/dismiss, e.g. 'webostv', 'roomba', 'ipp'." },
         fields: { type: 'object', description: "op:'setup': answers for the fields the flow asked for (e.g. {host:'192.168.1.20'})." },
+        alias: { type: 'string', description: "op:'automate': human name for the automation." },
+        triggers: { type: 'array', description: "op:'automate': HA trigger list.", items: { type: 'object' } },
+        actions: { type: 'array', description: "op:'automate': HA action list.", items: { type: 'object' } },
+        conditions: { type: 'array', description: "op:'automate': optional HA condition list.", items: { type: 'object' } },
       }, required: ['op'] },
       available: haEnabled(),
     },
@@ -452,6 +456,18 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
         section: { type: 'string', description: "Panel section for op:'open'." },
         key: { type: 'string', description: 'Setting key (ORB2_* / OPENAI_*).' },
         value: { type: 'string', description: "New value for op:'set'." },
+      }, required: ['op'] },
+      available: true,
+    },
+    {
+      name: 'Timer',
+      description: "Timers, alarms and time-based reminders — use for ANY 'set a timer', 'remind me in/at', 'wake me', 'alarm' request. op:'set' {label, minutes} or {label, at:'HH:MM'} (24h, today/tomorrow if past); op:'list'; op:'cancel' {query}. Shows the countdown widget; when it fires the owner is notified on their channels even if the app is closed.",
+      input_schema: { type: 'object', properties: {
+        op: { type: 'string', enum: ['set', 'list', 'cancel'] },
+        label: { type: 'string', description: "What it's for — 'pasta', 'stand-up meeting'." },
+        minutes: { type: 'number', description: 'Duration from now.' },
+        at: { type: 'string', description: "Absolute time 'HH:MM' (24h)." },
+        query: { type: 'string', description: 'Timer to cancel, by label.' },
       }, required: ['op'] },
       available: true,
     },
@@ -989,6 +1005,25 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
         } as any)
         return `Showed camera widget${cams.length > 1 ? 's' : ''}: ${cams.slice(0, 4).map(c => c.name).join(', ')}.`
       }
+      if (op === 'presence') {
+        const people = (await haStates(['person'])).map(p => ({
+          entity_id: p.entity_id, name: p.name, home: p.state === 'home', state: p.state,
+        }))
+        if (!people.length) return 'No people configured in Home Assistant yet (Settings → People there, or ask me to add one).'
+        emitWidget(ctx.sessionId, { id: 'presence', type: 'presence', title: "Who's home",
+          pill: `${people.filter(p => p.home).length}/${people.length} home`, people } as any)
+        return `Presence: ${people.map(p => `${p.name} is ${p.home ? 'home' : p.state}`).join(' · ')}.`
+      }
+      if (op === 'automations') {
+        const autos = (await haStates(['automation'])).map(a => ({
+          entity_id: a.entity_id, name: a.name, on: a.state === 'on',
+          last: a.attributes.last_triggered || null,
+        }))
+        if (!autos.length) return "No automations yet. I can create one — describe it (e.g. 'every night at 10, lock the doors') and I'll use HomeAdmin op:'automate'."
+        emitWidget(ctx.sessionId, { id: 'automations', type: 'automations', title: 'Automations',
+          pill: `${autos.filter(a => a.on).length}/${autos.length} on`, automations: autos } as any)
+        return `Automations: ${autos.map(a => `${a.name} (${a.on ? 'on' : 'off'})`).join(' · ')}.`
+      }
       if (op === 'climate') {
         const cl = await haJoinAreas(await haStates(['climate']))
         if (!cl.length) return 'No thermostats found.'
@@ -1043,6 +1078,30 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
         if (!name) return 'Give the room a name.'
         const a = await haCreateArea(name)
         return `Created area "${a.name}".`
+      }
+      if (op === 'dismiss') {
+        const handler = String(args?.integration || '').trim().toLowerCase()
+        if (!handler) return 'Which discovered integration should I dismiss?'
+        const flows = await haDiscoveredFlows()
+        const targets = flows.filter(f => f.handler === handler)
+        if (!targets.length) return `Nothing from "${handler}" in the discovery queue.`
+        const { haFlowDismiss } = await import('../connectors/homeAssistant.js')
+        for (const f of targets) await haFlowDismiss(f.flow_id)
+        return `Dismissed ${targets.length} "${handler}" discovery suggestion(s). HA will re-offer it if the device reappears.`
+      }
+      if (op === 'automate') {
+        const alias = String(args?.alias || '').trim()
+        const triggers = args?.triggers
+        const actions = args?.actions
+        if (!alias || !Array.isArray(triggers) || !triggers.length || !Array.isArray(actions) || !actions.length) {
+          return "op:'automate' needs {alias, triggers:[...], actions:[...]} (HA automation schema; optional conditions:[...])."
+        }
+        const autoId = alias.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 48) || `orb_${Date.now().toString(36)}`
+        const body: Record<string, any> = { alias, triggers, actions, mode: 'single' }
+        if (Array.isArray(args?.conditions) && args.conditions.length) body.conditions = args.conditions
+        const { haCreateAutomation } = await import('../connectors/homeAssistant.js')
+        await haCreateAutomation(autoId, body)
+        return `Created automation "${alias}" (id ${autoId}) and enabled it. Show it with Home op:'automations'; it can be turned off there any time.`
       }
       if (op === 'cleanup') {
         // A physical device paired through several integrations (Sonos also
@@ -1204,6 +1263,40 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
       return `Set ${key}${SETTINGS_PLAINTEXT_KEYS.has(key) ? ` = ${value}` : ''} (live).${/BASE_URL|API_KEY/.test(key) ? ' A restart may be needed for the brain endpoint to fully switch.' : ''}`
     }
     return `Unknown op "${op}".`
+  })
+  add('Timer', {}, async args => {
+    const op = String(args?.op || 'list')
+    const { listTimers, addTimer, cancelTimer, timerWidgetSpec } = await import('../home/timers.js')
+    try {
+      if (op === 'set') {
+        const label = String(args?.label || 'Timer').trim()
+        let at: number | null = null
+        if (args?.minutes != null && Number(args.minutes) > 0) at = Date.now() + Number(args.minutes) * 60_000
+        else if (typeof args?.at === 'string' && /^\d{1,2}:\d{2}$/.test(args.at.trim())) {
+          const [h, m] = args.at.trim().split(':').map(Number)
+          const d = new Date(); d.setHours(h!, m!, 0, 0)
+          if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1)
+          at = d.getTime()
+        }
+        if (!at) return "Give me a duration (minutes) or a time (at:'HH:MM')."
+        await addTimer(ctx.store, label, at, ctx.sessionId)
+        const timers = await listTimers(ctx.store)
+        emitWidget(ctx.sessionId, timerWidgetSpec(timers) as any)
+        const mins = Math.round((at - Date.now()) / 60_000)
+        return `Set: "${label}" — fires ${mins < 90 ? `in ${mins} min` : `at ${new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}. I'll notify you when it's time.`
+      }
+      if (op === 'cancel') {
+        const gone = await cancelTimer(ctx.store, String(args?.query || ''))
+        if (!gone) return `No timer matching "${args?.query}".`
+        emitWidget(ctx.sessionId, timerWidgetSpec(await listTimers(ctx.store)) as any)
+        return `Cancelled "${gone.label}".`
+      }
+      const timers = await listTimers(ctx.store)
+      emitWidget(ctx.sessionId, timerWidgetSpec(timers) as any)
+      return timers.length
+        ? 'Running: ' + timers.map(t => `${t.label} (${Math.max(0, Math.round((t.at - Date.now()) / 60_000))} min left)`).join(' · ')
+        : 'No timers running.'
+    } catch (e) { return `[Timer] ${(e as Error).message}` }
   })
   add('Shopping', {}, async args => {
     const op = String(args?.op || 'show')

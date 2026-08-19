@@ -667,6 +667,29 @@ body {
 .wg-read .v .u { font-size:11px; color:var(--ink-dim); margin-left:2px; }
 .wg-read .n { font-size:10.5px; color:var(--ink-dim); margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
+/* ── timers ── */
+.wg-timer { position:relative; display:flex; align-items:center; gap:10px; padding:11px 12px; border-radius:11px;
+  background:rgba(255,255,255,.03); border:1px solid var(--line); overflow:hidden; }
+.wg-timer .bar { position:absolute; inset:auto 0 0 0; height:3px; background:rgba(255,255,255,.05); }
+.wg-timer .fill { height:100%; background:var(--nv); transition:width 1s linear; }
+.wg-timer .nm { flex:1; min-width:0; font-size:12.5px; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wg-timer .left { flex:none; font-size:14px; color:var(--nv-bright); font-family:var(--mono); }
+.wg-timer.done { border-color:rgba(118,185,0,.55); background:rgba(118,185,0,.12); }
+.wg-timer.done .left { color:var(--ink); }
+
+/* ── presence ── */
+.wg-presence { flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:7px; }
+.wg-person { display:flex; align-items:center; gap:10px; padding:11px 12px; border-radius:11px;
+  background:rgba(255,255,255,.03); border:1px solid var(--line); }
+.wg-person .dot { width:9px; height:9px; border-radius:50%; background:var(--ink-dim); flex:none; }
+.wg-person.home .dot { background:var(--nv-bright); box-shadow:0 0 8px rgba(118,185,0,.6); }
+.wg-person .nm { flex:1; font-size:13px; color:var(--ink); }
+.wg-person .st { font-size:11px; color:var(--ink-dim); font-family:var(--mono); }
+.wg-person.home .st { color:var(--nv-bright); }
+
+/* automations: reuse .wg-sec-row; dim when disabled */
+.wg-sec-row.offed { opacity:.55; }
+
 /* ── camera ── */
 .wg-cam { width:100%; flex:1; min-height:0; object-fit:cover; border-radius:10px; background:#000; }
 

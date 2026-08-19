@@ -403,6 +403,9 @@
     else if(spec.type==='scenes'){ wg.style.width='360px'; wg.style.height='300px'; }
     else if(spec.type==='sensors'){ wg.style.width='420px'; wg.style.height='400px'; }
     else if(spec.type==='camera'){ wg.style.width='480px'; wg.style.height='340px'; }
+    else if(spec.type==='timers'){ wg.style.width='340px'; wg.style.height='340px'; }
+    else if(spec.type==='presence'){ wg.style.width='340px'; wg.style.height='260px'; }
+    else if(spec.type==='automations'){ wg.style.width='420px'; wg.style.height='400px'; }
     else if(spec.type==='document'){ wg.style.width='560px'; wg.style.height='520px'; }
     else if(spec.type==='wallet'){ wg.style.width='380px'; wg.style.height='400px'; }
     else if(spec.type==='lights'){ wg.style.width='400px'; wg.style.height='440px'; }
@@ -518,7 +521,7 @@
     }
   }, 15000);
 
-  function titleFor(s){ return ({chart:'Chart',results:'Results',video:'Video',music:'Music',table:'Table',stats:'Stats',gallery:'Gallery',image:'Image',embed:'Embed',model:'3D model',calculator:'Calculator',weather:'Weather',calendar:'Calendar',code:'Code',mail:'Mail',vercel:'Vercel',map:'Map',docker:'Docker',app:'App',html:'HTML',note:'Note',vacuum:'Vacuum',covers:'Shades',security:'Security',plugs:'Plugs',scenes:'Scenes',sensors:'Readings',camera:'Camera',document:'Document',wallet:'Wallet',lights:'Lights',media:'Media',climate:'Climate',todo:'Tasks',home:'Home'})[s.type]||(s.type?String(s.type):'Note'); }
+  function titleFor(s){ return ({chart:'Chart',results:'Results',video:'Video',music:'Music',table:'Table',stats:'Stats',gallery:'Gallery',image:'Image',embed:'Embed',model:'3D model',calculator:'Calculator',weather:'Weather',calendar:'Calendar',code:'Code',mail:'Mail',vercel:'Vercel',map:'Map',docker:'Docker',app:'App',html:'HTML',note:'Note',vacuum:'Vacuum',covers:'Shades',security:'Security',plugs:'Plugs',scenes:'Scenes',sensors:'Readings',camera:'Camera',timers:'Timers',presence:"Who's home",automations:'Automations',document:'Document',wallet:'Wallet',lights:'Lights',media:'Media',climate:'Climate',todo:'Tasks',home:'Home'})[s.type]||(s.type?String(s.type):'Note'); }
 
   // ── widget placement: free-floating, but flow without >15% overlap; when the
   //    visible band is full, drop below + scroll there (the orb follows). ──
@@ -588,6 +591,9 @@
     else if(spec.type==='scenes') renderScenes(body, spec);
     else if(spec.type==='sensors') renderSensors(body, spec);
     else if(spec.type==='camera') renderCamera(body, spec, wg);
+    else if(spec.type==='timers') renderTimers(body, spec, wg);
+    else if(spec.type==='presence') renderPresence(body, spec);
+    else if(spec.type==='automations') renderAutomations(body, spec);
     else if(_plugins[spec.type]) renderPlugin(body, spec, _plugins[spec.type]);
     else {
       // Freshly-minted custom widget? (CreateWidget installs plugins at
@@ -915,6 +921,62 @@
     bust(); body.appendChild(img);
     if(wg){ if(wg._camTimer) clearInterval(wg._camTimer);
       wg._camTimer=setInterval(()=>{ if(!document.contains(wg)){ clearInterval(wg._camTimer); return; } if(wg._state==='active') bust(); },10000); }
+  }
+
+  // ── timers: live countdowns ──
+  function renderTimers(body, spec, wg){
+    const wrap=document.createElement('div'); wrap.className='wg-lights'; body.appendChild(wrap);
+    const timers=spec.timers||[];
+    if(!timers.length){ wrap.innerHTML='<div class="wg-empty">No timers running.<br><span style="font-size:11px;">Say “set a timer for 10 minutes”.</span></div>'; if(wg&&wg._tmrTimer){clearInterval(wg._tmrTimer);wg._tmrTimer=null;} return; }
+    const rows=[];
+    timers.forEach(t=>{
+      const row=document.createElement('div'); row.className='wg-timer';
+      row.innerHTML=`<div class="bar"><div class="fill"></div></div><span class="nm">${esc2(t.label)}</span><span class="left mono"></span>`;
+      wrap.appendChild(row); rows.push({t,row});
+    });
+    const fmt=ms=>{ const s=Math.max(0,Math.round(ms/1000)); const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),ss=s%60;
+      return h?`${h}:${String(m).padStart(2,'0')}:${String(ss).padStart(2,'0')}`:`${m}:${String(ss).padStart(2,'0')}`; };
+    const tickAll=()=>{ const now=Date.now();
+      rows.forEach(({t,row})=>{
+        const total=Math.max(1,t.at-t.set), left=t.at-now;
+        row.querySelector('.left').textContent=left<=0?'done':fmt(left);
+        row.querySelector('.fill').style.width=Math.max(0,Math.min(100,100*(1-left/total)))+'%';
+        row.classList.toggle('done',left<=0);
+      }); };
+    tickAll();
+    if(wg){ if(wg._tmrTimer) clearInterval(wg._tmrTimer);
+      wg._tmrTimer=setInterval(()=>{ if(!document.contains(wg)){ clearInterval(wg._tmrTimer); return; } tickAll(); },1000); }
+  }
+
+  // ── presence: who's home ──
+  function renderPresence(body, spec){
+    const wrap=document.createElement('div'); wrap.className='wg-presence'; body.appendChild(wrap);
+    const people=spec.people||[];
+    if(!people.length){ wrap.innerHTML='<div class="wg-empty">No people configured.</div>'; return; }
+    people.forEach(p=>{
+      const chip=document.createElement('div'); chip.className='wg-person'+(p.home?' home':'');
+      chip.innerHTML=`<span class="dot"></span><span class="nm">${esc2(p.name)}</span><span class="st">${esc2(p.home?'home':(p.state||'away'))}</span>`;
+      wrap.appendChild(chip);
+    });
+  }
+
+  // ── automations: toggle + run ──
+  function renderAutomations(body, spec){
+    const wrap=document.createElement('div'); wrap.className='wg-security'; body.appendChild(wrap);
+    const autos=spec.automations||[];
+    if(!autos.length){ wrap.innerHTML='<div class="wg-empty">No automations yet — describe one and Orb creates it.</div>'; return; }
+    autos.forEach(a=>{
+      const row=document.createElement('div'); row.className='wg-sec-row'+(a.on?'':' offed');
+      const last=a.last?new Date(a.last):null;
+      row.innerHTML=`<span class="ic">${homeIcon('scene')}</span><span class="nm" title="${esc2(a.name)}">${esc2(a.name)}</span>`+
+        `<span class="st">${last?esc2(last.toLocaleDateString(undefined,{month:'short',day:'numeric'})):'never ran'}</span>`;
+      const run=document.createElement('button'); run.className='wg-light-tg'; run.textContent='Run';
+      run.onclick=async()=>{ if(await haCtl(a.entity_id,'run')) toast('Ran '+a.name); };
+      const tg=document.createElement('button'); tg.className='wg-light-tg'; tg.textContent=a.on?'On':'Off';
+      tg.onclick=async()=>{ const target=a.on?'off':'on';
+        if(await haCtl(a.entity_id,target)){ a.on=!a.on; tg.textContent=a.on?'On':'Off'; row.classList.toggle('offed',!a.on); } };
+      row.appendChild(run); row.appendChild(tg); wrap.appendChild(row);
+    });
   }
 
   // ── vacuum: robot control ──
