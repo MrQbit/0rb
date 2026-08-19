@@ -270,3 +270,20 @@ describe('safety-class alerts (loop A8)', () => {
     expect(safetyState({ entity_id: 'lock.a', domain: 'lock', name: 'a', state: 'unlocked', attributes: {} } as any)).toBeNull()
   })
 })
+
+describe('device health watch (loop A9)', () => {
+  test('flags low batteries and long-unavailable; ignores healthy', async () => {
+    const { healthIssues } = await import('../home/proactive.ts')
+    const now = Date.now()
+    const mk = (over: any) => ({ entity_id: 'x.'+Math.random(), domain: 'sensor', name: over.name || 'dev', state: '50', attributes: {}, ...over })
+    const issues = healthIssues([
+      mk({ name: 'Door sensor battery', attributes: { device_class: 'battery' }, state: '9' }),
+      mk({ name: 'Healthy battery', attributes: { device_class: 'battery' }, state: '80' }),
+      mk({ name: 'Zero-reading battery', attributes: { device_class: 'battery' }, state: '0' }), // 0 = often "unknown", skip
+      mk({ name: 'Ghost cam', domain: 'camera', state: 'unavailable', attributes: { orb_last_changed: now - 48 * 3600_000 } }),
+      mk({ name: 'Blip', domain: 'light', state: 'unavailable', attributes: { orb_last_changed: now - 3600_000 } }),
+    ] as any, now)
+    expect(issues.map(i => i.name).sort()).toEqual(['Door sensor battery', 'Ghost cam'])
+    expect(issues.find(i => i.name === 'Door sensor battery')!.detail).toBe('9%')
+  })
+})

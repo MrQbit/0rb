@@ -361,7 +361,7 @@
     // re-emits the same id to "update the widget", not make a new one).
     if(spec.id && widgets.has(spec.id)){
       const ex = widgets.get(spec.id);
-      const ttl = ex.querySelector('.wg-title'); if(ttl) ttl.textContent = spec.title || titleFor(spec);
+      const ttl = ex.querySelector('.wg-title'); if(ttl){ ttl.textContent = spec.title || titleFor(spec); ttl.title = ttl.textContent; }
       if(ex._chart){ try{ ex._chart.destroy(); }catch{} ex._chart=null; }
       if(ex._map){ try{ ex._map.remove(); }catch{} ex._map=null; }
       if(ex._mapRo){ try{ ex._mapRo.disconnect(); }catch{} ex._mapRo=null; }
@@ -422,7 +422,7 @@
     const wpos = { x: place.x, y: place.y };
     wg.style.left=wpos.x+'px'; wg.style.top=wpos.y+'px';
     const head=document.createElement('div'); head.className='wg-head';
-    const ttl=document.createElement('span'); ttl.className='wg-title'; ttl.textContent = spec.title || titleFor(spec);
+    const ttl=document.createElement('span'); ttl.className='wg-title'; ttl.textContent = spec.title || titleFor(spec); ttl.title = ttl.textContent;
     const x=document.createElement('button'); x.className='wg-x'; x.setAttribute('aria-label','Close');
     x.innerHTML='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>'; x.onclick=()=>{ widgets.delete(wid);
       if(wg._chart){try{wg._chart.destroy();}catch{}}
@@ -729,7 +729,7 @@
       (g.lights||[]).forEach(l=>{
         const row=document.createElement('div'); row.className='wg-light'+(l.on?' on':'');
         row.innerHTML=`<span class="ic">${homeIcon('light')}</span><span class="nm" title="${esc2(l.name)}">${esc2(l.name)}</span>`;
-        const sl=document.createElement('input'); sl.type='range'; sl.min=0; sl.max=100; sl.value=l.on?(l.brightness!=null?l.brightness:100):0; sl.className='dim';
+        const sl=document.createElement('input'); sl.type='range'; sl.min=0; sl.max=100; sl.value=l.on?(l.brightness!=null?l.brightness:100):0; sl.className='dim'; sl.setAttribute('aria-label','Brightness: '+l.name);
         sl.onchange=async()=>{ const v=Number(sl.value);
           try{ const r=await fetch('/v1/home/control',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify(v===0?{entity_id:l.entity_id,action:'off'}:{entity_id:l.entity_id,action:'set',value:v})});
             if(r.ok){ l.on=v>0; row.classList.toggle('on',v>0); } else toast('Failed'); }catch{ toast('Failed'); } };
@@ -765,7 +765,7 @@
     wrap.appendChild(ctl);
     const volRow=document.createElement('div'); volRow.className='vol';
     volRow.innerHTML='<span class="vlbl">vol</span>';
-    const vol=document.createElement('input'); vol.type='range'; vol.min=0; vol.max=100; vol.value=spec.volume!=null?spec.volume:50;
+    const vol=document.createElement('input'); vol.type='range'; vol.min=0; vol.max=100; vol.value=spec.volume!=null?spec.volume:50; vol.setAttribute('aria-label','Volume: '+(spec.name||'player'));
     vol.onchange=async()=>{ try{ const r=await fetch('/v1/home/control',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({entity_id:spec.entity_id,action:'set',value:Number(vol.value)})});
       if(!r.ok) toast('Failed'); }catch{ toast('Failed'); } };
     volRow.appendChild(vol); wrap.appendChild(volRow);
@@ -835,7 +835,7 @@
         const open=c.state==='open'||(c.position!=null&&c.position>0);
         const row=document.createElement('div'); row.className='wg-light'+(open?' on':'');
         row.innerHTML=`<span class="ic">${homeIcon('cover')}</span><span class="nm" title="${esc2(c.name)}">${esc2(c.name)}</span>`;
-        const sl=document.createElement('input'); sl.type='range'; sl.min=0; sl.max=100; sl.className='dim';
+        const sl=document.createElement('input'); sl.type='range'; sl.min=0; sl.max=100; sl.className='dim'; sl.setAttribute('aria-label','Position: '+c.name);
         sl.value=c.position!=null?c.position:(open?100:0);
         sl.onchange=async()=>{ if(await haCtl(c.entity_id,'set',Number(sl.value))) row.classList.toggle('on',Number(sl.value)>0); };
         const tg=document.createElement('button'); tg.className='wg-light-tg'; tg.textContent=open?'Open':'Closed';

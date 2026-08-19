@@ -191,10 +191,56 @@ async function checkArrivals(): Promise<void> {
   }
 }
 
+/** Pure: devices needing a health nudge — low battery or long-unavailable. */
+export function healthIssues(entities: HaEntity[], now = Date.now()): Array<{ entity_id: string; name: string; kind: 'battery' | 'unavailable'; detail: string }> {
+  const out: Array<{ entity_id: string; name: string; kind: 'battery' | 'unavailable'; detail: string }> = []
+  for (const e of entities) {
+    if (e.domain === 'sensor' && e.attributes?.device_class === 'battery') {
+      const pct = Number(e.state)
+      if (Number.isFinite(pct) && pct > 0 && pct <= 15) out.push({ entity_id: e.entity_id, name: e.name, kind: 'battery', detail: `${pct}%` })
+    }
+    const lc = e.attributes?.orb_last_changed ?? null // injected for tests
+    if (e.state === 'unavailable') {
+      const since = lc ? Number(lc) : null
+      if (since === null || now - since >= 24 * 3600_000) out.push({ entity_id: e.entity_id, name: e.name, kind: 'unavailable', detail: 'unreachable' })
+    }
+  }
+  return out
+}
+
+const healthNudged = new Map<string, number>()
+const HEALTH_RENUDGE_MS = 7 * 24 * 3600_000
+let healthTicks = 0
+
+async function checkDeviceHealth(): Promise<void> {
+  // Hourly is plenty for battery/availability drift.
+  if (healthTicks++ % 60 !== 0) return
+  const entities = await haStates().catch(() => [] as HaEntity[])
+  const issues = healthIssues(entities.map(e => {
+    // real last-changed comes from HA state metadata
+    const raw = (e.attributes || {}) as any
+    return { ...e, attributes: { ...raw, orb_last_changed: raw.orb_last_changed } }
+  }))
+  const fresh = issues.filter(i => {
+    const last = healthNudged.get(i.entity_id) || 0
+    return Date.now() - last >= HEALTH_RENUDGE_MS
+  })
+  if (!fresh.length) return
+  for (const i of fresh) healthNudged.set(i.entity_id, Date.now())
+  const bat = fresh.filter(i => i.kind === 'battery').map(i => `${i.name} (${i.detail})`)
+  const un = fresh.filter(i => i.kind === 'unavailable').map(i => i.name)
+  const bits: string[] = []
+  if (bat.length) bits.push(`batteries low: ${bat.join(', ')}`)
+  if (un.length) bits.push(`unreachable: ${un.join(', ')}`)
+  await notifyOwner(`🔧 Device health — ${bits.join(' · ')}.`)
+  log.info('device_health_nudge', { count: fresh.length })
+}
+
 async function tick(): Promise<void> {
   // Discovery queue changes rarely — check every 5th poll (~5 min default).
   if (discoveryTicks++ % 5 === 0) await checkDiscoveries().catch(() => { /* best effort */ })
   await checkArrivals().catch(() => { /* best effort */ })
+  await checkDeviceHealth().catch(() => { /* best effort */ })
   if (pushStore) { import('./briefing.js').then(m => m.maybeSendBriefing(pushStore!, notifyOwner)).catch(() => { /* optional */ }) }
   if (pushStore) { import('../family/family.js').then(m => m.fireDueRoutines(pushStore!, notifyOwner)).catch(() => { /* optional */ }) }
   let entities: HaEntity[]
