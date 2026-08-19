@@ -450,9 +450,9 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
     },
     {
       name: 'Settings',
-      description: "Read and change Orb's own settings, and open the Settings panel for the user. op:'open' {section?} opens the panel (sections: access, users, channels, voice, apps, files, integrations, system). op:'get' {key?} reads current settings (secret values are shown only as set/unset). op:'set' {key, value} changes a setting live (e.g. OPENAI_MODEL, ORB2_TTS_VOICE, ORB2_HOME_LOCATION, OPENAI_BASE_URL for a cloud brain). Use when the user asks to change how Orb works — do it for them instead of describing where to click. Endpoint/key changes may need a restart to fully apply.",
+      description: "Read and change Orb's own settings, and open the Settings panel for the user. op:'open' {section?} opens the panel (sections: access, users, channels, voice, apps, files, integrations, system). op:'get' {key?} reads current settings (secret values are shown only as set/unset). op:'connect' {value:<pasted credential>} auto-detects WHICH service a pasted API key/token belongs to by its shape and wires it into the right setting (use whenever the user pastes a key without saying where it goes — if ambiguous it returns the candidates to ask about). op:'set' {key, value} changes a setting live (e.g. OPENAI_MODEL, ORB2_TTS_VOICE, ORB2_HOME_LOCATION, OPENAI_BASE_URL for a cloud brain). Use when the user asks to change how Orb works — do it for them instead of describing where to click. Endpoint/key changes may need a restart to fully apply.",
       input_schema: { type: 'object', properties: {
-        op: { type: 'string', enum: ['open', 'get', 'set'] },
+        op: { type: 'string', enum: ['open', 'get', 'set', 'connect'] },
         section: { type: 'string', description: "Panel section for op:'open'." },
         key: { type: 'string', description: 'Setting key (ORB2_* / OPENAI_*).' },
         value: { type: 'string', description: "New value for op:'set'." },
@@ -1351,6 +1351,32 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
       }))
       return rows.join('\n')
     }
+    if (op === 'connect') {
+      const paste = String(args?.value || args?.key || '').trim()
+      const { SETTINGS_KEYS } = await import('../settingsKeys.js')
+      const { detectKey } = await import('../connectors/keyDetect.js')
+      const matches = detectKey(paste)
+      if (!matches.length) return "I don't recognize that credential's shape. Tell me which service it's for and I'll set it with op:'set'."
+      const certain = matches.filter(m => m.certain)
+      if (certain.length !== 1) {
+        return `That looks like it could be: ${matches.map(m => m.service).join(' OR ')}. Ask the user which one, then op:'set' with the matching key (${matches.map(m => m.setting).join(' / ')}).`
+      }
+      const m = certain[0]!
+      if (!(SETTINGS_KEYS as readonly string[]).includes(m.setting)) {
+        return `Recognized: ${m.service}. ${m.note || 'This one is not a local setting.'}`
+      }
+      const { CRITICAL_SETTINGS } = await import('../settingsKeys.js')
+      if (CRITICAL_SETTINGS.has(m.setting)) {
+        const { isOwner } = await import('../auth/otp.js')
+        const email = ctx.ownerId.replace(/^user:/, '')
+        if (email.includes('@') && !(await isOwner(ctx.store, email))) {
+          return `That's a ${m.service} credential — a critical setting only a household OWNER can change.`
+        }
+      }
+      await ctx.store.putKv(`setting:${m.setting}`, paste, 0)
+      process.env[m.setting] = paste
+      return `Recognized a ${m.service} credential and connected it (${m.setting}).${m.note ? ' ' + m.note : ''} The matching features are live now.`
+    }
     if (op === 'set') {
       const key = String(args?.key || '').trim()
       const value = String(args?.value ?? '').trim()
@@ -1512,7 +1538,33 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
     const op = String(args?.op || 'list')
     const { listTimers, addTimer, cancelTimer, timerWidgetSpec } = await import('../home/timers.js')
     try {
-      if (op === 'set') {
+      if (op === 'connect') {
+      const paste = String(args?.value || args?.key || '').trim()
+      const { SETTINGS_KEYS } = await import('../settingsKeys.js')
+      const { detectKey } = await import('../connectors/keyDetect.js')
+      const matches = detectKey(paste)
+      if (!matches.length) return "I don't recognize that credential's shape. Tell me which service it's for and I'll set it with op:'set'."
+      const certain = matches.filter(m => m.certain)
+      if (certain.length !== 1) {
+        return `That looks like it could be: ${matches.map(m => m.service).join(' OR ')}. Ask the user which one, then op:'set' with the matching key (${matches.map(m => m.setting).join(' / ')}).`
+      }
+      const m = certain[0]!
+      if (!(SETTINGS_KEYS as readonly string[]).includes(m.setting)) {
+        return `Recognized: ${m.service}. ${m.note || 'This one is not a local setting.'}`
+      }
+      const { CRITICAL_SETTINGS } = await import('../settingsKeys.js')
+      if (CRITICAL_SETTINGS.has(m.setting)) {
+        const { isOwner } = await import('../auth/otp.js')
+        const email = ctx.ownerId.replace(/^user:/, '')
+        if (email.includes('@') && !(await isOwner(ctx.store, email))) {
+          return `That's a ${m.service} credential — a critical setting only a household OWNER can change.`
+        }
+      }
+      await ctx.store.putKv(`setting:${m.setting}`, paste, 0)
+      process.env[m.setting] = paste
+      return `Recognized a ${m.service} credential and connected it (${m.setting}).${m.note ? ' ' + m.note : ''} The matching features are live now.`
+    }
+    if (op === 'set') {
         const label = String(args?.label || 'Timer').trim()
         let at: number | null = null
         if (args?.minutes != null && Number(args.minutes) > 0) at = Date.now() + Number(args.minutes) * 60_000

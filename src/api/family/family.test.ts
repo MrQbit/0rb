@@ -287,3 +287,31 @@ describe('device health watch (loop A9)', () => {
     expect(issues.find(i => i.name === 'Door sensor battery')!.detail).toBe('9%')
   })
 })
+
+describe('smart-paste key detection (connectors QoL)', () => {
+  test('unambiguous shapes map to one service', async () => {
+    const { detectKey } = await import('../connectors/keyDetect.ts')
+    const one = (p: string) => { const m = detectKey(p); expect(m.length).toBe(1); expect(m[0]!.certain).toBe(true); return m[0]! }
+    expect(one('AIzaSyB-abc123def456ghi789jkl012mno345p').setting).toBe('ORB2_YOUTUBE_API_KEY')
+    expect(one('sk-or-v1-' + 'a'.repeat(48)).setting).toBe('ORB2_OPENROUTER_KEY')
+    expect(one('sk-ant-api03-xyz').setting).toBe('OPENAI_API_KEY')
+    expect(one('sk-proj-' + 'A'.repeat(30)).setting).toBe('OPENAI_API_KEY')
+    expect(one('BSA' + 'x'.repeat(24)).setting).toBe('ORB2_BRAVE_API_KEY')
+    const jwt = 'eyJ' + 'a'.repeat(40) + '.' + 'b'.repeat(50) + '.' + 'c'.repeat(40)
+    expect(one(jwt).setting).toBe('ORB2_HA_TOKEN')
+  })
+
+  test('32-hex is ambiguous: spotify id/secret or newsapi', async () => {
+    const { detectKey } = await import('../connectors/keyDetect.ts')
+    const m = detectKey('a'.repeat(32))
+    expect(m.length).toBe(3)
+    expect(m.every(x => !x.certain)).toBe(true)
+  })
+
+  test('garbage and multi-word strings are rejected', async () => {
+    const { detectKey } = await import('../connectors/keyDetect.ts')
+    expect(detectKey('hello world').length).toBe(0)
+    expect(detectKey('short').length).toBe(0)
+    expect(detectKey('').length).toBe(0)
+  })
+})
