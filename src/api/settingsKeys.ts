@@ -45,3 +45,18 @@ export const SETTINGS_PLAINTEXT_KEYS = new Set([
   'ORB2_TELEGRAM_OWNER_ID', 'ORB2_OWNER_PHONE', 'OPENAI_MODEL', 'OPENAI_BASE_URL',
   'ORB2_WIDGETS_DISABLED', 'ORB2_ROUTER_ENABLED', 'ORB2_ROUTER_STRONG_MODEL',
 ])
+
+/**
+ * Settings only an OWNER may change: the brain, its endpoint/keys, who can
+ * sign in, message channels, smart-home credentials, and self-modification.
+ * A member changing any of these could take over or brick the household.
+ */
+export const CRITICAL_SETTINGS = new Set<string>([
+  'OPENAI_MODEL', 'OPENAI_BASE_URL', 'OPENAI_API_KEY', 'ORB2_HF_TOKEN',
+  'ORB2_ROUTER_ENABLED', 'ORB2_OPENROUTER_KEY', 'ORB2_ROUTER_STRONG_MODEL',
+  'ORB2_AUTH_ALLOWED_EMAILS',
+  'ORB2_SMTP_HOST', 'ORB2_SMTP_PORT', 'ORB2_SMTP_USER', 'ORB2_SMTP_PASS', 'ORB2_SMTP_FROM',
+  'ORB2_TELEGRAM_BOT_TOKEN', 'ORB2_TELEGRAM_OWNER_ID', 'ORB2_OWNER_PHONE',
+  'ORB2_HA_URL', 'ORB2_HA_TOKEN',
+  'ORB2_FCM_PROJECT_ID', 'ORB2_FCM_SERVICE_ACCOUNT',
+])

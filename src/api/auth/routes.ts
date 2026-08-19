@@ -21,7 +21,7 @@ import {
   parseCookies,
   SESSION_COOKIE,
 } from './session.js'
-import { requestOtp, verifyOtp, getUsers, addUser, removeUser } from './otp.js'
+import { requestOtp, verifyOtp, getUsers, addUser, removeUser, isOwner } from './otp.js'
 
 function json(status: number, body: unknown, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(body), {
@@ -61,18 +61,23 @@ export async function handleAuthRoutes(
     return json(200, { ok: true, sent: r.sent, via })
   }
 
-  // ── User database (allowed users) — owner/authenticated only ──
+  // ── User database (allowed users) — reads for any session; WRITES are
+  //    owner-only (members must not add users, change roles, or evict). ──
   if (pathname === '/v1/auth/users') {
     const me = sessionUser(req)
     if (authEnabled() && !me) return json(401, { error: 'authentication required' })
     if (method === 'GET') {
       return json(200, { users: await getUsers(store) })
     }
+    if (authEnabled() && me && !(await isOwner(store, me))) {
+      return json(403, { error: 'Only a household owner can manage users', code: 'OWNER_REQUIRED' })
+    }
     if (method === 'POST') {
-      let body: { email?: string; telegram_chat_id?: string; label?: string }
+      let body: { email?: string; telegram_chat_id?: string; label?: string; role?: 'owner' | 'member'; person_entity?: string }
       try { body = (await req.json()) as any } catch { return json(400, { error: 'invalid JSON' }) }
       if (!body.email) return json(400, { error: 'email required' })
-      const users = await addUser(store, { email: body.email, telegram_chat_id: body.telegram_chat_id, label: body.label })
+      if (body.role !== undefined && !['owner', 'member'].includes(body.role)) return json(400, { error: 'role must be owner|member' })
+      const users = await addUser(store, { email: body.email, telegram_chat_id: body.telegram_chat_id, label: body.label, role: body.role, person_entity: body.person_entity })
       return json(200, { ok: true, users })
     }
     if (method === 'DELETE') {

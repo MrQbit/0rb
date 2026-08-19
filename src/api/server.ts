@@ -28,7 +28,7 @@ import { tryTailscaleRoute } from './connectors/tailscaleRoutes.js'
 import { tryWidgetRegistryRoute } from './widgets/registryRoutes.js'
 import { tryWalletRoute } from './wallet/routes.js'
 import { tryShoppingRoute } from './shopping/routes.js'
-import { SETTINGS_KEYS, SETTINGS_PLAINTEXT_KEYS } from './settingsKeys.js'
+import { SETTINGS_KEYS, SETTINGS_PLAINTEXT_KEYS, CRITICAL_SETTINGS } from './settingsKeys.js'
 import { routeTurn } from './modelRouter.js'
 import { buildFallbackChain } from './foundry/fallbackChain.js'
 import { getDefaultMcpServers } from './mcp/defaultServers.js'
@@ -2503,6 +2503,22 @@ async function handlePutSettings(
   const updated: string[] = []
   const vaultClient = getVaultClient()
   const attribution = attributionFor(identity)
+  // Role gate: members may not change critical settings (brain, endpoints,
+  // auth, channels, smart-home credentials). Owners pass; unknown/service
+  // identities are treated as owner for back-compat (single-user installs).
+  {
+    const email = String(attribution.oid || '').replace(/^user:/, '')
+    if (email.includes('@')) {
+      const { isOwner } = await import('./auth/otp.js')
+      if (!(await isOwner(ctx.store, email))) {
+        const attempted = Object.keys(body).filter(k => CRITICAL_SETTINGS.has(k))
+        if (attempted.length) {
+          ctx.audit({ ...attribution, event: 'settings.denied', data: { keys: attempted } })
+          return jsonResponse(403, { error: `Only a household owner can change: ${attempted.join(', ')}`, code: 'OWNER_REQUIRED' })
+        }
+      }
+    }
+  }
   for (const key of SETTINGS_KEYS) {
     if (typeof body[key] === 'string' && body[key].trim()) {
       const value = body[key].trim()

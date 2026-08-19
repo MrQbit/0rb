@@ -128,6 +128,9 @@ export async function familyPromptExtra(store: Store, ownerId: string): Promise<
     const idx = users.findIndex(x => x.email === u.email)
     const role = u.role ?? (idx === 0 ? 'owner' : 'member')
     let out = `\nCurrent user: ${u.label || email} <${email}> (household ${role}).`
+    const prefs = await getPrefs(store, email)
+    const pk = Object.entries(prefs)
+    if (pk.length) out += `\nTheir preferences: ${pk.map(([k, v]) => `${k}: ${v}`).join('; ')}.`
     const due = await takePendingNotes(store, email, 'next')
     if (due.length) {
       const lines = await Promise.all(due.map(async n => `- from ${await memberName(store, n.from)}: "${n.text}"`))
@@ -162,4 +165,64 @@ export async function removeEvent(store: Store, query: string): Promise<FamilyEv
   const [gone] = events.splice(idx, 1)
   await store.putKv(EVENTS_KEY, JSON.stringify(events), 0)
   return gone!
+}
+
+// ── per-person preferences (round 2: settings isolation, the human kind) ─
+// Free-form personal preferences the agent honours per member ("keep replies
+// short", "my coffee is a flat white", "call me Max"). Injected into the
+// system prompt for that member's turns only.
+const PREFS_PREFIX = 'family:prefs:'
+
+export async function getPrefs(store: Store, email: string): Promise<Record<string, string>> {
+  try { return JSON.parse((await store.getKv(PREFS_PREFIX + normalizeEmail(email))) || '{}') } catch { return {} }
+}
+export async function setPref(store: Store, email: string, key: string, value: string): Promise<void> {
+  const prefs = await getPrefs(store, email)
+  const k = key.trim().slice(0, 40)
+  if (!k) return
+  if (value.trim()) prefs[k] = value.trim().slice(0, 200)
+  else delete prefs[k]
+  await store.putKv(PREFS_PREFIX + normalizeEmail(email), JSON.stringify(prefs), 0)
+}
+
+// ── chore rota ─────────────────────────────────────────────────────────
+const CHORES_KEY = 'family:chores'
+
+export interface Chore {
+  id: string
+  title: string
+  who: string
+  /** optional weekday 0-6 (Sun-Sat) it recurs on; one-off when absent */
+  day?: number
+  done?: number
+}
+
+export async function listChores(store: Store): Promise<Chore[]> {
+  try {
+    const all = JSON.parse((await store.getKv(CHORES_KEY)) || '[]') as Chore[]
+    // Recurring chores reset when their day comes around again.
+    const today = new Date().getDay()
+    let changed = false
+    for (const c of all) {
+      if (c.day !== undefined && c.done && c.day === today && Date.now() - c.done > 24 * 3600_000) { c.done = undefined; changed = true }
+    }
+    if (changed) await store.putKv(CHORES_KEY, JSON.stringify(all), 0)
+    return all
+  } catch { return [] }
+}
+export async function addChore(store: Store, title: string, who: string, day?: number): Promise<Chore> {
+  const chores = await listChores(store)
+  const c: Chore = { id: rid('ch'), title: title.slice(0, 120), who: normalizeEmail(who), day }
+  chores.push(c)
+  await store.putKv(CHORES_KEY, JSON.stringify(chores), 0)
+  return c
+}
+export async function completeChore(store: Store, query: string): Promise<Chore | null> {
+  const chores = await listChores(store)
+  const q = query.toLowerCase()
+  const c = chores.find(x => !x.done && (x.id === query || x.title.toLowerCase().includes(q)))
+  if (!c) return null
+  c.done = Date.now()
+  await store.putKv(CHORES_KEY, JSON.stringify(chores.filter(x => x.day !== undefined || !x.done || Date.now() - x.done! < 7 * 24 * 3600_000)), 0)
+  return c
 }

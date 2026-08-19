@@ -141,3 +141,54 @@ describe('family calendar', () => {
     expect((await listEvents(store)).length).toBe(0)
   })
 })
+
+describe('critical settings gate (round 2)', () => {
+  test('CRITICAL_SETTINGS covers brain, auth, channels, HA credentials', async () => {
+    const { CRITICAL_SETTINGS, SETTINGS_KEYS } = await import('../settingsKeys.ts')
+    for (const k of ['OPENAI_MODEL', 'OPENAI_BASE_URL', 'OPENAI_API_KEY', 'ORB2_AUTH_ALLOWED_EMAILS', 'ORB2_HA_TOKEN', 'ORB2_TELEGRAM_BOT_TOKEN']) {
+      expect(CRITICAL_SETTINGS.has(k)).toBe(true)
+    }
+    // every critical key is a real settings key (no typo drift)
+    for (const k of CRITICAL_SETTINGS) expect((SETTINGS_KEYS as readonly string[]).includes(k)).toBe(true)
+    // benign keys stay member-changeable
+    expect(CRITICAL_SETTINGS.has('ORB2_TTS_VOICE')).toBe(false)
+    expect(CRITICAL_SETTINGS.has('ORB2_HOME_LOCATION')).toBe(false)
+  })
+})
+
+describe('per-person preferences', () => {
+  test('set, list, overwrite, delete — isolated per member', async () => {
+    const { getPrefs, setPref } = await import('./family.ts')
+    await setPref(store, 'kid@example.com', 'nickname', 'Max')
+    await setPref(store, 'kid@example.com', 'style', 'short answers')
+    await setPref(store, 'owner@example.com', 'coffee', 'flat white')
+    expect(await getPrefs(store, 'kid@example.com')).toEqual({ nickname: 'Max', style: 'short answers' })
+    expect(await getPrefs(store, 'owner@example.com')).toEqual({ coffee: 'flat white' })
+    await setPref(store, 'kid@example.com', 'nickname', '')
+    expect((await getPrefs(store, 'kid@example.com')).nickname).toBeUndefined()
+  })
+
+  test('prefs surface in the member prompt only', async () => {
+    const { setPref } = await import('./family.ts')
+    await setPref(store, 'kid@example.com', 'nickname', 'Max')
+    const kidExtra = await familyPromptExtra(store, 'user:kid@example.com')
+    expect(kidExtra).toContain('nickname: Max')
+    const ownerExtra = await familyPromptExtra(store, 'user:owner@example.com')
+    expect(ownerExtra).not.toContain('nickname: Max')
+  })
+})
+
+describe('chores', () => {
+  test('add, complete, one-off cleanup', async () => {
+    const { addChore, listChores, completeChore } = await import('./family.ts')
+    await addChore(store, 'Take out trash', 'kid@example.com')
+    await addChore(store, 'Water plants', 'owner@example.com', 3)
+    let chores = await listChores(store)
+    expect(chores.length).toBe(2)
+    const done = await completeChore(store, 'trash')
+    expect(done?.title).toBe('Take out trash')
+    expect((await completeChore(store, 'trash'))).toBeNull() // already done
+    chores = await listChores(store)
+    expect(chores.find(c => c.title === 'Water plants')?.done).toBeUndefined()
+  })
+})

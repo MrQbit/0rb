@@ -461,9 +461,9 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
     },
     {
       name: 'Family',
-      description: "The household: notes between members, a shared family calendar, reminders for each other, and announcements over the speakers. op:'note' {to, text, when:'next'|'home'} leaves a note delivered on their next chat ('next') or when they arrive home ('home'). op:'board' shows the family board widget. op:'remind' {to, label, minutes|at} sets a reminder that notifies THAT member on their channel. op:'calendar_add' {title, date:'YYYY-MM-DD', time?, who?} and op:'calendar' (show) manage the shared household calendar (no external account). op:'calendar_remove' {query}. op:'announce' {message} speaks a message on the home's speakers ('dinner is ready!'). op:'members' lists the household. Resolve people by first name.",
+      description: "The household: notes between members, a shared family calendar, reminders for each other, and announcements over the speakers. op:'note' {to, text, when:'next'|'home'} leaves a note delivered on their next chat ('next') or when they arrive home ('home'). op:'board' shows the family board widget. op:'remind' {to, label, minutes|at} sets a reminder that notifies THAT member on their channel. op:'calendar_add' {title, date:'YYYY-MM-DD', time?, who?} and op:'calendar' (show) manage the shared household calendar (no external account). op:'calendar_remove' {query}. op:'announce' {message} speaks a message on the home's speakers ('dinner is ready!'). op:'members' lists the household. op:'pref' {key, value} saves a personal preference for the CURRENT user (nickname, style, tastes — honoured in their future chats; empty value deletes); op:'prefs' lists theirs. Chores: op:'chore_add' {title, to, day?(0-6 weekly)}, op:'chore_done' {query}, op:'chores' shows the rota. Resolve people by first name.",
       input_schema: { type: 'object', properties: {
-        op: { type: 'string', enum: ['note', 'board', 'remind', 'calendar_add', 'calendar', 'calendar_remove', 'announce', 'members'] },
+        op: { type: 'string', enum: ['note', 'board', 'remind', 'calendar_add', 'calendar', 'calendar_remove', 'announce', 'members', 'pref', 'prefs', 'chore_add', 'chore_done', 'chores'] },
         to: { type: 'string', description: 'Member (name or email) for note/remind.' },
         text: { type: 'string', description: 'Note text.' },
         when: { type: 'string', enum: ['next', 'home'], description: "note delivery: next chat (default) or arrives-home." },
@@ -471,6 +471,9 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
         title: { type: 'string' }, date: { type: 'string' }, time: { type: 'string' }, who: { type: 'string' },
         message: { type: 'string', description: 'What to announce aloud.' },
         query: { type: 'string' },
+        key: { type: 'string', description: "Preference name for op:'pref'." },
+        value: { type: 'string', description: "Preference value (empty deletes)." },
+        day: { type: 'number', description: 'Weekly chore day 0-6 (Sun-Sat).' },
       }, required: ['op'] },
       available: true,
     },
@@ -1326,6 +1329,14 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
       const value = String(args?.value ?? '').trim()
       if (!(SETTINGS_KEYS as readonly string[]).includes(key)) return `"${key}" is not a settable key. Known keys: ${SETTINGS_KEYS.join(', ')}`
       if (!value) return 'Provide a value.'
+      const { CRITICAL_SETTINGS } = await import('../settingsKeys.js')
+      if (CRITICAL_SETTINGS.has(key)) {
+        const { isOwner } = await import('../auth/otp.js')
+        const email = ctx.ownerId.replace(/^user:/, '')
+        if (email.includes('@') && !(await isOwner(ctx.store, email))) {
+          return `"${key}" is a critical setting — only a household OWNER can change it. Tell them what you need, or ask an owner to do it.`
+        }
+      }
       await ctx.store.putKv(`setting:${key}`, value, 0)
       process.env[key] = value
       return `Set ${key}${SETTINGS_PLAINTEXT_KEYS.has(key) ? ` = ${value}` : ''} (live).${/BASE_URL|API_KEY/.test(key) ? ' A restart may be needed for the brain endpoint to fully switch.' : ''}`
@@ -1350,6 +1361,36 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
       if (op === 'members') {
         const users = await getUsers(ctx.store)
         return 'Household: ' + users.map((u, i) => `${u.label || u.email.split('@')[0]} <${u.email}> (${u.role ?? (i === 0 ? 'owner' : 'member')}${u.telegram_chat_id ? ', telegram' : ''})`).join(' · ')
+      }
+      if (op === 'pref') {
+        const key = String(args?.title || args?.label || args?.query || args?.key || '').trim() || 'note'
+        const value = String(args?.text || args?.value || args?.message || '').trim()
+        await fam.setPref(ctx.store, me, key, value)
+        return value ? `Noted — ${key}: ${value}. I'll remember that for you specifically.` : `Cleared your "${key}" preference.`
+      }
+      if (op === 'prefs') {
+        const prefs = await fam.getPrefs(ctx.store, me)
+        const entries = Object.entries(prefs)
+        return entries.length ? 'Your preferences: ' + entries.map(([k, v]) => `${k}: ${v}`).join(' · ') : 'No personal preferences saved yet.'
+      }
+      if (op === 'chore_add') {
+        const rec = await fam.resolveMember(ctx.store, String(args?.to || args?.who || ''))
+        if (!rec) return `Who is this chore for? I don't know "${args?.to || args?.who}".`
+        const title = String(args?.title || args?.text || '').trim()
+        if (!title) return 'What is the chore?'
+        const day = args?.day != null && Number(args.day) >= 0 && Number(args.day) <= 6 ? Number(args.day) : undefined
+        await fam.addChore(ctx.store, title, rec.email, day)
+        return `Chore added: "${title}" → ${rec.label || rec.email.split('@')[0]}${day !== undefined ? ` (every ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][day]})` : ''}.`
+      }
+      if (op === 'chore_done') {
+        const c = await fam.completeChore(ctx.store, String(args?.query || args?.title || ''))
+        return c ? `Nice — "${c.title}" marked done.` : `No open chore matching that.`
+      }
+      if (op === 'chores') {
+        const chores = await fam.listChores(ctx.store)
+        if (!chores.length) return 'No chores on the rota.'
+        const named = await Promise.all(chores.map(async c => `${c.title} → ${await fam.memberName(ctx.store, c.who)}${c.done ? ' ✓' : ''}${c.day !== undefined ? ` (${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][c.day]})` : ''}`))
+        return 'Chores: ' + named.join(' · ')
       }
       if (op === 'note') {
         const rec = await fam.resolveMember(ctx.store, String(args?.to || ''))
