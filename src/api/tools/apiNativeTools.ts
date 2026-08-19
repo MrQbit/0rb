@@ -39,7 +39,7 @@ import { vercelEnabled, deployToVercel } from '../connectors/vercel.js'
 import { cloudStorageEnabled, searchCloud, downloadCloudFile, connectedProviders } from '../connectors/cloudStorage.js'
 import { geocode, route as geoRoute, weather, reverseGeocode } from '../connectors/geo.js'
 import { webSearch, webSearchEnabled } from '../connectors/websearch.js'
-import { haConfig, haAreas, haCreateArea, haUpdateEntity, haAreaByEntity, haJoinAreas, toDeviceCard, prettyDomain, describeAttrs, haConfigEntries, haDiscoveredFlows, haFlowAdvance, haFlowStart } from '../connectors/homeAssistant.js'
+import { haConfig, haAreas, haCreateArea, haUpdateEntity, haAreaByEntity, haJoinAreas, toDeviceCard, prettyDomain, describeAttrs, haConfigEntries, haDiscoveredFlows, haFlowAdvance, haFlowStart, haEntityRegistry } from '../connectors/homeAssistant.js'
 import { dockerEnabled, dockerList, dockerControl } from '../connectors/dockerc.js'
 import { haEnabled, haStates, haResolve, haCallService, HOME_DOMAINS, type HaEntity } from '../connectors/homeAssistant.js'
 import { onlineOptions, nearbyStores } from '../connectors/shopping.js'
@@ -422,7 +422,7 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
       name: 'Home',
       description: "Control and check the home's devices through Home Assistant — lights, switches/plugs, thermostats (climate), locks, window shades/blinds (cover), TVs & speakers (media_player), robot vacuums, fans, and door/window & motion sensors. This is how Orb acts as the house. Use op:'list' to see what's available (optionally a `type`), op:'status' to check a device by name, and op:'control' to change one: action on/off/toggle for lights/plugs/switches; lock/unlock for locks; open/close (or set with `value` 0-100) for shades; set with `value` for a thermostat's target temperature; play/pause/on/off (or set volume with `value` 0-100) for media; start/stop/dock for a vacuum. Always refer to devices by their friendly name (e.g. \"kitchen lights\", \"front door\").",
       input_schema: { type: 'object', properties: {
-        op: { type: 'string', enum: ['list', 'status', 'control', 'media', 'lights', 'climate', 'vacuum'], description: "list = overview dashboard; status/control = one device; media = show a media REMOTE widget for TVs/speakers; lights = show the room-grouped LIGHTS widget; climate = show thermostat widgets. Prefer the function widgets (media/lights/climate) when the user is focused on one kind of device." },
+        op: { type: 'string', enum: ['list', 'status', 'control', 'media', 'lights', 'climate', 'vacuum', 'covers', 'security', 'plugs', 'scenes', 'sensors', 'camera'], description: "list = overview dashboard; status/control = one device; each FUNCTION op shows a focused widget: media (TV/speaker remote), lights (room-grouped), climate (thermostats), vacuum, covers (shades/blinds), security (locks + door/window/motion sensors), plugs (switches/outlets), scenes, sensors (readings: temperature/humidity/battery), camera (snapshots). ALWAYS prefer the function widget matching what the user is focused on — the overview dashboard (list) is for 'show me everything'." },
         query: { type: 'string', description: "Device name for status/control (e.g. 'living room lights', 'front door', 'bedroom thermostat')." },
         type: { type: 'string', enum: ['light', 'switch', 'climate', 'lock', 'cover', 'media_player', 'vacuum', 'fan', 'sensor', 'camera'], description: 'Optional device type filter for list.' },
         action: { type: 'string', enum: ['on', 'off', 'toggle', 'lock', 'unlock', 'open', 'close', 'play', 'pause', 'start', 'stop', 'dock', 'set'], description: 'What to do for op:control.' },
@@ -432,9 +432,9 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
     },
     {
       name: 'HomeAdmin',
-      description: "Organize AND configure the smart home in Home Assistant. Structure: op:'areas' lists rooms; op:'create_area' {name}; op:'assign' {query, area}; op:'rename' {query, name}; op:'hide' {query, hidden}. Device setup: op:'integrations' lists installed integrations + devices HA has DISCOVERED on the network but not set up yet; op:'pair' {integration} advances a discovered device's setup (e.g. integration:'webostv' makes the TV show its pairing prompt — the device must be ON and the user must accept on its screen); op:'setup' {integration, fields?} starts a NEW integration from scratch (e.g. 'roomba') and reports what fields it needs — pass them in `fields` on the next call; op:'diagnose' {query} explains why a device is failing (state, availability, which integration). Use these to actively FIX devices the user can't control instead of telling them to open HA.",
+      description: "Organize AND configure the smart home in Home Assistant. Structure: op:'areas' lists rooms; op:'create_area' {name}; op:'assign' {query, area}; op:'rename' {query, name}; op:'hide' {query, hidden}. Device setup: op:'integrations' lists installed integrations + devices HA has DISCOVERED on the network but not set up yet; op:'pair' {integration} advances a discovered device's setup (e.g. integration:'webostv' makes the TV show its pairing prompt — the device must be ON and the user must accept on its screen); op:'setup' {integration, fields?} starts a NEW integration from scratch (e.g. 'roomba') and reports what fields it needs — pass them in `fields` on the next call; op:'diagnose' {query} explains why a device is failing (state, availability, which integration). op:'cleanup' hides duplicate entities when one physical device was registered by several integrations (Sonos/TVs often triple-register via Cast/DLNA — native wins). Use these to actively FIX devices instead of telling the user to open HA. HYGIENE: after pairing a new device, always (1) rename it to a clean human name, (2) assign it to its room, (3) run cleanup.",
       input_schema: { type: 'object', properties: {
-        op: { type: 'string', enum: ['areas', 'create_area', 'assign', 'rename', 'hide', 'integrations', 'pair', 'setup', 'diagnose'] },
+        op: { type: 'string', enum: ['areas', 'create_area', 'assign', 'rename', 'hide', 'integrations', 'pair', 'setup', 'diagnose', 'cleanup'] },
         query: { type: 'string', description: 'Device to act on, by name.' },
         area: { type: 'string', description: "Room name for op:'assign'." },
         name: { type: 'string', description: "New display name for op:'rename' / op:'create_area'." },
@@ -909,6 +909,86 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
         } as any)
         return `Showed vacuum widget: ${vs.map(v => `${v.name} (${v.state}${v.attributes.battery_level != null ? `, ${v.attributes.battery_level}%` : ''})`).join(', ')}.`
       }
+      if (op === 'covers') {
+        const cs = await haJoinAreas(await haStates(['cover']))
+        if (!cs.length) return 'No shades/blinds/covers in Home Assistant.'
+        const groups = new Map<string, any[]>()
+        for (const e of cs) {
+          const area = e.area || 'Other'
+          const arr = groups.get(area) ?? []
+          arr.push({ entity_id: e.entity_id, name: e.name, state: e.state, position: e.attributes.current_position })
+          groups.set(area, arr)
+        }
+        emitWidget(ctx.sessionId, { id: 'covers', type: 'covers', title: 'Shades',
+          groups: [...groups.entries()].map(([area, covers]) => ({ area, covers })) } as any)
+        return `Showed the shades widget — ${cs.length} cover(s).`
+      }
+      if (op === 'security') {
+        const [locks, bins] = await Promise.all([
+          haJoinAreas(await haStates(['lock'])),
+          haJoinAreas(await haStates(['binary_sensor'])),
+        ])
+        const KINDS: Record<string, string> = { door: 'door', garage_door: 'door', window: 'window', opening: 'door', motion: 'motion', occupancy: 'motion', presence: 'motion', smoke: 'smoke', carbon_monoxide: 'co' }
+        const sensors = bins
+          .map(e => ({ entity_id: e.entity_id, name: e.name, area: e.area, kind: KINDS[e.attributes.device_class] , on: e.state === 'on' }))
+          .filter(s => s.kind)
+        if (!locks.length && !sensors.length) return 'No locks or door/window/motion sensors in Home Assistant.'
+        emitWidget(ctx.sessionId, { id: 'security', type: 'security', title: 'Security',
+          pill: `${locks.filter(l => l.state !== 'locked').length + sensors.filter(s => s.on && s.kind !== 'motion').length} open`,
+          locks: locks.map(l => ({ entity_id: l.entity_id, name: l.name, area: l.area, locked: l.state === 'locked' })),
+          sensors } as any)
+        const open = sensors.filter(s => s.on && s.kind !== 'motion').map(s => s.name)
+        return `Showed the security widget: ${locks.length} lock(s), ${sensors.length} sensor(s).${open.length ? ` OPEN right now: ${open.join(', ')}.` : ''}`
+      }
+      if (op === 'plugs') {
+        const ps = await haJoinAreas(await haStates(['switch']))
+        if (!ps.length) return 'No plugs/switches in Home Assistant.'
+        const groups = new Map<string, any[]>()
+        for (const e of ps) {
+          const area = e.area || 'Other'
+          const arr = groups.get(area) ?? []
+          arr.push({ entity_id: e.entity_id, name: e.name, on: e.state === 'on' })
+          groups.set(area, arr)
+        }
+        emitWidget(ctx.sessionId, { id: 'plugs', type: 'plugs', title: 'Plugs & switches',
+          pill: `${ps.filter(e => e.state === 'on').length}/${ps.length} on`,
+          groups: [...groups.entries()].map(([area, plugs]) => ({ area, plugs })) } as any)
+        return `Showed the plugs widget — ${ps.length} switch(es).`
+      }
+      if (op === 'scenes') {
+        const sc = await haJoinAreas(await haStates(['scene']))
+        if (!sc.length) return 'No scenes defined in Home Assistant.'
+        emitWidget(ctx.sessionId, { id: 'scenes', type: 'scenes', title: 'Scenes',
+          scenes: sc.map(s => ({ entity_id: s.entity_id, name: s.name, area: s.area })) } as any)
+        return `Showed the scenes widget: ${sc.map(s => s.name).join(', ')}.`
+      }
+      if (op === 'sensors') {
+        const ss = await haJoinAreas(await haStates(['sensor']))
+        const KEEP = new Set(['temperature', 'humidity', 'battery', 'illuminance', 'power', 'energy', 'pm25', 'co2', 'pressure'])
+        const readings = ss
+          .filter(e => KEEP.has(e.attributes.device_class) && e.state !== 'unavailable' && e.state !== 'unknown')
+          .map(e => ({ entity_id: e.entity_id, name: e.name, area: e.area, kind: e.attributes.device_class, value: e.state, unit: e.attributes.unit_of_measurement || '' }))
+        if (!readings.length) return 'No environmental sensors (temperature/humidity/battery/energy…) found.'
+        const groups = new Map<string, any[]>()
+        for (const r of readings) {
+          const arr = groups.get(r.area || 'Other') ?? []
+          arr.push(r)
+          groups.set(r.area || 'Other', arr)
+        }
+        emitWidget(ctx.sessionId, { id: 'sensors', type: 'sensors', title: 'Readings',
+          groups: [...groups.entries()].map(([area, readings]) => ({ area, readings })) } as any)
+        return `Showed the readings widget — ${readings.length} sensor(s).`
+      }
+      if (op === 'camera') {
+        const cams = await haJoinAreas(await haStates(['camera']))
+        if (!cams.length) return 'No cameras in Home Assistant.'
+        for (const c of cams.slice(0, 4)) emitWidget(ctx.sessionId, {
+          id: `camera-${c.entity_id}`, type: 'camera', title: c.name,
+          entity_id: c.entity_id, name: c.name, area: c.area,
+          snapshot: `/v1/home/ha-image?path=${encodeURIComponent(`/api/camera_proxy/${c.entity_id}`)}`,
+        } as any)
+        return `Showed camera widget${cams.length > 1 ? 's' : ''}: ${cams.slice(0, 4).map(c => c.name).join(', ')}.`
+      }
       if (op === 'climate') {
         const cl = await haJoinAreas(await haStates(['climate']))
         if (!cl.length) return 'No thermostats found.'
@@ -964,6 +1044,36 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
         const a = await haCreateArea(name)
         return `Created area "${a.name}".`
       }
+      if (op === 'cleanup') {
+        // A physical device paired through several integrations (Sonos also
+        // seen by Cast/DLNA, a TV by Cast + its native integration) shows up
+        // as duplicate entities. Keep the native one, hide the generic ones.
+        const [states, reg] = await Promise.all([haStates(), haEntityRegistry()])
+        const regById = new Map(reg.map(r => [r.entity_id, r] as const))
+        const norm = (s: string) => s.toLowerCase().replace(/\[.*?\]/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
+        const GENERIC: Record<string, number> = { cast: 1, dlna_dmr: 0, upnp: 0 }
+        type Dupe = { e: HaEntity; platform: string }
+        const groups = new Map<string, Dupe[]>()
+        for (const e of states.filter(x => ['media_player', 'camera'].includes(x.domain))) {
+          const r = regById.get(e.entity_id)
+          if (r?.hidden_by) continue
+          const k = `${e.domain}:${norm(e.name)}`
+          const arr = groups.get(k) ?? []
+          arr.push({ e, platform: r?.platform ?? '' })
+          groups.set(k, arr)
+        }
+        const hid: string[] = []
+        for (const [, g] of groups) {
+          if (g.length < 2) continue
+          g.sort((a, b) => (GENERIC[b.platform] ?? 10) - (GENERIC[a.platform] ?? 10))
+          for (const dupe of g.slice(1)) {
+            await haUpdateEntity(dupe.e.entity_id, { hidden: true })
+            hid.push(`${dupe.e.name} (${dupe.platform || 'unknown'})`)
+          }
+        }
+        const plumbing = reg.filter(r => r.entity_category && !r.hidden_by).length
+        return `Cleanup done. ${hid.length ? `Hid duplicate entities: ${hid.join(', ')} — the native integration's entity stays.` : 'No cross-integration duplicates found.'} ${plumbing} config/diagnostic accessory entities are auto-excluded from Orb's dashboards (still visible inside Home Assistant). Undo any hide with op:'hide' {query, hidden:false}.`
+      }
       if (op === 'integrations') {
         const [entries, flows] = await Promise.all([haConfigEntries(), haDiscoveredFlows()])
         const bad = entries.filter(e => e.state !== 'loaded')
@@ -1016,11 +1126,15 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
         return out
       }
 
-      // Remaining ops act on one device resolved by name.
+      // Remaining ops act on one device resolved by name. Resolve against
+      // the CLEAN set first (config/diagnostic accessories excluded) so
+      // "living room tv" hits the TV, not its hidden autoplay switch; only
+      // op:'hide' may need to reach raw/hidden entities.
       const query = String(args?.query || '').trim()
       if (!query) return "Tell me which device — e.g. 'living room tv'."
-      const entities = await haStates(HOME_DOMAINS)
-      const matches = haResolve(entities, query)
+      const clean = await haJoinAreas(await haStates(HOME_DOMAINS))
+      let matches = haResolve(clean, query)
+      if (!matches.length && op === 'hide') matches = haResolve(await haStates(HOME_DOMAINS), query)
       if (!matches.length) return `No device matching "${query}".`
       const target = matches[0]!
       if (op === 'rename') {

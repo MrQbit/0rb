@@ -640,6 +640,36 @@ body {
 .wg-shop-merchant:hover { background:rgba(118,185,0,.16); color:var(--nv-bright); }
 .wg-shop-foot { font-size:10.5px; color:var(--ink-dim); text-align:center; flex:none; }
 
+/* ── security ── */
+.wg-security { flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:6px; }
+.wg-sec-row { display:flex; align-items:center; gap:10px; padding:9px 11px; border-radius:11px;
+  background:rgba(255,255,255,.03); border:1px solid var(--line); }
+.wg-sec-row .ic { line-height:0; color:var(--ink-dim); flex:none; }
+.wg-sec-row .nm { flex:1; min-width:0; font-size:12.5px; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wg-sec-row .st { flex:none; font-size:10.5px; color:var(--ink-dim); font-family:var(--mono); }
+.wg-sec-row.alert { background:rgba(255,93,93,.08); border-color:rgba(255,93,93,.4); }
+.wg-sec-row.alert .ic, .wg-sec-row.alert .st { color:var(--danger); }
+
+/* ── scenes ── */
+.wg-scenes { flex:1; min-height:0; overflow-y:auto; display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:8px; align-content:start; }
+.wg-scene { display:flex; align-items:center; gap:8px; padding:12px; border-radius:12px; cursor:pointer;
+  font:inherit; font-size:12.5px; text-align:left; color:var(--ink);
+  background:rgba(255,255,255,.03); border:1px solid var(--glass-edge); transition:all .15s var(--ease); }
+.wg-scene .ic { line-height:0; color:var(--ink-dim); }
+.wg-scene:hover { border-color:rgba(118,185,0,.45); color:var(--nv-bright); }
+.wg-scene.fired { background:rgba(118,185,0,.16); border-color:rgba(118,185,0,.6); }
+.wg-scene.fired .ic { color:var(--nv); }
+
+/* ── readings ── */
+.wg-read-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:8px; }
+.wg-read { padding:11px 12px; border-radius:12px; background:rgba(255,255,255,.03); border:1px solid var(--line); }
+.wg-read .v { font-size:19px; font-weight:300; color:var(--ink); letter-spacing:.3px; }
+.wg-read .v .u { font-size:11px; color:var(--ink-dim); margin-left:2px; }
+.wg-read .n { font-size:10.5px; color:var(--ink-dim); margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* ── camera ── */
+.wg-cam { width:100%; flex:1; min-height:0; object-fit:cover; border-radius:10px; background:#000; }
+
 /* ── climate ── */
 .wg-climate { flex:1; min-height:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; }
 .wg-climate .cur { font-size:44px; font-weight:300; color:var(--ink); letter-spacing:1px; }

@@ -55,6 +55,12 @@ export const WIDGET_CATALOG: WidgetDef[] = [
   { id: 'lights', name: 'Lights', desc: 'Room-by-room light control.', category: 'Home', setup: 'none', icon: '💡', envKeys: ['ORB2_HA_TOKEN'] },
   { id: 'media-remote', name: 'Media remote', desc: 'TV & speaker remote (play, volume, artwork).', category: 'Home', setup: 'none', icon: '📺', envKeys: ['ORB2_HA_TOKEN'] },
   { id: 'climate', name: 'Climate', desc: 'Thermostat dial.', category: 'Home', setup: 'none', icon: '🌡️', envKeys: ['ORB2_HA_TOKEN'] },
+  { id: 'covers', name: 'Shades', desc: 'Open/close/position blinds by room.', category: 'Home', setup: 'none', icon: '🪟', envKeys: ['ORB2_HA_TOKEN'] },
+  { id: 'security', name: 'Security', desc: 'Locks + door/window/motion at a glance.', category: 'Home', setup: 'none', icon: '🔒', envKeys: ['ORB2_HA_TOKEN'] },
+  { id: 'plugs', name: 'Plugs', desc: 'Switches and outlets by room.', category: 'Home', setup: 'none', icon: '🔌', envKeys: ['ORB2_HA_TOKEN'] },
+  { id: 'scenes', name: 'Scenes', desc: 'One-tap scenes.', category: 'Home', setup: 'none', icon: '✨', envKeys: ['ORB2_HA_TOKEN'] },
+  { id: 'sensors', name: 'Readings', desc: 'Temperature, humidity, battery, energy.', category: 'Home', setup: 'none', icon: '📊', envKeys: ['ORB2_HA_TOKEN'] },
+  { id: 'camera', name: 'Cameras', desc: 'Camera snapshots.', category: 'Home', setup: 'none', icon: '📷', envKeys: ['ORB2_HA_TOKEN'] },
 
   // ── Info (free, keyless data) ──
   { id: 'weather', name: 'Weather', desc: 'Current conditions + 5-day forecast for any place.', category: 'Info', setup: 'none', icon: '☀️' },

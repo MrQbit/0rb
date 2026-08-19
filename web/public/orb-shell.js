@@ -397,6 +397,12 @@
     else if(spec.type==='climate'){ wg.style.width='300px'; wg.style.height='300px'; }
     else if(spec.type==='shopping'){ wg.style.width='420px'; wg.style.height='480px'; }
     else if(spec.type==='vacuum'){ wg.style.width='300px'; wg.style.height='300px'; }
+    else if(spec.type==='covers'){ wg.style.width='400px'; wg.style.height='420px'; }
+    else if(spec.type==='security'){ wg.style.width='400px'; wg.style.height='440px'; }
+    else if(spec.type==='plugs'){ wg.style.width='460px'; wg.style.height='420px'; }
+    else if(spec.type==='scenes'){ wg.style.width='360px'; wg.style.height='300px'; }
+    else if(spec.type==='sensors'){ wg.style.width='420px'; wg.style.height='400px'; }
+    else if(spec.type==='camera'){ wg.style.width='480px'; wg.style.height='340px'; }
     else if(spec.type==='document'){ wg.style.width='560px'; wg.style.height='520px'; }
     else if(spec.type==='wallet'){ wg.style.width='380px'; wg.style.height='400px'; }
     else if(spec.type==='lights'){ wg.style.width='400px'; wg.style.height='440px'; }
@@ -512,7 +518,7 @@
     }
   }, 15000);
 
-  function titleFor(s){ return ({chart:'Chart',results:'Results',video:'Video',music:'Music',table:'Table',stats:'Stats',gallery:'Gallery',image:'Image',embed:'Embed',model:'3D model',calculator:'Calculator',weather:'Weather',calendar:'Calendar',code:'Code',mail:'Mail',vercel:'Vercel',map:'Map',docker:'Docker',app:'App',html:'HTML',note:'Note',vacuum:'Vacuum',document:'Document',wallet:'Wallet',lights:'Lights',media:'Media',climate:'Climate',todo:'Tasks',home:'Home'})[s.type]||(s.type?String(s.type):'Note'); }
+  function titleFor(s){ return ({chart:'Chart',results:'Results',video:'Video',music:'Music',table:'Table',stats:'Stats',gallery:'Gallery',image:'Image',embed:'Embed',model:'3D model',calculator:'Calculator',weather:'Weather',calendar:'Calendar',code:'Code',mail:'Mail',vercel:'Vercel',map:'Map',docker:'Docker',app:'App',html:'HTML',note:'Note',vacuum:'Vacuum',covers:'Shades',security:'Security',plugs:'Plugs',scenes:'Scenes',sensors:'Readings',camera:'Camera',document:'Document',wallet:'Wallet',lights:'Lights',media:'Media',climate:'Climate',todo:'Tasks',home:'Home'})[s.type]||(s.type?String(s.type):'Note'); }
 
   // ── widget placement: free-floating, but flow without >15% overlap; when the
   //    visible band is full, drop below + scroll there (the orb follows). ──
@@ -576,6 +582,12 @@
     else if(spec.type==='climate') renderClimate(body, spec);
     else if(spec.type==='shopping') renderShopping(body, spec);
     else if(spec.type==='vacuum') renderVacuum(body, spec);
+    else if(spec.type==='covers') renderCovers(body, spec);
+    else if(spec.type==='security') renderSecurity(body, spec);
+    else if(spec.type==='plugs') renderPlugs(body, spec);
+    else if(spec.type==='scenes') renderScenes(body, spec);
+    else if(spec.type==='sensors') renderSensors(body, spec);
+    else if(spec.type==='camera') renderCamera(body, spec, wg);
     else if(_plugins[spec.type]) renderPlugin(body, spec, _plugins[spec.type]);
     else {
       // Freshly-minted custom widget? (CreateWidget installs plugins at
@@ -785,6 +797,124 @@
         else toast('Failed'); }catch{ toast('Failed'); } };
     form.querySelector('#shopAddBtn').onclick=doAdd;
     form.querySelector('#shopAdd').onkeydown=e=>{ if(e.key==='Enter') doAdd(); };
+  }
+
+  // shared: POST a control action, toast on failure. Returns ok.
+  async function haCtl(entity_id, action, value){
+    try{
+      const body={entity_id,action}; if(value!=null) body.value=value;
+      const r=await fetch('/v1/home/control',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+      if(!r.ok) toast('Couldn’t control the device');
+      return r.ok;
+    }catch{ toast('Couldn’t reach the server'); return false; }
+  }
+
+  // ── covers: shades/blinds, position slider per cover ──
+  function renderCovers(body, spec){
+    const wrap=document.createElement('div'); wrap.className='wg-lights'; body.appendChild(wrap);
+    const groups=spec.groups||[];
+    if(!groups.length){ wrap.innerHTML='<div class="wg-empty">No shades or blinds.</div>'; return; }
+    groups.forEach(g=>{
+      const h=document.createElement('div'); h.className='wg-area-h'; h.textContent=g.area; wrap.appendChild(h);
+      (g.covers||[]).forEach(c=>{
+        const open=c.state==='open'||(c.position!=null&&c.position>0);
+        const row=document.createElement('div'); row.className='wg-light'+(open?' on':'');
+        row.innerHTML=`<span class="ic">${homeIcon('cover')}</span><span class="nm" title="${esc2(c.name)}">${esc2(c.name)}</span>`;
+        const sl=document.createElement('input'); sl.type='range'; sl.min=0; sl.max=100; sl.className='dim';
+        sl.value=c.position!=null?c.position:(open?100:0);
+        sl.onchange=async()=>{ if(await haCtl(c.entity_id,'set',Number(sl.value))) row.classList.toggle('on',Number(sl.value)>0); };
+        const tg=document.createElement('button'); tg.className='wg-light-tg'; tg.textContent=open?'Open':'Closed';
+        tg.onclick=async()=>{ const target=row.classList.contains('on')?'close':'open';
+          if(await haCtl(c.entity_id,target)){ row.classList.toggle('on'); tg.textContent=row.classList.contains('on')?'Open':'Closed'; sl.value=row.classList.contains('on')?100:0; } };
+        row.appendChild(sl); row.appendChild(tg); wrap.appendChild(row);
+      });
+    });
+  }
+
+  // ── security: locks + door/window/motion, one calm glance ──
+  function renderSecurity(body, spec){
+    const wrap=document.createElement('div'); wrap.className='wg-security'; body.appendChild(wrap);
+    const locks=spec.locks||[], sensors=spec.sensors||[];
+    if(!locks.length&&!sensors.length){ wrap.innerHTML='<div class="wg-empty">No locks or sensors.</div>'; return; }
+    locks.forEach(l=>{
+      const row=document.createElement('div'); row.className='wg-sec-row'+(l.locked?'':' alert');
+      row.innerHTML=`<span class="ic">${homeIcon('lock')}</span><span class="nm">${esc2(l.name)}</span><span class="st">${l.locked?'locked':'UNLOCKED'}</span>`;
+      const b=document.createElement('button'); b.className='wg-light-tg'; b.textContent=l.locked?'Unlock':'Lock';
+      b.onclick=async()=>{ const act=row.classList.contains('alert')?'lock':'unlock';
+        if(await haCtl(l.entity_id,act)){ row.classList.toggle('alert'); const locked=!row.classList.contains('alert');
+          row.querySelector('.st').textContent=locked?'locked':'UNLOCKED'; b.textContent=locked?'Unlock':'Lock'; } };
+      row.appendChild(b); wrap.appendChild(row);
+    });
+    const kindIcon={door:'cover',window:'cover',motion:'binary_sensor',smoke:'sensor',co:'sensor'};
+    sensors.forEach(s=>{
+      const active=s.on&&s.kind!=='motion';
+      const row=document.createElement('div'); row.className='wg-sec-row'+(active?' alert':'');
+      row.innerHTML=`<span class="ic">${homeIcon(kindIcon[s.kind]||'binary_sensor')}</span><span class="nm">${esc2(s.name)}</span>`+
+        `<span class="st">${esc2(s.kind==='motion'?(s.on?'motion':'clear'):(s.on?'OPEN':'closed'))}</span>`;
+      wrap.appendChild(row);
+    });
+  }
+
+  // ── plugs: switch grid by room ──
+  function renderPlugs(body, spec){
+    const wrap=document.createElement('div'); wrap.className='wg-home'; body.appendChild(wrap);
+    const groups=spec.groups||[];
+    if(!groups.length){ wrap.innerHTML='<div class="wg-empty">No plugs or switches.</div>'; return; }
+    const grid=document.createElement('div'); grid.className='wg-home-grid';
+    groups.forEach(g=>{
+      if(groups.length>1){ const h=document.createElement('div'); h.className='wg-area-h span'; h.textContent=g.area; grid.appendChild(h); }
+      (g.plugs||[]).forEach(p=>{
+        const card=document.createElement('div'); card.className='wg-home-card ctl'+(p.on?' on':''); card.tabIndex=0; card.setAttribute('role','button');
+        card.innerHTML=`<div class="ic">${homeIcon('switch')}</div><div class="nm" title="${esc2(p.name)}">${esc2(p.name)}</div><div class="st">${p.on?'on':'off'}</div>`;
+        const flip=async()=>{ if(await haCtl(p.entity_id,'toggle')){ p.on=!p.on; card.classList.toggle('on',p.on); card.querySelector('.st').textContent=p.on?'on':'off'; } };
+        card.onclick=flip; card.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); flip(); } };
+        grid.appendChild(card);
+      });
+    });
+    wrap.appendChild(grid);
+  }
+
+  // ── scenes: one-tap moods ──
+  function renderScenes(body, spec){
+    const wrap=document.createElement('div'); wrap.className='wg-scenes'; body.appendChild(wrap);
+    const scenes=spec.scenes||[];
+    if(!scenes.length){ wrap.innerHTML='<div class="wg-empty">No scenes yet.</div>'; return; }
+    scenes.forEach(s=>{
+      const b=document.createElement('button'); b.className='wg-scene';
+      b.innerHTML=`<span class="ic">${homeIcon('scene')}</span><span>${esc2(s.name)}</span>`;
+      b.onclick=async()=>{ if(await haCtl(s.entity_id,'on')){ b.classList.add('fired'); toast(s.name); setTimeout(()=>b.classList.remove('fired'),900); } };
+      wrap.appendChild(b);
+    });
+  }
+
+  // ── sensors: readings tiles ──
+  function renderSensors(body, spec){
+    const wrap=document.createElement('div'); wrap.className='wg-home'; body.appendChild(wrap);
+    const groups=spec.groups||[];
+    if(!groups.length){ wrap.innerHTML='<div class="wg-empty">No readings.</div>'; return; }
+    const UNITKIND={temperature:'🌡',humidity:'💧',battery:'🔋',power:'⚡',energy:'⚡',illuminance:'☀',co2:'CO₂',pm25:'PM','pressure':'⭱'};
+    const grid=document.createElement('div'); grid.className='wg-read-grid';
+    groups.forEach(g=>{
+      if(groups.length>1){ const h=document.createElement('div'); h.className='wg-area-h span'; h.textContent=g.area; grid.appendChild(h); }
+      (g.readings||[]).forEach(r=>{
+        const t=document.createElement('div'); t.className='wg-read';
+        t.innerHTML=`<div class="v">${esc2(String(r.value))}<span class="u">${esc2(r.unit)}</span></div><div class="n" title="${esc2(r.name)}">${esc2(r.name)}</div>`;
+        grid.appendChild(t);
+      });
+    });
+    wrap.appendChild(grid);
+  }
+
+  // ── camera: snapshot, refreshes while active ──
+  function renderCamera(body, spec, wg){
+    const src=safeUrl(spec.snapshot);
+    if(!src){ body.innerHTML='<div class="wg-empty">No camera feed.</div>'; return; }
+    const img=document.createElement('img'); img.className='wg-cam'; img.alt=spec.name||'camera';
+    const bust=()=>{ img.src=src+(src.includes('?')?'&':'?')+'t='+Date.now(); };
+    img.onerror=()=>{ img.replaceWith(Object.assign(document.createElement('div'),{className:'wg-empty',textContent:'Camera unavailable.'})); if(wg&&wg._camTimer){clearInterval(wg._camTimer);wg._camTimer=null;} };
+    bust(); body.appendChild(img);
+    if(wg){ if(wg._camTimer) clearInterval(wg._camTimer);
+      wg._camTimer=setInterval(()=>{ if(!document.contains(wg)){ clearInterval(wg._camTimer); return; } if(wg._state==='active') bust(); },10000); }
   }
 
   // ── vacuum: robot control ──

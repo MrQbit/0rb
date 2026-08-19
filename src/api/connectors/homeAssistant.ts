@@ -147,7 +147,17 @@ export async function haFlowStart(handler: string): Promise<any> {
 }
 
 export interface HaArea { area_id: string; name: string }
-export interface HaRegistryEntry { entity_id: string; area_id: string | null; name: string | null; hidden_by: string | null }
+export interface HaRegistryEntry {
+  entity_id: string
+  area_id: string | null
+  name: string | null
+  hidden_by: string | null
+  /** 'config' | 'diagnostic' | null — HA's own controls-vs-plumbing split. */
+  entity_category: string | null
+  /** Which integration provides this entity (e.g. 'sonos', 'cast'). */
+  platform: string | null
+  device_id: string | null
+}
 
 export async function haAreas(): Promise<HaArea[]> {
   const r = (await haWsCommand('config/area_registry/list')) as any[]
@@ -159,9 +169,21 @@ export async function haCreateArea(name: string): Promise<HaArea> {
   return { area_id: a.area_id, name: a.name }
 }
 
+/** device_id → area_id from the device registry (entities inherit this). */
+export async function haDeviceAreas(): Promise<Map<string, string>> {
+  const r = (await haWsCommand('config/device_registry/list')) as any[]
+  const out = new Map<string, string>()
+  for (const d of r) if (d.id && d.area_id) out.set(d.id, d.area_id)
+  return out
+}
+
 export async function haEntityRegistry(): Promise<HaRegistryEntry[]> {
   const r = (await haWsCommand('config/entity_registry/list')) as any[]
-  return r.map(e => ({ entity_id: e.entity_id, area_id: e.area_id ?? null, name: e.name ?? null, hidden_by: e.hidden_by ?? null }))
+  return r.map(e => ({
+    entity_id: e.entity_id, area_id: e.area_id ?? null, name: e.name ?? null,
+    hidden_by: e.hidden_by ?? null, entity_category: e.entity_category ?? null,
+    platform: e.platform ?? null, device_id: e.device_id ?? null,
+  }))
 }
 
 /** Update registry fields on an entity: display name, area, hidden. */
@@ -219,13 +241,31 @@ export function toDeviceCard(e: HaEntity): any {
   }
 }
 
-/** Join area names onto entities (best-effort — WS registry may be slow). */
+/**
+ * Join area names onto entities AND drop the plumbing: entities HA marks as
+ * config/diagnostic (a Sonos speaker alone sprays bass/treble/crossfade
+ * accessory entities) and entities hidden in the registry. This is what keeps
+ * orb's surfaces clean while HA stays the full-detail backend.
+ */
 export async function haJoinAreas(entities: HaEntity[]): Promise<HaEntity[]> {
   try {
-    const byEntity = await haAreaByEntity()
-    for (const e of entities) e.area = byEntity.get(e.entity_id)
-  } catch { /* areas are optional decoration */ }
-  return entities
+    const [areas, reg, devs] = await Promise.all([haAreas(), haEntityRegistry(), haDeviceAreas()])
+    const areaName = new Map(areas.map(a => [a.area_id, a.name]))
+    const byId = new Map(reg.map(r => [r.entity_id, r]))
+    // HA-internal platforms whose entities are system state, not the home.
+    const INTERNAL = new Set(['backup', 'sun', 'analytics', 'hassio', 'update', 'person', 'zone', 'schedule', 'tod'])
+    const kept: HaEntity[] = []
+    for (const e of entities) {
+      const r = byId.get(e.entity_id)
+      if (r?.entity_category || r?.hidden_by) continue
+      if (r?.platform && INTERNAL.has(r.platform)) continue
+      // Entities inherit their area from the parent device unless overridden.
+      const areaId = r?.area_id ?? (r?.device_id ? devs.get(r.device_id) : null)
+      if (areaId && areaName.has(areaId)) e.area = areaName.get(areaId)
+      kept.push(e)
+    }
+    return kept
+  } catch { return entities /* registry unreachable → show everything */ }
 }
 
 /** entity_id → area name map (joined across both registries). */
