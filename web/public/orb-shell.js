@@ -368,7 +368,7 @@
     const wg = document.createElement('div'); wg.className='wg';
     const wid = spec.id || ('w-'+Date.now().toString(36)+(wgCount));
     wg.dataset.wid = wid;
-    const fill = spec.type==='app' || spec.type==='embed';
+    const fill = spec.type==='app' || spec.type==='embed' || (spec.type==='html' && !!(spec.url||spec.html));
     const wide = spec.type==='video' || spec.type==='model' || fill;
     if(fill){ wg.classList.add('wg-fill'); wg.style.width='640px'; wg.style.height='460px'; }
     else if(spec.type==='video') wg.style.width='480px';
@@ -385,6 +385,17 @@
     else if(spec.type==='chart') wg.style.height='340px';   // give charts room (resizable)
     else if(spec.type==='todo'){ wg.style.width='380px'; wg.style.height='360px'; }
     else if(spec.type==='home'){ wg.style.width='560px'; wg.style.height='480px'; }
+    else if(spec.type==='document'){ wg.style.width='560px'; wg.style.height='520px'; }
+    else if(spec.type==='wallet'){ wg.style.width='380px'; wg.style.height='420px'; }
+    else if(spec.type==='lights'){ wg.style.width='400px'; wg.style.height='460px'; }
+    else if(spec.type==='media'){ wg.style.width='380px'; wg.style.height='320px'; }
+    else if(spec.type==='climate'){ wg.style.width='300px'; wg.style.height='300px'; }
+    else if(spec.type==='shopping'){ wg.style.width='420px'; wg.style.height='480px'; }
+    else if(spec.type==='document'){ wg.style.width='560px'; wg.style.height='520px'; }
+    else if(spec.type==='wallet'){ wg.style.width='380px'; wg.style.height='400px'; }
+    else if(spec.type==='lights'){ wg.style.width='400px'; wg.style.height='440px'; }
+    else if(spec.type==='media'){ wg.style.width='360px'; wg.style.height='300px'; }
+    else if(spec.type==='climate'){ wg.style.width='280px'; wg.style.height='260px'; }
     else if(_plugins[spec.type]){ const p=_plugins[spec.type]; if(p.width)wg.style.width=p.width+'px'; if(p.height)wg.style.height=p.height+'px'; }
     wgCount++;
     const w = wide?(fill?640:spec.type==='model'?460:480):380;
@@ -414,7 +425,7 @@
     let d=null;
     head.addEventListener('pointerdown',(e)=>{ if(e.target===x)return; d={sx:e.clientX,sy:e.clientY,ox:wpos.x,oy:wpos.y}; head.setPointerCapture(e.pointerId); });
     head.addEventListener('pointermove',(e)=>{ if(!d)return; wpos.x=d.ox+(e.clientX-d.sx); wpos.y=d.oy+(e.clientY-d.sy); wg.style.left=wpos.x+'px'; wg.style.top=wpos.y+'px'; });
-    head.addEventListener('pointerup',()=>{ d=null; growWidgetCanvas(); localStorage.setItem('rak_wg_'+wid, JSON.stringify(wpos)); });
+    head.addEventListener('pointerup',()=>{ d=null; growWidgetCanvas(); });
     // lifecycle bookkeeping: track interaction so idle widgets can pill/stop
     wg._spec=spec; wg._lastTouch=Date.now(); wg._state='active';
     wg.addEventListener('pointerdown', ()=>{ if(wg._state!=='active') markTouched(wg); else wg._lastTouch=Date.now(); }, true);
@@ -495,7 +506,7 @@
     }
   }, 15000);
 
-  function titleFor(s){ return ({chart:'Chart',results:'Results',video:'Video',music:'Music',table:'Table',stats:'Stats',gallery:'Gallery',image:'Image',embed:'Embed',model:'3D model',calculator:'Calculator',weather:'Weather',calendar:'Calendar',code:'Code',mail:'Mail',vercel:'Vercel',map:'Map',docker:'Docker',app:'App'})[s.type]||'Note'; }
+  function titleFor(s){ return ({chart:'Chart',results:'Results',video:'Video',music:'Music',table:'Table',stats:'Stats',gallery:'Gallery',image:'Image',embed:'Embed',model:'3D model',calculator:'Calculator',weather:'Weather',calendar:'Calendar',code:'Code',mail:'Mail',vercel:'Vercel',map:'Map',docker:'Docker',app:'App',html:'HTML',note:'Note',document:'Document',wallet:'Wallet',lights:'Lights',media:'Media',climate:'Climate',todo:'Tasks',home:'Home'})[s.type]||(s.type?String(s.type):'Note'); }
 
   // ── widget placement: free-floating, but flow without >15% overlap; when the
   //    visible band is full, drop below + scroll there (the orb follows). ──
@@ -550,8 +561,283 @@
     else if(spec.type==='home') renderHome(body, spec, wg);
     else if(spec.type==='todo') renderTodo(body, spec);
     else if(spec.type==='app') renderApp(body, spec);
+    else if(spec.type==='html') renderHtml(body, spec);
+    else if(spec.type==='note') renderNote(body, spec);
+    else if(spec.type==='document') renderDocument(body, spec);
+    else if(spec.type==='wallet') renderWallet(body, spec, wg);
+    else if(spec.type==='lights') renderLights(body, spec);
+    else if(spec.type==='media') renderMedia(body, spec, wg);
+    else if(spec.type==='climate') renderClimate(body, spec);
+    else if(spec.type==='shopping') renderShopping(body, spec);
     else if(_plugins[spec.type]) renderPlugin(body, spec, _plugins[spec.type]);
-    else { const note=document.createElement('div'); note.className='wg-note'; note.textContent=spec.text||''; body.appendChild(note); }
+    else {
+      // Freshly-minted custom widget? (CreateWidget installs plugins at
+      // runtime.) Refresh the plugin registry once before giving up.
+      const e=document.createElement('div'); e.className='wg-empty'; e.textContent='Loading widget…'; body.appendChild(e);
+      loadPlugins().then(()=>{
+        if(_plugins[spec.type]){ body.innerHTML=''; renderPlugin(body, spec, _plugins[spec.type]); }
+        else e.textContent=`Unknown widget type "${spec.type}"`;
+      }).catch(()=>{ e.textContent=`Unknown widget type "${spec.type}"`; });
+    }
+  }
+
+  // ── document: file viewer (pdf / markdown / text / image / html) ──
+  function renderDocument(body, spec){
+    const url=safeUrl(spec.url);
+    const fmt=(spec.format||spec.mime||'').toLowerCase();
+    const name=spec.name||spec.title||'Document';
+    const bar=document.createElement('div'); bar.className='wg-doc-bar';
+    bar.innerHTML=`<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg><span class="nm" title="${esc2(name)}">${esc2(name)}</span>`;
+    if(url){
+      const a=document.createElement('a'); a.className='wg-doc-open'; a.href=url; a.target='_blank'; a.rel='noopener'; a.textContent='Open ↗'; bar.appendChild(a);
+    }
+    body.appendChild(bar);
+    const view=document.createElement('div'); view.className='wg-doc-view'; body.appendChild(view);
+    const isPdf=fmt.includes('pdf')||(url&&/\.pdf($|[?#])/i.test(url));
+    const isImg=fmt.startsWith('image')||/\b(png|jpe?g|gif|webp|svg)\b/.test(fmt)||(url&&/\.(png|jpe?g|gif|webp)($|[?#])/i.test(url));
+    const isMd=fmt.includes('markdown')||fmt==='md'||(url&&/\.(md|markdown)($|[?#])/i.test(url));
+    const isHtml=fmt.includes('html')||(url&&/\.html?($|[?#])/i.test(url));
+    if(spec.text!=null && !url){
+      if(isMd||!fmt||fmt==='text'||fmt.includes('plain')){
+        const d=document.createElement('div'); d.className='wg-md';
+        if(isMd) d.innerHTML=mdToHtml(String(spec.text));
+        else { d.className='wg-doc-text'; d.textContent=String(spec.text); }
+        view.appendChild(d);
+      } else if(isHtml){
+        const f=document.createElement('iframe'); f.className='wg-doc-frame'; f.setAttribute('sandbox','allow-scripts'); f.srcdoc=String(spec.text); view.appendChild(f);
+      } else { const d=document.createElement('div'); d.className='wg-doc-text'; d.textContent=String(spec.text); view.appendChild(d); }
+      return;
+    }
+    if(!url){ view.innerHTML='<div class="wg-empty">No document.</div>'; return; }
+    if(isPdf){
+      // Browsers render PDFs natively inside an embed/iframe.
+      const f=document.createElement('iframe'); f.className='wg-doc-frame'; f.src=url; view.appendChild(f);
+    } else if(isImg){
+      const i=document.createElement('img'); i.className='wg-image'; i.src=url; i.alt=name;
+      i.onerror=()=>{ i.replaceWith(Object.assign(document.createElement('div'),{className:'wg-empty',textContent:'Failed to load.'})); };
+      view.appendChild(i);
+    } else if(isMd||fmt==='text'||fmt.includes('plain')||(url&&/\.(txt|log|csv)($|[?#])/i.test(url))){
+      view.innerHTML='<div class="wg-empty">Loading…</div>';
+      fetch(url,{credentials:'same-origin'}).then(r=>r.ok?r.text():Promise.reject(r.status)).then(t=>{
+        view.innerHTML='';
+        const d=document.createElement('div');
+        if(isMd){ d.className='wg-md'; d.innerHTML=mdToHtml(t.slice(0,300000)); }
+        else { d.className='wg-doc-text'; d.textContent=t.slice(0,300000); }
+        view.appendChild(d);
+      }).catch(()=>{ view.innerHTML='<div class="wg-empty">Couldn’t load the document.</div>'; });
+    } else if(isHtml){
+      const f=document.createElement('iframe'); f.className='wg-doc-frame'; f.setAttribute('sandbox','allow-scripts allow-same-origin'); f.src=url; view.appendChild(f);
+    } else {
+      // Unknown format: try the browser's native viewer; offer Open as backup.
+      const f=document.createElement('iframe'); f.className='wg-doc-frame'; f.src=url; view.appendChild(f);
+    }
+  }
+
+  // ── wallet: see & choose payment mechanisms (metadata only, no PANs) ──
+  const CARD_ICONS={applepay:' Pay',googlepay:'G Pay'};
+  function renderWallet(body, spec, wg){
+    const wrap=document.createElement('div'); wrap.className='wg-wallet';
+    body.appendChild(wrap);
+    const draw=(methods, selected)=>{
+      wrap.innerHTML='';
+      const list=document.createElement('div'); list.className='wg-wallet-list';
+      if(!methods.length){
+        list.innerHTML='<div class="wg-empty">No payment methods yet — add one below.<br><span style="font-size:11px;">Orb stores only a label and last 4 digits, never card numbers.</span></div>';
+      }
+      methods.forEach(m=>{
+        const row=document.createElement('div'); row.className='wg-pay'+(m.id===selected?' sel':''); row.tabIndex=0; row.setAttribute('role','button');
+        const badge=m.kind==='applepay'?'Pay':m.kind==='googlepay'?'GPay':(m.brand||'card').toUpperCase();
+        row.innerHTML=`<span class="badge${m.kind!=='card'?' wallet':''}">${esc2(badge)}</span>`+
+          `<span class="grow"><span class="lbl">${esc2(m.label)}</span>${m.last4?`<span class="l4">···· ${esc2(m.last4)}</span>`:''}</span>`+
+          `<span class="tick">${m.id===selected?'✓':''}</span>`;
+        const pick=async()=>{ try{
+            const r=await fetch('/v1/wallet/select',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({id:m.id})});
+            if(r.ok){ draw(methods, m.id); toast('Paying with '+m.label); } else toast('Failed');
+          }catch{ toast('Failed'); } };
+        row.onclick=pick; row.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); pick(); } };
+        list.appendChild(row);
+      });
+      wrap.appendChild(list);
+      // Native wallet availability — an honest probe, not a promise.
+      if(window.PaymentRequest){
+        try{
+          const pr=new PaymentRequest([{supportedMethods:'https://apple.com/apple-pay',data:{version:3,merchantIdentifier:'probe',merchantCapabilities:['supports3DS'],supportedNetworks:['visa','masterCard'],countryCode:'US'}},{supportedMethods:'https://google.com/pay'}].slice(window.ApplePaySession?0:1),
+            {total:{label:'probe',amount:{currency:'USD',value:'0.00'}}});
+          pr.canMakePayment().then(ok=>{
+            const n=document.createElement('div'); n.className='wg-wallet-native';
+            n.textContent= ok ? 'Apple Pay / Google Pay available on this device — payment happens in its own sheet.' : 'No native wallet detected in this browser.';
+            wrap.appendChild(n);
+          }).catch(()=>{});
+        }catch{}
+      }
+      const form=document.createElement('div'); form.className='wg-wallet-add';
+      form.innerHTML=`<input id="wlLbl" placeholder="Label (e.g. Personal Visa)" maxlength="60"/><input id="wlL4" placeholder="last 4" maxlength="4" inputmode="numeric"/><button id="wlAdd">Add</button>`;
+      wrap.appendChild(form);
+      form.querySelector('#wlAdd').onclick=async()=>{
+        const label=form.querySelector('#wlLbl').value.trim(); const l4=form.querySelector('#wlL4').value.trim();
+        if(!label) return toast('Give it a label');
+        if(l4&&!/^\d{4}$/.test(l4)) return toast('Last 4 digits only — never the full number');
+        try{
+          const r=await fetch('/v1/wallet/add',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({label,last4:l4,kind:'card'})});
+          if(r.ok){ const d=await (await fetch('/v1/wallet',{credentials:'same-origin'})).json(); draw(d.methods,d.selected); }
+          else toast((await r.json()).error||'Failed');
+        }catch{ toast('Failed'); }
+      };
+    };
+    draw(spec.methods||[], spec.selected||null);
+  }
+
+  // ── lights: room-grouped light control ──
+  function renderLights(body, spec){
+    const groups=spec.groups||[];
+    if(!groups.length){ body.innerHTML='<div class="wg-empty">No lights found.</div>'; return; }
+    const wrap=document.createElement('div'); wrap.className='wg-lights'; body.appendChild(wrap);
+    groups.forEach(g=>{
+      const h=document.createElement('div'); h.className='wg-area-h'; h.textContent=g.area; wrap.appendChild(h);
+      (g.lights||[]).forEach(l=>{
+        const row=document.createElement('div'); row.className='wg-light'+(l.on?' on':'');
+        row.innerHTML=`<span class="ic">${homeIcon('light')}</span><span class="nm" title="${esc2(l.name)}">${esc2(l.name)}</span>`;
+        const sl=document.createElement('input'); sl.type='range'; sl.min=0; sl.max=100; sl.value=l.on?(l.brightness!=null?l.brightness:100):0; sl.className='dim';
+        sl.onchange=async()=>{ const v=Number(sl.value);
+          try{ const r=await fetch('/v1/home/control',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify(v===0?{entity_id:l.entity_id,action:'off'}:{entity_id:l.entity_id,action:'set',value:v})});
+            if(r.ok){ l.on=v>0; row.classList.toggle('on',v>0); } else toast('Failed'); }catch{ toast('Failed'); } };
+        const tg=document.createElement('button'); tg.className='wg-light-tg'; tg.textContent=l.on?'On':'Off';
+        tg.onclick=async()=>{ try{ const r=await fetch('/v1/home/control',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({entity_id:l.entity_id,action:'toggle'})});
+          if(r.ok){ l.on=!l.on; row.classList.toggle('on',l.on); tg.textContent=l.on?'On':'Off'; sl.value=l.on?(l.brightness||100):0; } else toast('Failed'); }catch{ toast('Failed'); } };
+        row.appendChild(sl); row.appendChild(tg); wrap.appendChild(row);
+      });
+    });
+  }
+
+  // ── media: TV / speaker remote ──
+  function renderMedia(body, spec, wg){
+    const wrap=document.createElement('div'); wrap.className='wg-media'; body.appendChild(wrap);
+    const art=document.createElement('div'); art.className='art';
+    const artUrl=spec.artwork&&safeUrl(spec.artwork);
+    if(artUrl){ const im=document.createElement('img'); im.src=artUrl; im.alt=''; im.onerror=()=>im.remove(); art.appendChild(im); }
+    else art.innerHTML=homeIcon('media_player');
+    wrap.appendChild(art);
+    const meta=document.createElement('div'); meta.className='meta';
+    meta.innerHTML=`<div class="now">${esc2(spec.media_title||spec.state||'idle')}</div><div class="src">${esc2([spec.app,spec.area].filter(Boolean).join(' · ')||spec.name||'')}</div>`;
+    wrap.appendChild(meta);
+    const ctl=document.createElement('div'); ctl.className='ctl';
+    const btn=(label,action,title)=>{ const b=document.createElement('button'); b.className='wg-med-btn'; b.innerHTML=label; b.title=title;
+      b.onclick=async()=>{ try{ const r=await fetch('/v1/home/control',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({entity_id:spec.entity_id,action})});
+        if(!r.ok) toast('Failed'); }catch{ toast('Failed'); } };
+      return b; };
+    ctl.appendChild(btn('⏮','prev','Previous'));
+    ctl.appendChild(btn('⏯','toggle','Play/Pause'));
+    ctl.appendChild(btn('⏭','next','Next'));
+    ctl.appendChild(btn('⏻','off','Off'));
+    wrap.appendChild(ctl);
+    const volRow=document.createElement('div'); volRow.className='vol';
+    volRow.innerHTML='<span class="vlbl">vol</span>';
+    const vol=document.createElement('input'); vol.type='range'; vol.min=0; vol.max=100; vol.value=spec.volume!=null?spec.volume:50;
+    vol.onchange=async()=>{ try{ const r=await fetch('/v1/home/control',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({entity_id:spec.entity_id,action:'set',value:Number(vol.value)})});
+      if(!r.ok) toast('Failed'); }catch{ toast('Failed'); } };
+    volRow.appendChild(vol); wrap.appendChild(volRow);
+  }
+
+  // ── shopping: list + buy options ──
+  function renderShopping(body, spec){
+    const wrap=document.createElement('div'); wrap.className='wg-shop'; body.appendChild(wrap);
+    const items=spec.items||[];
+    const list=document.createElement('div'); list.className='wg-shop-list';
+    if(!items.length) list.innerHTML='<div class="wg-empty">List is empty — ask Orb to add something.</div>';
+    items.forEach(it=>{
+      const row=document.createElement('div'); row.className='wg-shop-it'+(it.done?' done':'');
+      const cb=document.createElement('button'); cb.className='cb'; cb.setAttribute('aria-label','toggle'); cb.textContent=it.done?'✓':'';
+      cb.onclick=async()=>{ try{ const r=await fetch('/v1/shopping/toggle',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({id:it.id})});
+        if(r.ok){ it.done=!it.done; row.classList.toggle('done',it.done); cb.textContent=it.done?'✓':''; } else toast('Failed'); }catch{ toast('Failed'); } };
+      const nm=document.createElement('span'); nm.className='nm'; nm.textContent=(it.qty&&it.qty>1?it.qty+'× ':'')+it.name; nm.title=it.note||it.name;
+      const buy=document.createElement('a'); buy.className='buy'; buy.textContent='buy ↗'; buy.target='_blank'; buy.rel='noopener';
+      buy.href='https://www.amazon.com/s?k='+encodeURIComponent(it.name);
+      const rm=document.createElement('button'); rm.className='rm'; rm.textContent='✕'; rm.setAttribute('aria-label','remove');
+      rm.onclick=async()=>{ try{ const r=await fetch('/v1/shopping/'+encodeURIComponent(it.id),{method:'DELETE',credentials:'same-origin'});
+        if(r.ok) row.remove(); else toast('Failed'); }catch{ toast('Failed'); } };
+      row.append(cb,nm,buy,rm); list.appendChild(row);
+    });
+    wrap.appendChild(list);
+    if(spec.options&&spec.options.merchants){
+      const h=document.createElement('div'); h.className='wg-area-h'; h.textContent='Buy options · '+spec.options.query; wrap.appendChild(h);
+      const opts=document.createElement('div'); opts.className='wg-shop-opts';
+      spec.options.merchants.forEach(m=>{ const u=safeUrl(m.url); if(!u) return;
+        const a=document.createElement('a'); a.className='wg-shop-merchant'; a.href=u; a.target='_blank'; a.rel='noopener'; a.textContent=m.merchant+' ↗'; opts.appendChild(a); });
+      wrap.appendChild(opts);
+    }
+    const foot=document.createElement('div'); foot.className='wg-shop-foot';
+    foot.textContent='Checkout happens at the merchant — Amazon uses your Amazon account; elsewhere pick a method in the Wallet.';
+    wrap.appendChild(foot);
+    // quick-add
+    const form=document.createElement('div'); form.className='wg-wallet-add';
+    form.innerHTML='<input id="shopAdd" placeholder="Add an item…" maxlength="120"/><button id="shopAddBtn">Add</button>';
+    wrap.appendChild(form);
+    const doAdd=async()=>{ const inp=form.querySelector('#shopAdd'); const v=inp.value.trim(); if(!v) return;
+      try{ const r=await fetch('/v1/shopping/add',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({name:v})});
+        if(r.ok){ const d=await (await fetch('/v1/shopping',{credentials:'same-origin'})).json(); body.innerHTML=''; renderShopping(body,{...spec,items:d.items,options:spec.options}); }
+        else toast('Failed'); }catch{ toast('Failed'); } };
+    form.querySelector('#shopAddBtn').onclick=doAdd;
+    form.querySelector('#shopAdd').onkeydown=e=>{ if(e.key==='Enter') doAdd(); };
+  }
+
+  // ── climate: thermostat ──
+  function renderClimate(body, spec){
+    const wrap=document.createElement('div'); wrap.className='wg-climate'; body.appendChild(wrap);
+    const cur=spec.current!=null?Math.round(spec.current*10)/10:null;
+    let tgt=spec.target!=null?Number(spec.target):null;
+    wrap.innerHTML=`<div class="cur">${cur!=null?esc2(String(cur)):'—'}<span class="u">°</span></div><div class="lbl">${esc2(spec.area||spec.name||'')} · ${esc2(spec.state||'')}</div>`;
+    const row=document.createElement('div'); row.className='tgt';
+    const mk=(txt,delta)=>{ const b=document.createElement('button'); b.className='wg-med-btn'; b.textContent=txt;
+      b.onclick=async()=>{ if(tgt==null) return; tgt=Math.round((tgt+delta)*2)/2; tv.textContent=tgt+'°';
+        try{ const r=await fetch('/v1/home/control',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({entity_id:spec.entity_id,action:'set',value:tgt})});
+          if(!r.ok) toast('Failed'); }catch{ toast('Failed'); } };
+      return b; };
+    const tv=document.createElement('span'); tv.className='tv'; tv.textContent=tgt!=null?tgt+'°':'—';
+    row.appendChild(mk('−',-0.5)); row.appendChild(tv); row.appendChild(mk('+',0.5));
+    wrap.appendChild(row);
+  }
+
+  // ── Note: safe markdown subset (escape first, then format — never raw HTML) ──
+  function mdInline(s){
+    const codes=[];
+    s=s.replace(/`([^`]+)`/g,(_,c)=>{ codes.push(c); return '\u0000'+(codes.length-1)+'\u0000'; });
+    s=s.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
+    s=s.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
+    s=s.replace(/\*([^*]+)\*/g,'<em>$1</em>');
+    return s.replace(/\u0000(\d+)\u0000/g,(_,i)=>'<code>'+codes[+i]+'</code>');
+  }
+  function mdToHtml(text){
+    const lines=esc2(text).replace(/\r\n?/g,'\n').split('\n');
+    let out='', para=[], list=null, code=null;
+    const flushPara=()=>{ if(para.length){ out+='<p>'+para.map(mdInline).join('<br>')+'</p>'; para=[]; } };
+    const flushList=()=>{ if(list){ out+='<ul>'+list.map(li=>'<li>'+mdInline(li)+'</li>').join('')+'</ul>'; list=null; } };
+    for(const line of lines){
+      if(code!==null){ if(/^```/.test(line)){ out+='<pre><code>'+code.join('\n')+'</code></pre>'; code=null; } else code.push(line); continue; }
+      if(/^```/.test(line)){ flushPara(); flushList(); code=[]; continue; }
+      const h=line.match(/^(#{1,3})\s+(.*)$/);
+      if(h){ flushPara(); flushList(); const n=h[1].length; out+=`<h${n}>`+mdInline(h[2])+`</h${n}>`; continue; }
+      const b=line.match(/^-\s+(.*)$/);
+      if(b){ flushPara(); if(!list)list=[]; list.push(b[1]); continue; }
+      if(!line.trim()){ flushPara(); flushList(); continue; }
+      flushList(); para.push(line);
+    }
+    if(code!==null) out+='<pre><code>'+code.join('\n')+'</code></pre>';
+    flushPara(); flushList();
+    return out;
+  }
+  function renderNote(body, spec){
+    const note=document.createElement('div'); note.className='wg-md';
+    note.innerHTML=mdToHtml(spec.text||''); body.appendChild(note);
+  }
+
+  // ── HTML: url → app iframe; inline html → sandboxed srcdoc (never innerHTML) ──
+  function renderHtml(body, spec){
+    if(spec.url){ renderApp(body, spec); return; }
+    if(typeof spec.html==='string' && spec.html){
+      const f=document.createElement('iframe'); f.className='wg-app';
+      f.setAttribute('sandbox','allow-scripts'); f.srcdoc=spec.html; body.appendChild(f); return;
+    }
+    const e=document.createElement('div'); e.className='wg-empty'; e.textContent='Nothing to show.'; body.appendChild(e);
   }
 
   // ── Tasks (console-styled live to-do list driven by the agent) ──
@@ -595,12 +881,20 @@
     const wrap=document.createElement('div'); wrap.className='wg-home';
     const devices=spec.devices||[];
     if(!devices.length){ const e=document.createElement('div'); e.className='wg-empty'; e.textContent='No devices yet — connect Home Assistant in Settings.'; body.appendChild(e); return; }
-    // Actionable things first; passive sensors last so a house full of
-    // sensors doesn't bury the lights and locks.
+    // Group by room (area) when HA provides areas; 'Other' last. Within a
+    // group: actionable things first, passive sensors last.
     const rank=d=>d.controllable?0:(d.domain==='media_player'||d.domain==='vacuum'||d.domain==='climate'?1:2);
-    const sorted=[...devices].sort((a,b)=>rank(a)-rank(b)||String(a.name).localeCompare(String(b.name)));
+    const byArea=new Map();
+    for(const d of devices){ const a=d.area||'Other'; (byArea.get(a)||byArea.set(a,[]).get(a)).push(d); }
+    const areas=[...byArea.keys()].sort((a,b)=>(a==='Other')-(b==='Other')||a.localeCompare(b));
+    const sorted=[]; const headerAt=new Map();
+    for(const a of areas){
+      if(byArea.size>1) headerAt.set(sorted.length, a);
+      sorted.push(...byArea.get(a).sort((x,y)=>rank(x)-rank(y)||String(x.name).localeCompare(String(y.name))));
+    }
     const grid=document.createElement('div'); grid.className='wg-home-grid';
-    sorted.forEach(d=>{
+    sorted.forEach((d,idx)=>{
+      if(headerAt.has(idx)){ const h=document.createElement('div'); h.className='wg-area-h span'; h.textContent=headerAt.get(idx); grid.appendChild(h); }
       const card=document.createElement('div');
       card.className='wg-home-card'+(d.on===true?' on':'')+(d.controllable?' ctl':'')+(d.on===undefined?' passive':'');
       if(d.controllable){ card.tabIndex=0; card.setAttribute('role','button'); }
@@ -658,21 +952,33 @@
     }catch(e){ const n=document.createElement('div'); n.className='wg-note'; n.textContent='“'+(plugin.name||spec.type)+'” plugin failed: '+e.message; body.appendChild(n); }
   }
   function renderTable(body, spec){
+    const cols=spec.columns||[], rows=spec.rows||[];
+    if(!cols.length && !rows.length){ const e=document.createElement('div'); e.className='wg-empty'; e.textContent='No data.'; body.appendChild(e); return; }
     const t=document.createElement('table'); t.className='wg-table';
-    if(spec.columns&&spec.columns.length){ const tr=document.createElement('tr'); spec.columns.forEach(c=>{ const th=document.createElement('th'); th.textContent=c; tr.appendChild(th); }); t.appendChild(tr); }
-    (spec.rows||[]).forEach(r=>{ const tr=document.createElement('tr'); (Array.isArray(r)?r:[r]).forEach(c=>{ const td=document.createElement('td'); td.textContent=c==null?'':String(c); tr.appendChild(td); }); t.appendChild(tr); });
-    body.appendChild(t);
+    if(cols.length){ const thead=document.createElement('thead'); const tr=document.createElement('tr');
+      cols.forEach(c=>{ const th=document.createElement('th'); const s=c==null?'':String(c); th.textContent=s; th.title=s; tr.appendChild(th); });
+      thead.appendChild(tr); t.appendChild(thead); }
+    const tb=document.createElement('tbody');
+    rows.forEach(r=>{ const tr=document.createElement('tr'); (Array.isArray(r)?r:[r]).forEach(c=>{
+      const td=document.createElement('td'); const s=c==null?'':String(c); td.textContent=s; td.title=s;
+      if(s.trim()!=='' && Number.isFinite(Number(s.trim()))) td.classList.add('num');
+      tr.appendChild(td); }); tb.appendChild(tr); });
+    t.appendChild(tb); body.appendChild(t);
   }
   function renderStats(body, spec){
+    const stats=spec.stats||[];
+    if(!stats.length){ const e=document.createElement('div'); e.className='wg-empty'; e.textContent='No stats yet.'; body.appendChild(e); return; }
     const g=document.createElement('div'); g.className='wg-stats';
-    (spec.stats||[]).forEach(s=>{ const c=document.createElement('div'); c.className='wg-stat';
+    stats.forEach(s=>{ const c=document.createElement('div'); c.className='wg-stat';
       c.innerHTML=`<div class="wg-stat-v">${esc2(s.value)}</div><div class="wg-stat-l">${esc2(s.label)}</div>${s.sub?`<div class="wg-stat-s">${esc2(s.sub)}</div>`:''}`; g.appendChild(c); });
     body.appendChild(g);
   }
   function renderGallery(body, spec){
+    const ims=spec.images||[];
+    if(!ims.length){ const e=document.createElement('div'); e.className='wg-empty'; e.textContent='No images.'; body.appendChild(e); return; }
     const g=document.createElement('div'); g.className='wg-gallery';
-    (spec.images||[]).forEach(im=>{ const fig=document.createElement('div'); fig.className='wg-gitem';
-      fig.innerHTML=`<img src="${esc2(im.url)}" onerror="this.style.visibility='hidden'"/>${im.caption?`<span>${esc2(im.caption)}</span>`:''}`;
+    ims.forEach((im,i)=>{ const fig=document.createElement('div'); fig.className='wg-gitem';
+      fig.innerHTML=`<img src="${esc2(im.url)}" loading="lazy" alt="${esc2(im.caption||im.alt||spec.title||('Image '+(i+1)))}" onerror="this.style.visibility='hidden'"/>${im.caption?`<span>${esc2(im.caption)}</span>`:''}`;
       fig.onclick=()=>spawnWidget({type:'image',title:im.caption||'Image',url:im.url,caption:im.caption}); g.appendChild(fig); });
     body.appendChild(g);
   }
@@ -717,47 +1023,84 @@
     body.appendChild(mv);
   }
   // ── Calculator (fully interactive, no backend) ──
+  // Safe expression evaluator: tokenize digits/./+-*/()% and recursive-descent
+  // parse — no eval/Function. `%` is a postfix "divide this operand by 100".
+  function calcEval(src){
+    const clean=src.replace(/\s+/g,'');
+    const toks=clean.match(/\d+\.?\d*|\.\d+|[+\-*\/()%]/g)||[];
+    if(toks.join('')!==clean) throw new Error('bad expression');
+    let i=0;
+    const peek=()=>toks[i];
+    function expr(){ let v=term(); while(peek()==='+'||peek()==='-'){ const op=toks[i++]; const r=term(); v = op==='+'? v+r : v-r; } return v; }
+    function term(){ let v=factor(); while(peek()==='*'||peek()==='/'){ const op=toks[i++]; const r=factor(); v = op==='*'? v*r : v/r; } return v; }
+    function factor(){ if(peek()==='-'){ i++; return -factor(); } if(peek()==='+'){ i++; return factor(); } return primary(); }
+    function primary(){
+      let v;
+      if(peek()==='('){ i++; v=expr(); if(toks[i++]!==')') throw new Error('unbalanced parens'); }
+      else { const t=toks[i++]; if(t==null||!/^[\d.]/.test(t)) throw new Error('expected number'); v=parseFloat(t); }
+      while(peek()==='%'){ i++; v=v/100; }
+      return v;
+    }
+    const v=expr();
+    if(i<toks.length) throw new Error('trailing tokens');
+    if(!Number.isFinite(v)) throw new Error('not finite');
+    return v;
+  }
   function renderCalculator(body, spec){
-    const wrap=document.createElement('div'); wrap.className='wg-calc';
+    const wrap=document.createElement('div'); wrap.className='wg-calc'; wrap.tabIndex=0;
     const out=document.createElement('div'); out.className='wg-calc-out'; out.textContent='0';
     const keys=['C','±','%','÷','7','8','9','×','4','5','6','−','1','2','3','+','0','.','='];
     const grid=document.createElement('div'); grid.className='wg-calc-grid';
     let expr='', justEvaled=false;
     const sym={'÷':'/','×':'*','−':'-','+':'+'};
+    const toJs=e=>e.replace(/[÷×−]/g, m=>sym[m]);
+    const fmt=v=>String(parseFloat(v.toPrecision(12)));   // kill float dust (0.30000000000000004 → 0.3)
     const show=v=>{ out.textContent = (v.length>12? v.slice(0,12) : v) || '0'; };
+    const press=(k)=>{
+      try{
+        if(k==='C'){ expr=''; justEvaled=false; show('0'); return; }
+        if(k==='⌫'){ expr=expr.slice(0,-1); justEvaled=false; show(expr); return; }
+        if(k==='±'){ if(expr) expr = expr.startsWith('-')? expr.slice(1) : '-'+expr; show(expr); return; }
+        if(k==='='){ if(expr){ const r=fmt(calcEval(toJs(expr))); show(r); expr=r; justEvaled=true; } return; }
+        if(justEvaled && !'÷×−+%'.includes(k)){ expr=''; }
+        justEvaled=false; expr+=k; show(expr);
+      }catch{ show('Error'); expr=''; justEvaled=false; }
+    };
     keys.forEach(k=>{
       const b=document.createElement('button'); b.className='wg-calc-key'; b.textContent=k;
       if('÷×−+='.includes(k)) b.classList.add('op'); if(k==='C') b.classList.add('clr');
       if(k==='0') b.classList.add('zero');
-      b.onclick=()=>{
-        try{
-          if(k==='C'){ expr=''; show('0'); return; }
-          if(k==='±'){ if(expr) expr = expr.startsWith('-')? expr.slice(1) : '-'+expr; show(expr); return; }
-          if(k==='%'){ if(expr){ expr=String(parseFloat(eval(toJs(expr)))/100); show(expr);} return; }
-          if(k==='='){ if(expr){ const r=eval(toJs(expr)); show(String(r)); expr=String(r); justEvaled=true; } return; }
-          if(justEvaled && !'÷×−+'.includes(k)){ expr=''; justEvaled=false; }
-          justEvaled=false; expr+=k; show(expr);
-        }catch{ show('Error'); expr=''; }
-      };
+      b.onclick=()=>press(k);
       grid.appendChild(b);
     });
-    function toJs(e){ return e.replace(/[÷×−]/g, m=>sym[m]); }
+    // Keyboard input while the widget has focus (digits, ops, Enter/Esc/Backspace).
+    wrap.addEventListener('keydown',(e)=>{
+      if(e.metaKey||e.ctrlKey||e.altKey) return;
+      const map={'/':'÷','*':'×','-':'−','+':'+','%':'%','.':'.','(':'(',')':')','Enter':'=','=':'=','Escape':'C','Backspace':'⌫'};
+      const k=/^\d$/.test(e.key)? e.key : map[e.key];
+      if(k==null) return;
+      e.preventDefault(); press(k);
+    });
+    wrap.addEventListener('pointerup',()=>{ if(!wrap.contains(document.activeElement)) wrap.focus(); });
     wrap.append(out, grid); body.appendChild(wrap);
   }
 
   // ── Weather (renders data the agent provides; wire to an API later) ──
   function renderWeather(body, spec){
+    if(!spec.current){ const e=document.createElement('div'); e.className='wg-empty'; e.textContent='No weather data yet.'; body.appendChild(e); return; }
     const w=document.createElement('div'); w.className='wg-weather';
     const cur=spec.current||{};
+    const u=String(spec.unit||spec.units||'').toLowerCase();
+    const unit=(u==='c'||u==='celsius'||u==='metric')?'°C':'°F';
     const ic=weatherIcon(cur.condition||cur.icon||'');
     w.innerHTML=`<div class="wg-wx-loc">${esc2(spec.location||'—')}</div>
-      <div class="wg-wx-now"><span class="wg-wx-ic">${ic}</span><span class="wg-wx-temp">${cur.temp!=null?esc2(cur.temp)+'°':'—'}</span></div>
+      <div class="wg-wx-now"><span class="wg-wx-ic">${ic}</span><span class="wg-wx-temp">${cur.temp!=null?esc2(cur.temp)+'<span class="u">'+unit+'</span>':'—'}</span></div>
       <div class="wg-wx-cond">${esc2(cur.condition||'')}</div>
       <div class="wg-wx-meta">${cur.humidity!=null?'💧 '+esc2(cur.humidity)+'%':''} ${cur.wind!=null?' · 🌬 '+esc2(cur.wind):''}</div>`;
     if(Array.isArray(spec.forecast)&&spec.forecast.length){
       const f=document.createElement('div'); f.className='wg-wx-fc';
       spec.forecast.slice(0,6).forEach(d=>{ const c=document.createElement('div'); c.className='wg-wx-day';
-        c.innerHTML=`<span>${esc2(d.day||'')}</span><span class="i">${weatherIcon(d.condition||'')}</span><span class="t">${d.high!=null?esc2(d.high)+'°':''}${d.low!=null?' <em>'+esc2(d.low)+'°</em>':''}</span>`; f.appendChild(c); });
+        c.innerHTML=`<span>${esc2(d.day||'')}</span><span class="i">${weatherIcon(d.condition||'')}</span><span class="t">${d.high!=null?esc2(d.high)+unit:''}${d.low!=null?' <em>'+esc2(d.low)+unit+'</em>':''}</span>`; f.appendChild(c); });
       w.appendChild(f);
     }
     body.appendChild(w);
@@ -778,7 +1121,9 @@
     const head=document.createElement('div'); head.className='wg-cal-head';
     head.textContent=first.toLocaleString(undefined,{month:'long',year:'numeric'}); c.appendChild(head);
     const grid=document.createElement('div'); grid.className='wg-cal-grid';
-    ['S','M','T','W','T','F','S'].forEach(d=>{ const h=document.createElement('div'); h.className='wg-cal-dow'; h.textContent=d; grid.appendChild(h); });
+    // Locale weekday labels (Sunday-first grid; 2023-01-01 was a Sunday).
+    for(let i=0;i<7;i++){ const h=document.createElement('div'); h.className='wg-cal-dow';
+      h.textContent=new Date(2023,0,1+i).toLocaleDateString(undefined,{weekday:'narrow'}); grid.appendChild(h); }
     for(let i=0;i<pad;i++){ const e=document.createElement('div'); e.className='wg-cal-cell empty'; grid.appendChild(e); }
     for(let d=1;d<=days;d++){
       const key=`${year}-${String(mon+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
@@ -790,18 +1135,40 @@
       grid.appendChild(cell);
     }
     c.appendChild(grid);
-    const upcoming=(spec.events||[]).filter(e=>e.title).slice(0,4);
+    const evAll=(spec.events||[]).filter(e=>e.title);
+    const upcoming=evAll.slice(0,4);
     if(upcoming.length){ const ag=document.createElement('div'); ag.className='wg-cal-agenda';
       upcoming.forEach(e=>{ const r=document.createElement('div'); r.className='wg-cal-ev';
         r.innerHTML=`<span class="d">${esc2((e.date||'').slice(5,10))}</span><span class="ti">${esc2(e.time||'')}</span><span class="t">${esc2(e.title||'')}</span>`; ag.appendChild(r); });
+      if(evAll.length>4){ const more=document.createElement('div'); more.className='wg-cal-more'; more.textContent='+'+(evAll.length-4)+' more'; ag.appendChild(more); }
       c.appendChild(ag);
     }
     body.appendChild(c);
   }
 
   // ── Code (self-contained highlighter — CSP-safe, no CDN) ──
-  function hlCode(code){
-    const RE=/(\/\/[^\n]*|#[^\n]*|\/\*[\s\S]*?\*\/|--[^\n]*)|(`(?:\\.|[^`\\])*`|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')|\b(0x[\da-fA-F]+|\d+\.?\d*)\b|\b(const|let|var|function|fn|def|class|struct|interface|type|enum|return|if|else|elif|for|while|do|switch|case|break|continue|import|export|from|package|use|pub|async|await|new|extends|implements|public|private|protected|static|readonly|void|int|float|double|bool|boolean|string|char|true|false|null|nil|None|True|False|undefined|this|self|super|throw|throws|try|catch|finally|with|as|in|of|match|impl|func|range|defer|go|yield|lambda|not|and|or|is|namespace|module|require)\b/g;
+  const HL_KW={
+    js:'const let var function return if else for while do switch case break continue import export from new class extends implements interface type enum async await yield typeof instanceof in of delete void this super try catch finally throw static get set default public private protected readonly true false null undefined',
+    python:'def class return if elif else for while break continue pass import from as with try except finally raise lambda global nonlocal yield assert del in is not and or async await self True False None',
+    bash:'if then else elif fi for while until do done case esac in function select time export local readonly declare unset shift return exit trap set eval source alias echo printf read',
+    json:'true false null',
+  };
+  HL_KW.ts=HL_KW.js+' any unknown never namespace declare abstract keyof infer satisfies';
+  function hlKeywords(lang){
+    const l=String(lang||'').toLowerCase();
+    if(l==='python'||l==='py') return HL_KW.python;
+    if(l==='bash'||l==='sh'||l==='shell'||l==='zsh') return HL_KW.bash;
+    if(l==='json') return HL_KW.json;
+    if(l==='ts'||l==='typescript'||l==='tsx') return HL_KW.ts;
+    return HL_KW.js;   // fallback: js set
+  }
+  function hlCode(code, lang){
+    const kw=hlKeywords(lang).trim().split(/\s+/).join('|');
+    const RE=new RegExp(
+      /(\/\/[^\n]*|#[^\n]*|\/\*[\s\S]*?\*\/|--[^\n]*)/.source
+      +'|'+/(`(?:\\.|[^`\\])*`|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')/.source
+      +'|'+/\b(0x[\da-fA-F]+|\d+\.?\d*)\b/.source
+      +'|\\b('+kw+')\\b','g');
     let out='',last=0,m; const e=s=>esc2(s);
     while((m=RE.exec(code))){ out+=e(code.slice(last,m.index));
       const cls=m[1]?'c-cm':m[2]?'c-st':m[3]?'c-nu':'c-kw';
@@ -809,18 +1176,28 @@
     out+=e(code.slice(last)); return out;
   }
   function renderCode(body, spec){
-    const code=String(spec.code||spec.text||''); const lang=spec.language||spec.lang||'';
+    const full=String(spec.code||spec.text||''); const lang=spec.language||spec.lang||'';
+    const MAX=200000;
+    const truncated=full.length>MAX;
+    const code=truncated? full.slice(0,MAX) : full;
     const wrap=document.createElement('div'); wrap.className='wg-code';
     const bar=document.createElement('div'); bar.className='wg-code-bar';
     bar.innerHTML=`<span class="lang">${esc2(spec.filename||lang||'code')}</span>`;
     const cp=document.createElement('button'); cp.className='wg-code-copy'; cp.textContent='Copy';
-    cp.onclick=()=>{ navigator.clipboard&&navigator.clipboard.writeText(code); cp.textContent='Copied'; setTimeout(()=>cp.textContent='Copy',1200); };
+    cp.onclick=async()=>{
+      try{ await navigator.clipboard.writeText(full); cp.textContent='Copied'; }
+      catch{ cp.textContent='Copy failed'; }
+      setTimeout(()=>cp.textContent='Copy',1200);
+    };
     bar.appendChild(cp);
     const pre=document.createElement('pre'); pre.className='wg-code-pre';
     const lines=code.split('\n');
     const gutter=lines.map((_,i)=>i+1).join('\n');
-    pre.innerHTML=`<span class="wg-code-ln">${gutter}</span><code>${hlCode(code)}</code>`;
-    wrap.append(bar, pre); body.appendChild(wrap);
+    pre.innerHTML=`<span class="wg-code-ln">${gutter}</span><code>${hlCode(code, lang)}</code>`;
+    wrap.append(bar, pre);
+    if(truncated){ const n=document.createElement('div'); n.className='wg-code-trunc';
+      n.textContent=`Truncated — showing the first ${MAX.toLocaleString()} of ${full.length.toLocaleString()} characters. Copy grabs the full text.`; wrap.appendChild(n); }
+    body.appendChild(wrap);
   }
 
   // ── Docker (live micro-app: list + user/agent control) ──
@@ -851,7 +1228,9 @@
     const el=document.createElement('div'); el.className='wg-map'; body.appendChild(el);
     // Tolerate the coordinate shapes models actually emit: lng / lon / longitude.
     const num=v=>{ const n=Number(v); return Number.isFinite(n)?n:null; };
-    const pt=m=>{ if(!m) return null; const lat=num(m.lat!=null?m.lat:m.latitude), lng=num(m.lng!=null?m.lng:(m.lon!=null?m.lon:m.longitude)); return (lat==null||lng==null)?null:[lat,lng]; };
+    // Reject "Null Island" (0,0 ± noise) — it's a model hallucination, not a place.
+    const real=(lat,lng)=>!(Math.abs(lat)<0.5&&Math.abs(lng)<0.5);
+    const pt=m=>{ if(!m) return null; const lat=num(m.lat!=null?m.lat:m.latitude), lng=num(m.lng!=null?m.lng:(m.lon!=null?m.lon:m.longitude)); return (lat==null||lng==null||!real(lat,lng))?null:[lat,lng]; };
     const mk=(spec.markers||[]).map(m=>({p:pt(m), label:m&&m.label})).filter(m=>m.p);
     const route=(Array.isArray(spec.route)?spec.route:[]).map(p=>Array.isArray(p)?[num(p[0]),num(p[1])]:null).filter(p=>p&&p[0]!=null&&p[1]!=null);
     if(!mk.length && !route.length && !spec.center){ const e=document.createElement('div'); e.className='wg-note'; e.textContent='Nothing to map yet.'; body.appendChild(e); el.remove(); return; }
@@ -881,21 +1260,32 @@
         <div class="subj">${esc2(m.subject||'')}</div><div class="snip">${esc2(m.snippet||m.preview||'')}</div>`;
       const mu=safeUrl(m.url); if(mu){ r.style.cursor='pointer'; r.onclick=()=>window.open(mu,'_blank','noopener'); }
       list.appendChild(r); });
-    if(!(spec.messages||[]).length){ list.innerHTML='<div class="set-muted small" style="padding:10px;">No messages.</div>'; }
+    if(!(spec.messages||[]).length){ list.innerHTML='<div class="wg-empty">No messages.</div>'; }
     body.appendChild(list);
   }
 
   // ── Vercel deployments (wire to the Vercel connector later) ──
+  // Relative time for timestamps ("3h ago"); falls back to the raw value.
+  function relTime(v){
+    let t = typeof v==='number' ? v : (/^\d+$/.test(String(v)) ? Number(v) : Date.parse(v));
+    if(!Number.isFinite(t)) return String(v==null?'':v);
+    const s=Math.round((Date.now()-t)/1000);
+    if(s<45) return 'just now';
+    const m=Math.round(s/60); if(m<60) return m+'m ago';
+    const h=Math.round(m/60); if(h<24) return h+'h ago';
+    const d=Math.round(h/24); if(d<30) return d+'d ago';
+    return new Date(t).toLocaleDateString();
+  }
   function renderVercel(body, spec){
     const deps=spec.deployments||(spec.deployment?[spec.deployment]:[]);
     const list=document.createElement('div'); list.className='wg-vercel';
     deps.forEach(d=>{ const st=(d.state||d.readyState||'').toLowerCase();
       const cls=/ready|success/.test(st)?'ok':/build|queu|pending/.test(st)?'warn':/error|fail|cancel/.test(st)?'err':'';
       const r=document.createElement('div'); r.className='wg-vc-row';
-      r.innerHTML=`<span class="dot ${cls}"></span><div class="grow"><div class="nm">${esc2(d.name||d.url||'deploy')}</div><div class="mt">${esc2(d.branch||'')}${d.created?' · '+esc2(d.created):''}</div></div><span class="st ${cls}">${esc2(d.state||d.readyState||'')}</span>`;
+      r.innerHTML=`<span class="dot ${cls}"></span><div class="grow"><div class="nm">${esc2(d.name||d.url||'deploy')}</div><div class="mt">${esc2(d.branch||'')}${d.created?' · '+esc2(relTime(d.created)):''}</div></div><span class="st ${cls}">${esc2(d.state||d.readyState||'')}</span>`;
       const du=safeUrl(/^https?:\/\//i.test(d.url||'')?d.url:'https://'+d.url); if(du){ r.style.cursor='pointer'; r.onclick=()=>window.open(du,'_blank','noopener'); }
       list.appendChild(r); });
-    if(!deps.length){ list.innerHTML='<div class="set-muted small" style="padding:10px;">No deployments.</div>'; }
+    if(!deps.length){ list.innerHTML='<div class="wg-empty">No deployments.</div>'; }
     body.appendChild(list);
   }
 
@@ -909,26 +1299,36 @@
   }
   function renderChart(body, spec, wg){
     if(typeof Chart==='undefined'){ body.textContent='chart library not loaded'; return; }
+    const dsIn=spec.datasets||[], labels=spec.labels||[];
+    if(!dsIn.length && !labels.length){ const e=document.createElement('div'); e.className='wg-empty'; e.textContent='No data to chart yet.'; body.appendChild(e); return; }
+    // Theme colors at render time (fall back to the :root values).
+    const cs=getComputedStyle(document.documentElement);
+    const cvar=(n,fb)=>{ const v=(cs.getPropertyValue(n)||'').trim(); return v||fb; };
+    const nv=cvar('--nv','#76b900'), tick=cvar('--ink-dim','#93a08f'), gridc=cvar('--line','rgba(255,255,255,.08)');
+    const pal=[nv, ...PALETTE.slice(1)];
     const wrap=document.createElement('div'); wrap.className='wg-chart';
     const cv=document.createElement('canvas'); wrap.appendChild(cv); body.appendChild(wrap);
     const pie = spec.chart_type==='pie'||spec.chart_type==='doughnut';
-    const datasets=(spec.datasets||[]).map((dd,i)=>({
+    const datasets=dsIn.map((dd,i)=>({
       label: dd.label||('Series '+(i+1)), data: dd.data||[],
-      backgroundColor: pie?PALETTE:PALETTE[i%PALETTE.length],
-      borderColor: PALETTE[i%PALETTE.length], borderWidth:1.5, fill:false, tension:.3,
+      backgroundColor: pie?pal:pal[i%pal.length],
+      borderColor: pal[i%pal.length], borderWidth:1.5, fill:false, tension:.3,
     }));
     const chart = new Chart(cv.getContext('2d'), {
       type: spec.chart_type||'bar',
-      data: { labels: spec.labels||[], datasets },
-      options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ labels:{ color:'#9fb098', font:{size:11}, boxWidth:12 } } },
-        scales: pie?{}:{ x:{ ticks:{color:'#9fb098'}, grid:{color:'rgba(255,255,255,.06)'} }, y:{ ticks:{color:'#9fb098'}, grid:{color:'rgba(255,255,255,.06)'}, beginAtZero:true } } },
+      data: { labels, datasets },
+      options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ labels:{ color:tick, font:{size:11}, boxWidth:12 } } },
+        scales: pie?{}:{ x:{ ticks:{color:tick}, grid:{color:gridc} }, y:{ ticks:{color:tick}, grid:{color:gridc}, beginAtZero:true } } },
     });
     if(wg){ wg._chart = chart;
-      if(window.ResizeObserver && !wg._ro){ wg._ro = new ResizeObserver(()=>{ try{ wg._chart && wg._chart.resize(); }catch{} }); wg._ro.observe(wg); }
+      if(wg._ro){ try{ wg._ro.disconnect(); }catch{} wg._ro=null; }
+      if(window.ResizeObserver){ wg._ro = new ResizeObserver(()=>{ try{ wg._chart && wg._chart.resize(); }catch{} }); wg._ro.observe(wg); }
     }
   }
   function renderResults(body, spec){
-    (spec.items||[]).forEach(it=>{
+    const items=spec.items||[];
+    if(!items.length){ const e=document.createElement('div'); e.className='wg-empty'; e.textContent='No results.'; body.appendChild(e); return; }
+    items.forEach(it=>{
       const row=document.createElement('div'); row.className='wg-item';
       row.innerHTML = (it.thumbnail?`<img class="wg-thumb" src="${esc2(it.thumbnail)}" onerror="this.style.visibility='hidden'"/>`:'')
         + `<div class="grow"><div class="wg-it-title">${esc2(it.title)}</div>${it.subtitle?`<div class="wg-it-sub">${esc2(it.subtitle)}</div>`:''}</div>`;
@@ -951,17 +1351,20 @@
   function renderVideo(body, spec){
     const src=embedUrl(spec.url, spec.provider);
     if((spec.provider==='direct') || (!src && /\.(mp4|webm|ogg)(\?|$)/i.test(spec.url||''))){
-      const v=document.createElement('video'); v.className='wg-video'; v.controls=true; v.autoplay=true; v.src=spec.url||''; body.appendChild(v);
+      // muted so autoplay is actually allowed to start; controls let you unmute.
+      const v=document.createElement('video'); v.className='wg-video'; v.controls=true; v.autoplay=true; v.muted=true; v.src=spec.url||''; body.appendChild(v);
     } else if(src){
       const f=document.createElement('iframe'); f.className='wg-video'; f.src=src;
+      f.setAttribute('sandbox','allow-scripts allow-same-origin allow-presentation');
       f.setAttribute('allow','autoplay; encrypted-media; picture-in-picture'); f.setAttribute('allowfullscreen','');
       body.appendChild(f);
-    } else { body.textContent='Cannot play this video.'; }
+    } else { const e=document.createElement('div'); e.className='wg-empty'; e.textContent='Cannot play this video.'; body.appendChild(e); }
   }
   function embedUrl(url, provider){
     if(!url) return null; let m;
-    if(provider==='youtube' || /youtu/.test(url)){ m=url.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([\w-]{11})/); if(m) return `https://www.youtube.com/embed/${m[1]}?autoplay=1`; }
-    if(provider==='vimeo' || /vimeo/.test(url)){ m=url.match(/vimeo\.com\/(?:video\/)?(\d+)/); if(m) return `https://player.vimeo.com/video/${m[1]}?autoplay=1`; }
+    // muted autoplay (browsers block audible autoplay); privacy-enhanced YT domain.
+    if(provider==='youtube' || /youtu/.test(url)){ m=url.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([\w-]{11})/); if(m) return `https://www.youtube-nocookie.com/embed/${m[1]}?autoplay=1&mute=1`; }
+    if(provider==='vimeo' || /vimeo/.test(url)){ m=url.match(/vimeo\.com\/(?:video\/)?(\d+)/); if(m) return `https://player.vimeo.com/video/${m[1]}?autoplay=1&muted=1`; }
     return null;
   }
 

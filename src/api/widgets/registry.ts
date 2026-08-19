@@ -22,7 +22,7 @@ export interface WidgetDef {
   id: string
   name: string
   desc: string
-  category: 'Display' | 'Info' | 'Media' | 'Productivity' | 'Dev' | 'Account'
+  category: 'Display' | 'Info' | 'Media' | 'Productivity' | 'Dev' | 'Account' | 'Home'
   setup: WidgetSetup
   icon: string                 // emoji glyph (kept lightweight; UI may map to SVG)
   envKeys?: string[]           // env keys that must be set for `configured`
@@ -49,6 +49,12 @@ export const WIDGET_CATALOG: WidgetDef[] = [
   { id: 'calculator', name: 'Calculator', desc: 'An interactive calculator.', category: 'Display', setup: 'none', icon: '🧮' },
   { id: 'html', name: 'Custom app', desc: 'A bespoke hand-written interactive app.', category: 'Display', setup: 'none', icon: '✦' },
   { id: 'embed', name: 'Embed', desc: 'Embed any external interactive page (e.g. a 3D model).', category: 'Display', setup: 'none', icon: '🔗' },
+  { id: 'document', name: 'Document', desc: 'View documents — PDF, markdown, text, images.', category: 'Display', setup: 'none', icon: '📄' },
+  { id: 'wallet', name: 'Wallet', desc: 'See and choose payment methods (Apple/Google Pay, cards).', category: 'Account', setup: 'none', icon: '💳' },
+  { id: 'shopping', name: 'Shopping', desc: 'Shopping list + buy options (Amazon, grocery).', category: 'Productivity', setup: 'none', icon: '🛒' },
+  { id: 'lights', name: 'Lights', desc: 'Room-by-room light control.', category: 'Home', setup: 'none', icon: '💡', envKeys: ['ORB2_HA_TOKEN'] },
+  { id: 'media-remote', name: 'Media remote', desc: 'TV & speaker remote (play, volume, artwork).', category: 'Home', setup: 'none', icon: '📺', envKeys: ['ORB2_HA_TOKEN'] },
+  { id: 'climate', name: 'Climate', desc: 'Thermostat dial.', category: 'Home', setup: 'none', icon: '🌡️', envKeys: ['ORB2_HA_TOKEN'] },
 
   // ── Info (free, keyless data) ──
   { id: 'weather', name: 'Weather', desc: 'Current conditions + 5-day forecast for any place.', category: 'Info', setup: 'none', icon: '☀️' },

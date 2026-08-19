@@ -26,6 +26,8 @@ import { tryCloudOAuthRoute } from './connectors/cloudStorageRoutes.js'
 import { tryDockerRoute } from './connectors/dockerRoutes.js'
 import { tryTailscaleRoute } from './connectors/tailscaleRoutes.js'
 import { tryWidgetRegistryRoute } from './widgets/registryRoutes.js'
+import { tryWalletRoute } from './wallet/routes.js'
+import { tryShoppingRoute } from './shopping/routes.js'
 import { routeTurn } from './modelRouter.js'
 import { buildFallbackChain } from './foundry/fallbackChain.js'
 import { getDefaultMcpServers } from './mcp/defaultServers.js'
@@ -892,6 +894,10 @@ async function dispatch(
   if (tsRoute) return tsRoute
 
   // Widget registry (Settings → Apps): list + on/off toggle, session-gated.
+  const shopRoute = await tryShoppingRoute(req, method, pathname, ctx.store)
+  if (shopRoute) return shopRoute
+  const walletRoute = await tryWalletRoute(req, method, pathname, ctx.store)
+  if (walletRoute) return walletRoute
   const wgRoute = await tryWidgetRegistryRoute(req, method, pathname, ctx.store)
   if (wgRoute) return wgRoute
 

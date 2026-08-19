@@ -39,7 +39,7 @@ import { vercelEnabled, deployToVercel } from '../connectors/vercel.js'
 import { cloudStorageEnabled, searchCloud, downloadCloudFile, connectedProviders } from '../connectors/cloudStorage.js'
 import { geocode, route as geoRoute, weather, reverseGeocode } from '../connectors/geo.js'
 import { webSearch, webSearchEnabled } from '../connectors/websearch.js'
-import { haConfig } from '../connectors/homeAssistant.js'
+import { haConfig, haAreas, haCreateArea, haUpdateEntity, haAreaByEntity, haJoinAreas, toDeviceCard, prettyDomain, describeAttrs } from '../connectors/homeAssistant.js'
 import { dockerEnabled, dockerList, dockerControl } from '../connectors/dockerc.js'
 import { haEnabled, haStates, haResolve, haCallService, HOME_DOMAINS, type HaEntity } from '../connectors/homeAssistant.js'
 import { onlineOptions, nearbyStores } from '../connectors/shopping.js'
@@ -135,7 +135,7 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
       input_schema: {
         type: 'object',
         properties: {
-          type: { type: 'string', enum: ['chart', 'results', 'video', 'music', 'table', 'stats', 'gallery', 'image', 'embed', 'calculator', 'weather', 'calendar', 'map', 'code', 'mail', 'vercel', 'html', 'note'], description: 'Widget kind.' },
+          type: { type: 'string', enum: ['chart', 'results', 'video', 'music', 'table', 'stats', 'gallery', 'image', 'embed', 'calculator', 'weather', 'calendar', 'map', 'code', 'mail', 'vercel', 'html', 'note', 'document', 'wallet', 'shopping'], description: 'Widget kind.' },
           id: { type: 'string', description: "STRONGLY use a STABLE, SEMANTIC id per logical widget — e.g. 'map', 'weather', 'route', 'calendar', 'mail'. To CHANGE or EXTEND what is already shown (a different city's weather, add a hotel to the route, a new route), re-emit with the SAME id — this updates that widget IN PLACE and brings it back into view (even if it scrolled away or collapsed). NEVER open a second widget of the same kind; reuse its id. Omit only for a genuinely new, distinct thing." },
           html: { type: 'string', description: 'html: complete self-contained HTML document (with any CDN <script>/<link>) for a bespoke app.' },
           title: { type: 'string', description: 'Widget title shown in its header.' },
@@ -422,13 +422,55 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
       name: 'Home',
       description: "Control and check the home's devices through Home Assistant — lights, switches/plugs, thermostats (climate), locks, window shades/blinds (cover), TVs & speakers (media_player), robot vacuums, fans, and door/window & motion sensors. This is how Orb acts as the house. Use op:'list' to see what's available (optionally a `type`), op:'status' to check a device by name, and op:'control' to change one: action on/off/toggle for lights/plugs/switches; lock/unlock for locks; open/close (or set with `value` 0-100) for shades; set with `value` for a thermostat's target temperature; play/pause/on/off (or set volume with `value` 0-100) for media; start/stop/dock for a vacuum. Always refer to devices by their friendly name (e.g. \"kitchen lights\", \"front door\").",
       input_schema: { type: 'object', properties: {
-        op: { type: 'string', enum: ['list', 'status', 'control'], description: 'list devices, check status, or control one.' },
+        op: { type: 'string', enum: ['list', 'status', 'control', 'media', 'lights', 'climate'], description: "list = overview dashboard; status/control = one device; media = show a media REMOTE widget for TVs/speakers; lights = show the room-grouped LIGHTS widget; climate = show thermostat widgets. Prefer the function widgets (media/lights/climate) when the user is focused on one kind of device." },
         query: { type: 'string', description: "Device name for status/control (e.g. 'living room lights', 'front door', 'bedroom thermostat')." },
         type: { type: 'string', enum: ['light', 'switch', 'climate', 'lock', 'cover', 'media_player', 'vacuum', 'fan', 'sensor', 'camera'], description: 'Optional device type filter for list.' },
         action: { type: 'string', enum: ['on', 'off', 'toggle', 'lock', 'unlock', 'open', 'close', 'play', 'pause', 'start', 'stop', 'dock', 'set'], description: 'What to do for op:control.' },
         value: { type: 'number', description: 'Numeric arg for set: brightness/position/volume 0-100, or thermostat temperature.' },
       }, required: ['op'] },
       available: haEnabled(),
+    },
+    {
+      name: 'HomeAdmin',
+      description: "Organize the smart home's structure in Home Assistant — use when the user wants rooms/areas set up, devices renamed to friendly names, devices assigned to rooms, or clutter entities hidden. op:'areas' lists rooms with device counts. op:'create_area' {name} makes a room. op:'assign' {query, area} puts a device in a room (creates the room if needed). op:'rename' {query, name} sets a device's display name. op:'hide' {query, hidden} hides/unhides an entity from dashboards. Refer to devices by their current name (e.g. 'living room tv').",
+      input_schema: { type: 'object', properties: {
+        op: { type: 'string', enum: ['areas', 'create_area', 'assign', 'rename', 'hide'] },
+        query: { type: 'string', description: 'Device to act on, by name.' },
+        area: { type: 'string', description: "Room name for op:'assign'." },
+        name: { type: 'string', description: "New display name for op:'rename' / op:'create_area'." },
+        hidden: { type: 'boolean', description: "op:'hide': true hides, false unhides." },
+      }, required: ['op'] },
+      available: haEnabled(),
+    },
+    {
+      name: 'Shopping',
+      description: "The user's shopping list + buying flow (Amazon and grocery/other). op:'show' displays the shopping widget; op:'add' {items:[{name,qty?,note?}]} adds to the list; op:'remove' {query} removes by name; op:'options' {query} researches buy options with prices (web search + merchant links) and shows them in the widget — use this when the user hasn't named an exact product; op:'checkout' {query?} produces checkout links — Amazon items check out in the user's own Amazon account, other merchants via their site with the Wallet for payment choice. NEVER claim an order was placed — Orb hands off to the merchant, the user completes payment there.",
+      input_schema: { type: 'object', properties: {
+        op: { type: 'string', enum: ['show', 'add', 'remove', 'options', 'checkout'] },
+        items: { type: 'array', description: "op:'add': [{name, qty?, note?}] or plain strings.", items: { type: ['object', 'string'] } },
+        query: { type: 'string', description: 'Item name for remove/options/checkout.' },
+      }, required: ['op'] },
+      available: true,
+    },
+    {
+      name: 'CreateWidget',
+      description: "Create a brand-new REUSABLE widget type when NO existing Widget type fits the data you must display. Workflow: 1) call op:'template' to get a starter render.js and the exact contract; 2) adapt it and call op:'install' with {id, name, icon, render_js}; 3) display data with the Widget tool using type:<your id> — every field you put in that Widget spec is available to your render.js as `spec`. render.js MUST export `function render(el, spec, api)` — build DOM inside `el`, escape any text you interpolate with api.esc(). Self-contained only: no external scripts, no network. op:'list' shows installed custom widgets; op:'remove' {id} deletes one.",
+      input_schema: { type: 'object', properties: {
+        op: { type: 'string', enum: ['template', 'install', 'list', 'remove'] },
+        id: { type: 'string', description: 'Short kebab-case type id, e.g. "recipe-card".' },
+        name: { type: 'string', description: 'Human name shown in Settings → Apps.' },
+        icon: { type: 'string', description: 'One emoji.' },
+        render_js: { type: 'string', description: 'The full render.js source.' },
+      }, required: ['op'] },
+      available: true,
+    },
+    {
+      name: 'Wallet',
+      description: "The user's payment methods — use whenever asked to buy, pay, order, or check out. op:'show' opens the wallet widget so the user can SEE and SELECT how to pay (always do this before any purchase step); op:'list' returns the methods as text; op:'selected' returns the currently chosen method. Orb stores only labels/brand/last4 — never card numbers — and actual payment always happens in the user's own Apple Pay / Google Pay sheet or the merchant checkout, never automatically.",
+      input_schema: { type: 'object', properties: {
+        op: { type: 'string', enum: ['show', 'list', 'selected'] },
+      }, required: ['op'] },
+      available: true,
     },
   ]
   return defs
@@ -470,6 +512,22 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
         return `Displayed a custom app widget${args.title ? ` ("${args.title}")` : ''}.`
       } catch (e) {
         return `[ERROR] could not render the app widget: ${(e as Error).message}`
+      }
+    }
+    // Map guard: models routinely invent coordinates (usually [0,0] — "Null
+    // Island", open ocean off Africa). Trust only real-looking coords; when
+    // the spec carries a place STRING (or nothing), geocode it server-side —
+    // falling back to the user's home — so the map always lands somewhere true.
+    if (args?.type === 'map') {
+      const looksReal = (c: any) => Array.isArray(c) && c.length === 2 &&
+        Number.isFinite(Number(c[0])) && Number.isFinite(Number(c[1])) &&
+        !(Math.abs(Number(c[0])) < 0.5 && Math.abs(Number(c[1])) < 0.5)
+      const hasMarkers = Array.isArray(args.markers) && args.markers.some((m: any) => looksReal([m?.lat, m?.lng ?? m?.lon ?? m?.longitude]))
+      if (!hasMarkers && !looksReal(args.center)) {
+        const place = String(args.location || args.query || args.title || '').trim() || (await homeLocation()) || ''
+        const g = place ? await geocode(place).catch(() => null) : null
+        if (!g) return `[ERROR] I don't have real coordinates for that map. Use the Geocode tool first (or pass location:"<place name>") — never invent lat/lng.`
+        args = { ...args, center: [g.lat, g.lng], zoom: args.zoom || 12, markers: [{ lat: g.lat, lng: g.lng, label: g.name?.split(',')[0] || place }] }
       }
     }
     emitWidget(ctx.sessionId, { ...args, id } as any)
@@ -780,7 +838,7 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
 
       if (op === 'list') {
         const domains = args?.type ? [String(args.type)] : HOME_DOMAINS
-        const all = await haStates(domains)
+        const all = await haJoinAreas(await haStates(domains))
         if (!all.length) return 'No matching devices found in Home Assistant.'
         const byDomain = new Map<string, HaEntity[]>()
         for (const e of all) (byDomain.get(e.domain) ?? byDomain.set(e.domain, []).get(e.domain)!).push(e)
@@ -792,6 +850,51 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
           .map(([d, es]) => `${prettyDomain(d)} (${es.length}): ${es.slice(0, 4).map(e => e.name).join(', ')}${es.length > 4 ? '…' : ''}`)
           .join(' · ')
         return `Showed ${all.length} devices on the Home dashboard. ${summary}`
+      }
+
+      if (op === 'lights') {
+        const all = await haJoinAreas(await haStates(['light']))
+        if (!all.length) return 'No lights found in Home Assistant.'
+        const groups = new Map<string, any[]>()
+        for (const e of all) {
+          const area = e.area || 'Other'
+          ;(groups.get(area) ?? groups.set(area, []).get(area)!).push({
+            entity_id: e.entity_id, name: e.name, on: e.state === 'on',
+            brightness: e.attributes.brightness != null ? Math.round((e.attributes.brightness / 255) * 100) : undefined,
+          })
+        }
+        emitWidget(ctx.sessionId, {
+          id: 'lights', type: 'lights', title: 'Lights', pill: `${all.filter(e => e.state === 'on').length}/${all.length} on`,
+          groups: [...groups.entries()].map(([area, lights]) => ({ area, lights })),
+        } as any)
+        return `Showed the lights widget — ${all.length} light(s) in ${groups.size} room(s), ${all.filter(e => e.state === 'on').length} on.`
+      }
+      if (op === 'media') {
+        const q = String(args?.query || '').trim()
+        let players = await haJoinAreas(await haStates(['media_player']))
+        if (q) players = haResolve(players, q, 'media_player')
+        if (!players.length) return 'No media players found.'
+        for (const e of players.slice(0, 4)) {
+          const pic = e.attributes.entity_picture
+          emitWidget(ctx.sessionId, {
+            id: `media-${e.entity_id}`, type: 'media', title: e.name,
+            entity_id: e.entity_id, name: e.name, area: e.area, state: e.state,
+            media_title: e.attributes.media_title, app: e.attributes.app_name,
+            volume: e.attributes.volume_level != null ? Math.round(e.attributes.volume_level * 100) : undefined,
+            artwork: pic ? `/v1/home/ha-image?path=${encodeURIComponent(pic)}` : undefined,
+          } as any)
+        }
+        return `Showed media remote${players.length > 1 ? 's' : ''} for: ${players.slice(0, 4).map(p => p.name).join(', ')}.`
+      }
+      if (op === 'climate') {
+        const cl = await haJoinAreas(await haStates(['climate']))
+        if (!cl.length) return 'No thermostats found.'
+        for (const e of cl.slice(0, 4)) emitWidget(ctx.sessionId, {
+          id: `climate-${e.entity_id}`, type: 'climate', title: e.name,
+          entity_id: e.entity_id, name: e.name, area: e.area, state: e.state,
+          current: e.attributes.current_temperature, target: e.attributes.temperature,
+        } as any)
+        return `Showed thermostat${cl.length > 1 ? 's' : ''}: ${cl.slice(0, 4).map(c => `${c.name} (now ${c.attributes.current_temperature ?? '?'}°, set ${c.attributes.temperature ?? '?'}°)`).join(', ')}.`
       }
 
       const query = String(args?.query || '').trim()
@@ -822,9 +925,192 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
       return `[Home Assistant] ${(e as Error).message}`
     }
   })
+  add('HomeAdmin', {}, async args => {
+    try {
+      const op = String(args?.op || '')
+      if (op === 'areas') {
+        const [areas, byEntity] = await Promise.all([haAreas(), haAreaByEntity()])
+        if (!areas.length) return 'No areas defined yet. Create rooms with op:create_area.'
+        const counts = new Map<string, number>()
+        for (const name of byEntity.values()) counts.set(name, (counts.get(name) ?? 0) + 1)
+        return 'Areas: ' + areas.map(a => `${a.name} (${counts.get(a.name) ?? 0} devices)`).join(' · ')
+      }
+      if (op === 'create_area') {
+        const name = String(args?.name || args?.area || '').trim()
+        if (!name) return 'Give the room a name.'
+        const a = await haCreateArea(name)
+        return `Created area "${a.name}".`
+      }
+      // Remaining ops act on one device resolved by name.
+      const query = String(args?.query || '').trim()
+      if (!query) return "Tell me which device — e.g. 'living room tv'."
+      const entities = await haStates(HOME_DOMAINS)
+      const matches = haResolve(entities, query)
+      if (!matches.length) return `No device matching "${query}".`
+      const target = matches[0]!
+      if (op === 'rename') {
+        const name = String(args?.name || '').trim()
+        if (!name) return 'Give it a new name.'
+        await haUpdateEntity(target.entity_id, { name })
+        return `Renamed "${target.name}" → "${name}".`
+      }
+      if (op === 'assign') {
+        const areaName = String(args?.area || '').trim()
+        if (!areaName) return 'Which room? Pass `area`.'
+        const areas = await haAreas()
+        let area = areas.find(a => a.name.toLowerCase() === areaName.toLowerCase())
+        if (!area) area = await haCreateArea(areaName)
+        await haUpdateEntity(target.entity_id, { area_id: area.area_id })
+        return `Put "${target.name}" in ${area.name}.`
+      }
+      if (op === 'hide') {
+        const hidden = args?.hidden !== false
+        await haUpdateEntity(target.entity_id, { hidden })
+        return `${hidden ? 'Hid' : 'Unhid'} "${target.name}".`
+      }
+      return `Unknown op "${op}".`
+    } catch (e) {
+      return `[Home Assistant] ${(e as Error).message}`
+    }
+  })
+  add('Shopping', {}, async args => {
+    const op = String(args?.op || 'show')
+    const { shoppingList, saveShoppingList, newShoppingItem } = await import('../shopping/routes.js')
+    const emitList = async (extra: Record<string, any> = {}) => {
+      const items = await shoppingList(ctx.store)
+      emitWidget(ctx.sessionId, { id: 'shopping', type: 'shopping', title: 'Shopping',
+        pill: `${items.filter(i => !i.done).length} to buy`, items, ...extra } as any)
+      return items
+    }
+    try {
+      if (op === 'show') {
+        const items = await emitList()
+        return items.length ? `Showed the shopping list: ${items.map(i => `${i.name}${i.done ? ' ✓' : ''}`).join(', ')}.` : 'Showed the shopping list — it is empty.'
+      }
+      if (op === 'add') {
+        const raw = Array.isArray(args?.items) ? args.items : (args?.query ? [args.query] : [])
+        if (!raw.length) return 'What should I add? Pass items:[...].'
+        const items = await shoppingList(ctx.store)
+        const added: string[] = []
+        for (const r of raw.slice(0, 20)) {
+          const name = typeof r === 'string' ? r : String(r?.name || '')
+          if (!name.trim()) continue
+          items.push(newShoppingItem(name, typeof r === 'object' ? Number(r?.qty) || undefined : undefined, typeof r === 'object' && r?.note ? String(r.note) : undefined))
+          added.push(name.trim())
+        }
+        await saveShoppingList(ctx.store, items)
+        await emitList()
+        return `Added ${added.join(', ')} to the shopping list (${items.filter(i => !i.done).length} open items).`
+      }
+      if (op === 'remove') {
+        const q = String(args?.query || '').trim().toLowerCase()
+        if (!q) return 'Which item should I remove?'
+        const items = await shoppingList(ctx.store)
+        const idx = items.findIndex(i => i.name.toLowerCase().includes(q))
+        if (idx < 0) return `Nothing on the list matching "${args?.query}".`
+        const [gone] = items.splice(idx, 1)
+        await saveShoppingList(ctx.store, items)
+        await emitList()
+        return `Removed ${gone!.name}.`
+      }
+      if (op === 'options') {
+        const q = String(args?.query || '').trim()
+        if (!q) return 'What product should I research?'
+        const links = onlineOptions(q)
+        let digest = ''
+        try {
+          const hits = await webSearch(`${q} price buy`, 6)
+          digest = hits.slice(0, 5).map(h => `- ${h.title}: ${h.snippet.slice(0, 120)}`).join('\n')
+        } catch { /* links still useful without live prices */ }
+        await emitList({ options: { query: q, merchants: links } })
+        return `Buy options for "${q}" are in the shopping widget (Amazon, Walmart, Google Shopping, eBay).${digest ? `\nLive price signals from the web:\n${digest}\nSummarize the best 2-3 options for the user.` : ''}`
+      }
+      if (op === 'checkout') {
+        const q = String(args?.query || '').trim()
+        const items = await shoppingList(ctx.store)
+        const targets = q ? items.filter(i => i.name.toLowerCase().includes(q.toLowerCase())) : items.filter(i => !i.done)
+        if (!targets.length) return 'Nothing to check out.'
+        const links = targets.map(t => `${t.name}: https://www.amazon.com/s?k=${encodeURIComponent(t.name)}`)
+        await emitList({ checkout: targets.map(t => t.name) })
+        return `Checkout handoff ready. Amazon links (payment happens in the user's Amazon account):\n${links.join('\n')}\nFor non-Amazon merchants, show the Wallet (Wallet op:show) so the user picks how to pay. Do NOT claim any order was placed.`
+      }
+      return `Unknown op "${op}".`
+    } catch (e) { return `[Shopping] ${(e as Error).message}` }
+  })
+  add('CreateWidget', {}, async args => {
+    const op = String(args?.op || 'template')
+    const { installPlugin, removePlugin, listPlugins } = await import('../widgets/plugins.js')
+    if (op === 'template') return WIDGET_TEMPLATE_GUIDE
+    if (op === 'list') {
+      const ps = listPlugins()
+      return ps.length ? 'Custom widgets: ' + ps.map(p => `${p.id} ("${p.name}")`).join(', ') : 'No custom widgets installed.'
+    }
+    if (op === 'remove') {
+      const id = String(args?.id || '').trim()
+      return removePlugin(id) ? `Removed custom widget "${id}".` : `No custom widget "${id}".`
+    }
+    if (op === 'install') {
+      try {
+        const p = installPlugin({
+          id: String(args?.id || ''), name: String(args?.name || ''), icon: String(args?.icon || '🧩'),
+          render_js: String(args?.render_js || ''),
+        })
+        return `Installed widget type "${p.id}". Now display data with: Widget { type: "${p.id}", title: "...", ...your fields }. The console picks it up automatically.`
+      } catch (e) { return `[CreateWidget] ${(e as Error).message}. Fix the input and retry — op:'template' shows the contract.` }
+    }
+    return `Unknown op "${op}".`
+  })
+  add('Wallet', { readOnly: true }, async args => {
+    const op = String(args?.op || 'show')
+    const { walletMethods } = await import('../wallet/routes.js')
+    const { methods, selected } = await walletMethods(ctx.store)
+    const label = (m: any) => `${m.label}${m.brand ? ` (${m.brand}${m.last4 ? ` ····${m.last4}` : ''})` : ''}${m.id === selected ? ' [selected]' : ''}`
+    if (op === 'show') {
+      emitWidget(ctx.sessionId, { id: 'wallet', type: 'wallet', title: 'Wallet', methods, selected } as any)
+      return methods.length
+        ? `Showed the wallet. Methods: ${methods.map(label).join(' · ')}. The user selects/confirms in the widget — never assume a choice.`
+        : 'Showed the wallet — it is empty. The user can add a payment method right in the widget.'
+    }
+    if (op === 'list') return methods.length ? methods.map(label).join(' · ') : 'No payment methods saved yet.'
+    if (op === 'selected') {
+      const m = methods.find(x => x.id === selected)
+      return m ? `Selected: ${label(m)}` : 'No payment method selected yet — use op:show so the user can pick one.'
+    }
+    return `Unknown op "${op}".`
+  })
 
   return tools
 }
+
+/** Contract + starter the agent copies when minting a new widget type. */
+const WIDGET_TEMPLATE_GUIDE = `WIDGET CONTRACT
+- render.js runs inside the console card body. Export: function render(el, spec, api)
+- el: the card's body element (a flex column). Build DOM inside it.
+- spec: the exact JSON you pass to the Widget tool ({type, title, ...your fields}).
+- api.esc(s): HTML-escape — use it on EVERY interpolated string.
+- Style with the console's CSS variables: var(--ink) text, var(--ink-dim) muted,
+  var(--nv) green accent, var(--line) hairline, var(--mono) monospace font.
+- No external scripts, no fetch to the internet, no innerHTML of unescaped data.
+
+STARTER (adapt freely):
+export function render(el, spec, api){
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'display:flex;flex-direction:column;gap:8px;';
+  const items = Array.isArray(spec.items) ? spec.items : [];
+  if (!items.length){
+    wrap.innerHTML = '<div style="color:var(--ink-dim);text-align:center;padding:20px;">Nothing here yet.</div>';
+  }
+  for (const it of items){
+    const row = document.createElement('div');
+    row.style.cssText = 'padding:8px 10px;border:1px solid var(--line);border-radius:10px;';
+    row.innerHTML = '<div style="font-size:13px;color:var(--ink);">'+api.esc(it.title||'')+'</div>'
+      + '<div style="font-size:11px;color:var(--ink-dim);">'+api.esc(it.detail||'')+'</div>';
+    wrap.appendChild(row);
+  }
+  el.appendChild(wrap);
+}
+
+Install with CreateWidget op:'install' {id:'my-widget', name:'My widget', icon:'🧩', render_js:'<the source>'} then emit Widget {type:'my-widget', title:'...', items:[...]}.`
 
 /**
  * The user's home location as a short label. Prefers the ORB2_HOME_LOCATION
@@ -844,55 +1130,10 @@ async function homeLocation(): Promise<string | null> {
   return null
 }
 
-/** Map an HA entity to a device card for the `home` dashboard widget. */
-function toDeviceCard(e: HaEntity): any {
-  const icons: Record<string, string> = {
-    light: '💡', switch: '🔌', climate: '🌡️', lock: '🔒', cover: '🪟',
-    media_player: '📺', vacuum: '🤖', fan: '🌀', binary_sensor: '📡',
-    sensor: '📊', camera: '📷', scene: '✨',
-  }
-  let on: boolean | undefined
-  if (e.domain === 'lock') on = e.state === 'locked'
-  else if (e.domain === 'cover') on = e.state === 'open'
-  else if (e.domain === 'media_player') on = !['off', 'idle', 'standby', 'unavailable'].includes(e.state)
-  else if (['light', 'switch', 'fan'].includes(e.domain)) on = e.state === 'on'
-  const controllable = ['light', 'switch', 'fan', 'lock', 'cover'].includes(e.domain)
-  return {
-    entity_id: e.entity_id,
-    name: e.name,
-    domain: e.domain,
-    kind: prettyDomain(e.domain),
-    icon: icons[e.domain] || '•',
-    state: e.state,
-    on,
-    sub: describeAttrs(e),
-    controllable,
-  }
-}
 
 /** Human label for an HA domain. */
-function prettyDomain(domain: string): string {
-  const map: Record<string, string> = {
-    light: 'Light', switch: 'Plug/Switch', climate: 'Thermostat', lock: 'Lock',
-    cover: 'Shade', media_player: 'Media', vacuum: 'Vacuum', fan: 'Fan',
-    binary_sensor: 'Sensor', sensor: 'Sensor', camera: 'Camera', scene: 'Scene',
-  }
-  return map[domain] || domain
-}
 
 /** One-line attribute summary for a device's status card. */
-function describeAttrs(e: HaEntity): string {
-  const a = e.attributes
-  if (e.domain === 'climate') {
-    const cur = a.current_temperature, tgt = a.temperature
-    return [cur != null ? `now ${cur}°` : '', tgt != null ? `set ${tgt}°` : ''].filter(Boolean).join(', ')
-  }
-  if (e.domain === 'light' && a.brightness != null) return `${Math.round((a.brightness / 255) * 100)}% bright`
-  if (e.domain === 'cover' && a.current_position != null) return `${a.current_position}% open`
-  if (e.domain === 'media_player' && a.media_title) return `${a.media_title}`
-  if (e.domain === 'sensor' && a.unit_of_measurement) return `${e.state}${a.unit_of_measurement}`
-  return ''
-}
 
 /** Map a friendly action onto a Home Assistant domain/service + data. */
 function planControl(

@@ -6,7 +6,7 @@
  *   GET  /v1/home/devices            → current devices (for the widget)
  *   POST /v1/home/control            → { entity_id, action, value? } → call HA
  */
-import { haEnabled, haStates, haCallService, HOME_DOMAINS } from '../connectors/homeAssistant.js'
+import { haEnabled, haStates, haCallService, HOME_DOMAINS, haJoinAreas, toDeviceCard } from '../connectors/homeAssistant.js'
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
@@ -42,6 +42,12 @@ function serviceFor(domain: string, action: string, value?: number): { service: 
       return null
     case 'media_player':
       if (action === 'toggle') return { service: 'media_play_pause', data: {} }
+      if (action === 'play') return { service: 'media_play', data: {} }
+      if (action === 'pause') return { service: 'media_pause', data: {} }
+      if (action === 'next') return { service: 'media_next_track', data: {} }
+      if (action === 'prev') return { service: 'media_previous_track', data: {} }
+      if (action === 'on') return { service: 'turn_on', data: {} }
+      if (action === 'off') return { service: 'turn_off', data: {} }
       if (action === 'set' && value != null) return { service: 'volume_set', data: { volume_level: Math.max(0, Math.min(1, value / 100)) } }
       return null
     case 'climate':
@@ -61,10 +67,22 @@ export async function tryHandleHomeRoute(method: string, pathname: string, req: 
   if (!pathname.startsWith('/v1/home')) return null
   if (!haEnabled()) return jsonResponse(503, { error: 'Home Assistant not configured', code: 'HA_DISABLED' })
 
+  // Media artwork etc. — entity_picture paths are relative to HA and need
+  // its auth; proxy them so the console (incl. remote/tailnet) can render.
+  if (method === 'GET' && pathname === '/v1/home/ha-image') {
+    const p = new URL(req.url).searchParams.get('path') || ''
+    if (!p.startsWith('/')) return jsonResponse(400, { error: 'bad path' })
+    try {
+      const base = (process.env.ORB2_HA_URL || '').replace(/\/+$/, '')
+      const r = await fetch(`${base}${p}`, { headers: { Authorization: `Bearer ${process.env.ORB2_HA_TOKEN || ''}` } })
+      if (!r.ok) return jsonResponse(502, { error: `HA ${r.status}` })
+      return new Response(r.body, { status: 200, headers: { 'content-type': r.headers.get('content-type') || 'image/jpeg', 'cache-control': 'private, max-age=30' } })
+    } catch (e) { return jsonResponse(502, { error: (e as Error).message }) }
+  }
   if (method === 'GET' && pathname === '/v1/home/devices') {
     try {
-      const all = await haStates(HOME_DOMAINS)
-      return jsonResponse(200, { devices: all })
+      const all = await haJoinAreas(await haStates(HOME_DOMAINS))
+      return jsonResponse(200, { devices: all.map(toDeviceCard) })
     } catch (e) {
       return jsonResponse(502, { error: (e as Error).message })
     }
