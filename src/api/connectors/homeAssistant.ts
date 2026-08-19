@@ -192,7 +192,7 @@ export async function haFlowStart(handler: string): Promise<any> {
   })
 }
 
-export interface FlowField { name: string; type: string; required: boolean; options?: string[] }
+export interface FlowField { name: string; type: string; required: boolean; options?: string[]; label?: string; help?: string; option_labels?: Record<string, string> }
 export interface FlowView {
   type: 'form' | 'create_entry' | 'abort' | 'unknown'
   flow_id?: string
@@ -203,6 +203,73 @@ export interface FlowView {
   errors?: Record<string, string>
   fields?: FlowField[]
   placeholders?: Record<string, string>
+  /** Human strings from HA's translation catalog (filled by translateFlowView). */
+  step_title?: string
+  step_description?: string
+  errors_text?: string[]
+  abort_text?: string
+}
+
+/** Translation catalog for one integration's config flows (cached — the
+ *  strings HA's own UI shows: step titles, field labels, error messages). */
+const _flowI18n = new Map<string, Record<string, string>>()
+async function haFlowStrings(domain: string): Promise<Record<string, string>> {
+  const hit = _flowI18n.get(domain)
+  if (hit) return hit
+  const res = (await haWsCommand('frontend/get_translations', {
+    language: 'en', category: 'config', integration: domain,
+  })) as any
+  const strings = (res?.resources ?? {}) as Record<string, string>
+  _flowI18n.set(domain, strings)
+  return strings
+}
+
+/** The integration's display name from its manifest ("brother" → "Brother Printer"). */
+const _manifestNames = new Map<string, string>()
+export async function haIntegrationName(domain: string): Promise<string> {
+  const hit = _manifestNames.get(domain)
+  if (hit) return hit
+  let name = domain
+  try {
+    const m = (await haWsCommand('manifest/get', { integration: domain })) as any
+    if (m?.name) name = String(m.name)
+  } catch {}
+  _manifestNames.set(domain, name)
+  return name
+}
+
+/**
+ * Merge HA's human strings into a flow view so forms read like HA's own UI —
+ * "Type of the printer", "The printer is not supported" — instead of raw
+ * schema names and error codes. Best-effort: missing strings stay undefined
+ * and the UI falls back to prettified names.
+ */
+export async function translateFlowView(view: FlowView): Promise<FlowView> {
+  if (!view.handler) return view
+  try {
+    const r = await haFlowStrings(view.handler)
+    const p = `component.${view.handler}.config`
+    const fill = (s?: string) => s?.replace(/\{(\w+)\}/g, (_, k) => view.placeholders?.[k] ?? `{${k}}`)
+    if (view.step_id) {
+      view.step_title = fill(r[`${p}.step.${view.step_id}.title`])
+      view.step_description = fill(r[`${p}.step.${view.step_id}.description`])
+      for (const f of view.fields ?? []) {
+        f.label = r[`${p}.step.${view.step_id}.data.${f.name}`]
+        f.help = fill(r[`${p}.step.${view.step_id}.data_description.${f.name}`])
+        if (f.options) {
+          const labels: Record<string, string> = {}
+          for (const o of f.options) {
+            const t = r[`${p}.step.${view.step_id}.data.${f.name}.options.${o}`] ?? r[`component.${view.handler}.selector.${f.name}.options.${o}`]
+            if (t) labels[o] = t
+          }
+          if (Object.keys(labels).length) f.option_labels = labels
+        }
+      }
+    }
+    if (view.errors) view.errors_text = Object.values(view.errors).map(c => fill(r[`${p}.error.${c}`]) ?? c)
+    if (view.type === 'abort' && view.reason) view.abort_text = fill(r[`${p}.abort.${view.reason}`]) ?? view.reason
+  } catch {}
+  return view
 }
 
 /** Flatten HA's raw config-flow result into what a form UI needs: one field

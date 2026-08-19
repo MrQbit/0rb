@@ -969,23 +969,28 @@
 
   // ── setup: a Home Assistant pairing flow, driven visually ──
   // Shared by the setup widget (agent-initiated) and Settings → Smart home.
+  function haPretty(s){ s=String(s||'').replace(/_/g,' '); return s.charAt(0).toUpperCase()+s.slice(1); }
   function haFlowForm(box, flow, integration, onFlow){
     box.innerHTML='';
     const f=flow||{};
     if(f.type==='create_entry'){ box.innerHTML=`<div class="ha-flow-done">✓ ${esc2(f.title||integration||'Integration')} is set up — devices appear shortly.</div>`; if(onFlow) onFlow(f); return; }
-    if(f.type==='abort'){ box.innerHTML=`<div class="ha-flow-abort">${f.reason==='already_configured'?'Already set up — nothing to do.':'Setup stopped: '+esc2(f.reason||'unknown')+'.'}</div>`; if(onFlow) onFlow(f); return; }
+    if(f.type==='abort'){ box.innerHTML=`<div class="ha-flow-abort">${esc2(f.abort_text||(f.reason==='already_configured'?'Already set up — nothing to do.':'Setup stopped: '+(f.reason||'unknown')+'.'))}</div>`; if(onFlow) onFlow(f); return; }
     if(f.type!=='form'||!f.flow_id){ box.innerHTML='<div class="set-muted small">Waiting on Home Assistant…</div>'; return; }
-    const head=document.createElement('div'); head.className='set-muted small'; head.textContent='Step: '+(f.step_id||'confirm'); box.appendChild(head);
-    if(f.errors){ const e=document.createElement('div'); e.className='ha-flow-err'; e.textContent=Object.entries(f.errors).map(([k,v])=>k==='base'?String(v):k+': '+v).join(' · '); box.appendChild(e); }
+    // Human strings from HA's translation catalog; prettified fallbacks.
+    if(f.step_title){ const h=document.createElement('div'); h.className='ha-flow-title'; h.textContent=f.step_title; box.appendChild(h); }
+    if(f.step_description){ const d=document.createElement('div'); d.className='set-muted small'; d.textContent=f.step_description; box.appendChild(d); }
+    if(f.errors){ const e=document.createElement('div'); e.className='ha-flow-err'; e.textContent=(f.errors_text&&f.errors_text.length?f.errors_text:Object.values(f.errors)).join(' · '); box.appendChild(e); }
     const inputs={};
     (f.fields||[]).forEach(fd=>{
       const row=document.createElement('label'); row.className='ha-flow-field';
-      const cap=document.createElement('span'); cap.textContent=fd.name.replace(/_/g,' ')+(fd.required?'':' (optional)'); row.appendChild(cap);
+      const cap=document.createElement('span'); cap.textContent=(fd.label||haPretty(fd.name))+(fd.required?'':' (optional)'); row.appendChild(cap);
       let inp;
-      if(fd.options&&fd.options.length){ inp=document.createElement('select'); fd.options.forEach(o=>{ const op=document.createElement('option'); op.value=o; op.textContent=o; inp.appendChild(op); }); }
+      if(fd.options&&fd.options.length){ inp=document.createElement('select'); fd.options.forEach(o=>{ const op=document.createElement('option'); op.value=o; op.textContent=(fd.option_labels&&fd.option_labels[o])||haPretty(o); inp.appendChild(op); }); }
       else if(fd.type==='boolean'){ inp=document.createElement('input'); inp.type='checkbox'; }
       else { inp=document.createElement('input'); inp.type=/code|token|password|secret|key/i.test(fd.name)?'password':(fd.type==='integer'?'number':'text'); inp.autocomplete='off'; }
-      row.appendChild(inp); box.appendChild(row); inputs[fd.name]={inp,fd};
+      row.appendChild(inp);
+      if(fd.help){ const h=document.createElement('span'); h.className='ha-flow-help'; h.textContent=fd.help; row.appendChild(h); }
+      box.appendChild(row); inputs[fd.name]={inp,fd};
     });
     const go=document.createElement('button'); go.className='set-btn'; go.textContent=(f.fields&&f.fields.length)?'Continue':'Confirm';
     go.onclick=async()=>{
@@ -1918,7 +1923,7 @@
     flows.innerHTML='';
     disc.forEach(f=>{
       const row=document.createElement('div'); row.className='set-item';
-      row.innerHTML=`<div class="grow"><div class="t">${esc(f.handler)}</div><div class="s">discovered${f.step_id?' · '+esc(f.step_id):''}</div></div>`;
+      row.innerHTML=`<div class="grow"><div class="t">${esc(f.title||f.handler)}</div><div class="s">found on your network</div></div>`;
       const setup=document.createElement('button'); setup.className='set-btn'; setup.textContent='Set up';
       const dismiss=document.createElement('button'); dismiss.className='set-btn ghost'; dismiss.textContent='Dismiss';
       const formBox=document.createElement('div'); formBox.className='ha-flow-box'; formBox.style.display='none';

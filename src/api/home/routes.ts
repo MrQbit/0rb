@@ -8,7 +8,7 @@
  */
 import {
   haEnabled, haStates, haCallService, HOME_DOMAINS, haJoinAreas, toDeviceCard,
-  haConfigEntries, haDiscoveredFlows, haFlowStart, haFlowAdvance, haFlowDismiss, normalizeFlowResult,
+  haConfigEntries, haDiscoveredFlows, haFlowStart, haFlowAdvance, haFlowDismiss, normalizeFlowResult, translateFlowView, haIntegrationName,
 } from '../connectors/homeAssistant.js'
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -92,7 +92,9 @@ export async function tryHandleHomeRoute(method: string, pathname: string, req: 
       const INTERNAL = new Set(['sun', 'analytics', 'backup', 'go2rtc', 'hassio', 'onboarding', 'hardware', 'usb',
         'shopping_list', 'google_translate', 'met', 'radio_browser', 'zone', 'person', 'update'])
       const visible = entries.filter(e => e.state !== 'loaded' || !INTERNAL.has(e.domain))
-      return jsonResponse(200, { configured: true, entries: visible, discovered })
+      // Human names for discovered handlers ("brother" → "Brother Printer").
+      const named = await Promise.all(discovered.map(async f => ({ ...f, title: await haIntegrationName(f.handler) })))
+      return jsonResponse(200, { configured: true, entries: visible, discovered: named })
     } catch (e) {
       return jsonResponse(200, { configured: true, reachable: false, error: (e as Error).message, entries: [], discovered: [] })
     }
@@ -106,19 +108,22 @@ export async function tryHandleHomeRoute(method: string, pathname: string, req: 
     const b = await readJson(req)
     const handler = String(b?.handler || '').trim().toLowerCase()
     if (!/^[a-z0-9_]+$/.test(handler)) return jsonResponse(400, { error: 'handler must be an integration id, e.g. roomba' })
-    try { return jsonResponse(200, { flow: normalizeFlowResult(await haFlowStart(handler)) }) }
+    try {
+      const view = normalizeFlowResult(await haFlowStart(handler)); view.handler ||= handler
+      return jsonResponse(200, { flow: await translateFlowView(view) })
+    }
     catch (e) { return jsonResponse(502, { error: (e as Error).message }) }
   }
   const fm = pathname.match(/^\/v1\/home\/flow\/([A-Za-z0-9]+)$/)
   if (fm && method === 'GET') {
     const { haFlowStatus } = await import('../connectors/homeAssistant.js')
-    try { return jsonResponse(200, { flow: normalizeFlowResult(await haFlowStatus(fm[1]!)) }) }
+    try { return jsonResponse(200, { flow: await translateFlowView(normalizeFlowResult(await haFlowStatus(fm[1]!))) }) }
     catch (e) { return jsonResponse(502, { error: (e as Error).message }) }
   }
   if (fm && method === 'POST') {
     const b = await readJson(req)
     const data = (b?.data && typeof b.data === 'object') ? b.data : {}
-    try { return jsonResponse(200, { flow: normalizeFlowResult(await haFlowAdvance(fm[1]!, data)) }) }
+    try { return jsonResponse(200, { flow: await translateFlowView(normalizeFlowResult(await haFlowAdvance(fm[1]!, data))) }) }
     catch (e) { return jsonResponse(502, { error: (e as Error).message }) }
   }
   if (fm && method === 'DELETE') {

@@ -39,7 +39,7 @@ import { vercelEnabled, deployToVercel } from '../connectors/vercel.js'
 import { cloudStorageEnabled, searchCloud, downloadCloudFile, connectedProviders } from '../connectors/cloudStorage.js'
 import { geocode, route as geoRoute, weather, reverseGeocode } from '../connectors/geo.js'
 import { webSearch, webSearchEnabled } from '../connectors/websearch.js'
-import { haConfig, haAreas, haCreateArea, haUpdateEntity, haAreaByEntity, haJoinAreas, toDeviceCard, prettyDomain, describeAttrs, haConfigEntries, haDiscoveredFlows, haFlowAdvance, haFlowStart, haEntityRegistry, normalizeFlowResult } from '../connectors/homeAssistant.js'
+import { haConfig, haAreas, haCreateArea, haUpdateEntity, haAreaByEntity, haJoinAreas, toDeviceCard, prettyDomain, describeAttrs, haConfigEntries, haDiscoveredFlows, haFlowAdvance, haFlowStart, haEntityRegistry, normalizeFlowResult, translateFlowView } from '../connectors/homeAssistant.js'
 import { dockerEnabled, dockerList, dockerControl } from '../connectors/dockerc.js'
 import { haEnabled, haStates, haResolve, haCallService, HOME_DOMAINS, type HaEntity } from '../connectors/homeAssistant.js'
 import { onlineOptions, nearbyStores } from '../connectors/shopping.js'
@@ -1260,9 +1260,10 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
         }
         // Every flow state also renders as a setup widget — the user sees the
         // form (or the success/abort state) on screen, not just chat prose.
+        const view = normalizeFlowResult(result); view.handler ||= handler
         emitWidget(ctx.sessionId, {
           id: `setup-${handler}`, type: 'setup',
-          title: `Set up ${handler}`, integration: handler, flow: normalizeFlowResult(result),
+          title: `Set up ${handler}`, integration: handler, flow: await translateFlowView(view),
         } as any)
         if (result?.type === 'create_entry') return `Done — ${handler} is set up ("${result.title || handler}"). Its devices will appear shortly. A setup card on screen confirms it.`
         if (result?.type === 'abort') return `${handler} setup aborted: ${result.reason || 'unknown'}. ${result.reason === 'already_configured' ? 'It is already set up.' : ''}`
