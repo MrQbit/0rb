@@ -2098,15 +2098,21 @@ async function getFallbackChainForModel(primaryModel: string): Promise<string[]>
   return buildFallbackChain(primaryModel, models)
 }
 
-// Probe the OpenAI-compatible backend's /models (30s cache, 3s timeout).
+// Probe the configured backend's /models (30s cache, 3s timeout). Works for
+// OpenAI-compatible endpoints and, with native headers, api.anthropic.com.
 let _openAiModelsCache: { ids: string[]; at: number } | null = null
 async function listOpenAiCompatModels(): Promise<string[]> {
-  const base = (process.env.OPENAI_BASE_URL || '').replace(/\/+$/, '')
+  const { isAnthropic } = await import('./core/anthropicAdapter.js')
+  const anthropic = isAnthropic()
+  const base = anthropic ? 'https://api.anthropic.com/v1' : (process.env.OPENAI_BASE_URL || '').replace(/\/+$/, '')
   if (!base) return []
   if (_openAiModelsCache && Date.now() - _openAiModelsCache.at < 30_000) return _openAiModelsCache.ids
   try {
     const headers: Record<string, string> = {}
-    if (process.env.OPENAI_API_KEY) headers.authorization = `Bearer ${process.env.OPENAI_API_KEY}`
+    if (anthropic) {
+      headers['x-api-key'] = process.env.OPENAI_API_KEY || ''
+      headers['anthropic-version'] = '2023-06-01'
+    } else if (process.env.OPENAI_API_KEY) headers.authorization = `Bearer ${process.env.OPENAI_API_KEY}`
     const res = await fetch(`${base}/models`, { headers, signal: AbortSignal.timeout(3000) })
     if (!res.ok) return _openAiModelsCache?.ids ?? []
     const data = (await res.json()) as { data?: Array<{ id?: string }> }

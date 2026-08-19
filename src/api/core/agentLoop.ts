@@ -11,6 +11,11 @@
  * caller sets OPENAI_BASE_URL / OPENAI_API_KEY / model for the turn.
  */
 
+import {
+  isAnthropic, anthropicEndpoint, anthropicHeaders, buildAnthropicBody,
+  parseAnthropicResponse, streamAnthropic,
+} from './anthropicAdapter.js'
+
 export interface LoopToolDef { name: string; description: string; input_schema: any }
 export interface LoopTools {
   list: () => LoopToolDef[]
@@ -65,14 +70,15 @@ function endpoint(): string {
   return `${base}/chat/completions`
 }
 
-function buildBody(state: LoopState, toolDefs: any[], stream: boolean): any {
-  // Reasoning-in-system-prompt models (Meta Muse Glimmer: low|medium|high|xhigh);
-  // inert plain text for models that don't recognize the directive.
+// Reasoning-in-system-prompt models (Meta Muse Glimmer: low|medium|high|xhigh);
+// inert plain text for models that don't recognize the directive.
+function systemPromptFor(state: LoopState): string {
   const strength = process.env.ORB2_REASONING_STRENGTH
-  const systemPrompt = strength
-    ? `Reasoning strength: ${strength}\n\n${state.systemPrompt}`
-    : state.systemPrompt
-  const messages = [{ role: 'system', content: systemPrompt }, ...state.messages]
+  return strength ? `Reasoning strength: ${strength}\n\n${state.systemPrompt}` : state.systemPrompt
+}
+
+function buildBody(state: LoopState, toolDefs: any[], stream: boolean): any {
+  const messages = [{ role: 'system', content: systemPromptFor(state) }, ...state.messages]
   return {
     model: state.model,
     messages,
@@ -157,13 +163,20 @@ export function createAgentLoop({ model, tools, permissions, settings = {}, hook
       let text = ''
       let toolCalls: any[] = []
       try {
-        const res = await fetch(endpoint(), {
+        // Anthropic keys/endpoints speak the native Messages API; everything
+        // else stays on OpenAI chat-completions. History is OpenAI-shaped
+        // either way — the adapter translates at the wire.
+        const anthropic = isAnthropic()
+        const body = anthropic
+          ? buildAnthropicBody({ model: state.model, system: systemPromptFor(state), history: state.messages, fnTools: toolDefs, stream })
+          : buildBody(state, toolDefs, stream)
+        const res = await fetch(anthropic ? anthropicEndpoint() : endpoint(), {
           method: 'POST',
-          headers: {
+          headers: anthropic ? anthropicHeaders() : {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${process.env.OPENAI_API_KEY || 'local'}`,
           },
-          body: JSON.stringify(buildBody(state, toolDefs, stream)),
+          body: JSON.stringify(body),
         })
         if (!res.ok) {
           const err = await res.text().catch(() => '')
@@ -172,13 +185,19 @@ export function createAgentLoop({ model, tools, permissions, settings = {}, hook
         }
 
         if (stream) {
-          const it = streamChat(res)
+          const it = anthropic ? streamAnthropic(res) : streamChat(res)
           let step = await it.next()
           while (!step.done) {
             yield { type: 'stream_event', text: step.value }
             step = await it.next()
           }
           const out = step.value as StreamResult
+          text = out.content
+          toolCalls = out.toolCalls
+          state.tokenUsage.input += out.usage.input
+          state.tokenUsage.output += out.usage.output
+        } else if (anthropic) {
+          const out = parseAnthropicResponse(await res.json())
           text = out.content
           toolCalls = out.toolCalls
           state.tokenUsage.input += out.usage.input

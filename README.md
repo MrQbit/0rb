@@ -54,8 +54,10 @@ Raspberry Pi) are in **[DEPLOYMENT.md](DEPLOYMENT.md)**.
   Glimmer 30B in a measured tool-use bake-off: **28/30 vs 16/30** correct
   calls, **3.7 s vs 19.4 s** median latency.
 - **Cloud:** set `OPENAI_BASE_URL` / `OPENAI_MODEL` / `OPENAI_API_KEY`
-  (Settings → System, or just ask the agent) for OpenRouter, OpenAI, or
-  Anthropic's OpenAI-compatible endpoint. Applies live.
+  (Settings → System, or just ask the agent) for OpenRouter, OpenAI, or the
+  **Anthropic API, spoken natively** — point the endpoint at
+  `https://api.anthropic.com` with an `sk-ant-…` key and a Claude model.
+  Applies live.
 - **Smart router (optional):** voice turns stay on the local brain for latency,
   hard turns go to a stronger cloud model (`ORB2_ROUTER_ENABLED=1` +
   `ORB2_OPENROUTER_KEY`).

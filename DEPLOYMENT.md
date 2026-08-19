@@ -61,8 +61,9 @@ at a hosted embedder) all work.
 Set in `.env`:
 
 ```ini
-# Brain → a cloud OpenAI-compatible endpoint (OpenRouter / OpenAI /
-# Anthropic's OpenAI-compatible endpoint — or your own GPU box):
+# Brain → a cloud endpoint: any OpenAI-compatible URL (OpenRouter / OpenAI /
+# your own GPU box), or the Anthropic API natively:
+#   OPENAI_BASE_URL=https://api.anthropic.com + an sk-ant-… key + a Claude model.
 OPENAI_BASE_URL=https://openrouter.ai/api/v1
 OPENAI_MODEL=<provider-model-id>
 OPENAI_API_KEY=<key>
@@ -85,8 +86,10 @@ You can also flip an existing install to a cloud brain at any time from
 - **Your own Spark over Tailscale** — run Mode 1 on your Spark, expose
   `:8888` on the tailnet, and point a second machine's `OPENAI_BASE_URL` at it.
 - **A GPU box / VPS** you rent, running the same vLLM image.
-- **A hosted provider** — OpenRouter, OpenAI, or Anthropic's
-  OpenAI-compatible endpoint. Pick a multimodal model if you want vision.
+- **A hosted provider** — OpenRouter, OpenAI, or the Anthropic API
+  (spoken natively — `https://api.anthropic.com` with an `sk-ant-…` key;
+  tool calls and vision are translated automatically). Pick a multimodal
+  model if you want vision.
 
 There is also a middle path on GPU boxes: the **smart router**
 (`ORB2_ROUTER_ENABLED=1` + `ORB2_OPENROUTER_KEY`) keeps voice turns on the

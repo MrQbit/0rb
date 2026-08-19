@@ -22,7 +22,8 @@ export function visionEnabled(): boolean {
 // to moondream when set to anything else. Either backend makes the tool show up.
 export function llmVisionEnabled(): boolean {
   const backend = (process.env.ORB2_VISION_BACKEND || '').toLowerCase()
-  return backend === 'llm' && !!process.env.OPENAI_BASE_URL
+  // An sk-ant- key with no base URL means the native Anthropic brain — vision-capable.
+  return backend === 'llm' && (!!process.env.OPENAI_BASE_URL || (process.env.OPENAI_API_KEY || '').startsWith('sk-ant-'))
 }
 export function visionToolAvailable(): boolean {
   return visionEnabled() || llmVisionEnabled()
@@ -31,8 +32,25 @@ export function visionToolAvailable(): boolean {
 async function captionViaLLM(frame: Frame, question: string): Promise<string> {
   const base = (process.env.OPENAI_BASE_URL || '').replace(/\/+$/, '')
   const model = process.env.OPENAI_MODEL || 'qwen3-coder-next'
-  const dataUri = `data:image/jpeg;base64,${Buffer.from(frame.jpeg).toString('base64')}`
+  const b64 = Buffer.from(frame.jpeg).toString('base64')
+  const dataUri = `data:image/jpeg;base64,${b64}`
   const prompt = question || 'Describe what you see in this image in 1-3 concise, factual sentences.'
+  // Native Anthropic brain: same caption via the Messages API image block.
+  const { isAnthropic, anthropicEndpoint, anthropicHeaders, parseAnthropicResponse } = await import('../core/anthropicAdapter.js')
+  if (isAnthropic()) {
+    const res = await fetch(anthropicEndpoint(), {
+      method: 'POST', headers: anthropicHeaders(),
+      body: JSON.stringify({
+        model, max_tokens: 300,
+        messages: [{ role: 'user', content: [
+          { type: 'text', text: prompt },
+          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } },
+        ] }],
+      }),
+    })
+    if (!res.ok) throw new Error(`LLM vision ${res.status}: ${(await res.text()).slice(0, 200)}`)
+    return parseAnthropicResponse(await res.json()).content.trim() || '(no result)'
+  }
   const headers: Record<string, string> = { 'content-type': 'application/json' }
   if (process.env.OPENAI_API_KEY) headers.authorization = `Bearer ${process.env.OPENAI_API_KEY}`
   const res = await fetch(`${base}/chat/completions`, {

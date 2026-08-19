@@ -2236,9 +2236,9 @@
     const el=$('#setBrainCfg'); if(!el)return;
     const base=s.OPENAI_BASE_URL||'';
     const isLocal = !base || /vllm|127\.0\.0\.1|localhost/.test(base);
-    el.innerHTML = `<p class="set-muted small">Can't run the model on this box? Point the brain at a cloud <strong>OpenAI-compatible</strong> endpoint (OpenAI, OpenRouter, Together, Groq…). Endpoint &amp; key changes take effect after a restart.</p>`+
-      `<div class="set-form"><input id="brEndpoint" type="text" placeholder="https://api.openai.com/v1" value="${esc(isLocal?'':base)}" style="flex:2;" /></div>`+
-      `<div class="set-form"><input id="brModel" type="text" placeholder="model id (e.g. gpt-4o)" value="${esc(s.OPENAI_MODEL||'')}" /><input id="brKey" type="password" placeholder="API key" autocomplete="off" /></div>`+
+    el.innerHTML = `<p class="set-muted small">Can't run the model on this box? Point the brain at a cloud endpoint — any <strong>OpenAI-compatible</strong> API (OpenAI, OpenRouter, Together, Groq…) or the <strong>Anthropic API</strong> natively: endpoint <code>https://api.anthropic.com</code>, an sk-ant-… key, and a Claude model. Endpoint &amp; key changes take effect after a restart.</p>`+
+      `<div class="set-form"><input id="brEndpoint" type="text" placeholder="https://api.openai.com/v1 or https://api.anthropic.com" value="${esc(isLocal?'':base)}" style="flex:2;" /></div>`+
+      `<div class="set-form"><input id="brModel" type="text" placeholder="model id (gpt-4o, claude-sonnet-4-6…)" value="${esc(s.OPENAI_MODEL||'')}" /><input id="brKey" type="password" placeholder="API key" autocomplete="off" /></div>`+
       `<div class="set-row" style="margin-top:8px;"><button id="brSave" class="set-btn">Use cloud brain</button><button id="brLocal" class="set-btn ghost">Reset to local</button></div>`+
       // ── Smart routing (cost optimizer) ──
       `<div style="border-top:1px solid var(--line);margin:16px 0 0;padding-top:12px;">`+

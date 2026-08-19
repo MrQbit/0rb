@@ -28,7 +28,7 @@ export function detectKey(pasteRaw: string): KeyMatch[] {
     return [{ setting: 'ORB2_OPENROUTER_KEY', service: 'OpenRouter', certain: true, note: 'Also usable as the cloud brain (OPENAI_API_KEY with https://openrouter.ai/api/v1).' }]
   }
   if (/^sk-ant-/.test(paste)) {
-    return [{ setting: 'OPENAI_API_KEY', service: 'Anthropic', certain: true, note: 'Pair with OPENAI_BASE_URL=https://api.anthropic.com/v1 and an Anthropic model id.' }]
+    return [{ setting: 'OPENAI_API_KEY', service: 'Anthropic', certain: true, note: 'Orb speaks the Anthropic API natively — set OPENAI_BASE_URL=https://api.anthropic.com and a Claude model id (e.g. claude-sonnet-4-6). The Settings model dropdown then lists the account\'s Claude models.' }]
   }
   if (/^sk-[A-Za-z0-9_-]{20,}$/.test(paste)) {
     return [{ setting: 'OPENAI_API_KEY', service: 'OpenAI', certain: true, note: 'Pair with OPENAI_BASE_URL=https://api.openai.com/v1.' }]
