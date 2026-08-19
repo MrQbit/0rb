@@ -43,35 +43,29 @@ services:
     environment:
       <<: *gpu-env
       NCCL_IGNORE_CPU_AFFINITY: "1"
-    # Brain = Meta Muse Glimmer 30B (dense, multimodal/vision, Apache 2.0),
-    # NVFP4 W4A4 quant — Blackwell-only kernels, ~25GB weights, per the
-    # official vLLM recipe (recipes.vllm.ai/meta-models/Muse-Glimmer-30B).
-    # Served ALSO under the legacy alias `qwen3-coder-next` so orb2-api
-    # (OPENAI_MODEL=qwen3-coder-next) keeps working without any change.
-    # Reasoning effort is set per-request via system prompt:
-    #   "Reasoning strength: low|medium|high|xhigh".
+    # Brain = Qwen3.8-27B (dense, multimodal/vision, Apache 2.0), NVFP4 quant
+    # for Blackwell. Chosen over Muse Glimmer 30B by a 30-trial tool-use
+    # bake-off on this box (2026-08-25): 28/30 vs 16/30 pass, 3.7s vs 19.4s
+    # median call latency, zero mangled tool names. Served ALSO under the
+    # legacy alias `qwen3-coder-next` so orb2-api keeps working unchanged.
     command:
       - vllm
       - serve
-      - Inferact/Muse-Glimmer-30B-NVFP4-W4A4
+      - unsloth/Qwen3.8-27B-NVFP4
       # Pinned so an upstream re-upload can't silently change the weights
-      # (that's how the old Qwen brain broke). Bump deliberately.
+      # (that's how the old Qwen3.6 brain broke). Bump deliberately.
       - --revision
-      - d35cb79050f419c457611b1cee5c5d15b176f285
+      - 7d6f8d4d72f56b92b3cdbf22f156b90e1bab0108
       - --served-model-name
-      - muse-glimmer
+      - qwen3.8
       - qwen3-coder-next
       - --enable-auto-tool-choice
-      # muse_glimmer parsers: tool-call + reasoning must run together (the
-      # reasoning parser preserves the channel markers the tool parser needs).
       - --tool-call-parser
-      - muse_glimmer
+      - qwen3_coder
       - --reasoning-parser
-      - muse_glimmer
+      - qwen3
       - --generation-config
       - auto
-      # DFlash speculative decoding (optional, faster, costs GPU memory):
-      #   --speculative-config '{"method":"dflash","model":"meta-models/Muse-Glimmer-30B-assistant","num_speculative_tokens":15}'
       - --max-model-len
       - "131072"
       # Trimmed from 0.8 to leave clear headroom for the voice models that run
@@ -329,13 +323,13 @@ services:
       LLM_ENDPOINT: http://vllm:8888/v1
       LLM_KEY: local
       LLM_MODEL: qwen3-coder-next
-      # Keep the conversational orb snappy. Two mechanisms, both harmless where
-      # not understood: ORB2_DISABLE_THINKING sends the Qwen-style
-      # chat_template_kwargs.enable_thinking=false; ORB2_REASONING_STRENGTH
-      # prepends "Reasoning strength: <v>" to the system prompt, which is how
-      # Muse Glimmer (the current brain) is steered (low|medium|high|xhigh).
+      # Keep the conversational orb snappy. ORB2_DISABLE_THINKING sends the
+      # Qwen-style chat_template_kwargs.enable_thinking=false (native for the
+      # Qwen3.8 brain). ORB2_REASONING_STRENGTH ("Reasoning strength: <v>"
+      # system-prompt line) is the Muse Glimmer mechanism — leave unset here;
+      # set it if you point the stack back at a Glimmer brain.
       ORB2_DISABLE_THINKING: "1"
-      ORB2_REASONING_STRENGTH: "low"
+      ORB2_REASONING_STRENGTH: ""
       # Generous output ceiling — with the 131072 window there's no truncation
       # tradeoff; this is just a sane upper bound (16384 ≈ a very long reply).
       ORB2_MAX_OUTPUT_TOKENS: "16384"
