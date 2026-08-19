@@ -451,7 +451,7 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
     },
     {
       name: 'AirPlay',
-      description: "See and use AirPlay speakers & TVs found DIRECTLY on the network — no Home Assistant setup needed (covers devices HA doesn't know). op:'list' shows every AirPlay device (and network printer) the LAN bridge sees. op:'say' {device, text} speaks a message on a speaker (TTS, e.g. \"tell the living room dinner is ready\"). op:'play' {device, url} streams an audio URL (internet radio, a music file). op:'stop' stops playback; op:'volume' {device, level:0-100}. Refer to devices by name (e.g. 'living room'). Prefer the Home tool when the device IS in Home Assistant (richer control); use AirPlay for devices that aren't, or when Home fails.",
+      description: "The DEFAULT way to speak or play audio on speakers & TVs: AirPlay devices found DIRECTLY on the network, zero setup (works even for devices Home Assistant doesn't know). op:'list' shows every AirPlay device (and network printer) the LAN bridge sees. op:'say' {device, text} speaks a message on a speaker (TTS, e.g. \"tell the living room dinner is ready\"). op:'play' {device, url} streams an audio URL (internet radio, a music file). op:'stop' stops playback; op:'volume' {device, level:0-100}. Refer to devices by name (e.g. 'living room'). PREFER this over the Home tool for playback/announcements; fall back to Home (HA) only for what AirPlay can't do — TV power/inputs, media browsing, grouped scenes.",
       input_schema: { type: 'object', properties: {
         op: { type: 'string', enum: ['list', 'say', 'play', 'stop', 'volume'] },
         device: { type: 'string', description: "Speaker/TV name (fuzzy matched), e.g. 'living room'." },
@@ -947,9 +947,14 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
         if (!players.length) return 'No media players found.'
         for (const e of players.slice(0, 4)) {
           const pic = e.attributes.entity_picture
+          // Say WHAT the device is: a Sonos named "Living Room" and a TV in
+          // the Living Room area are indistinguishable by name alone.
+          const dc = String(e.attributes.device_class || '').toLowerCase()
+          const kind = dc === 'tv' || /\btv\b/i.test(e.name) ? 'TV' : dc === 'receiver' ? 'receiver' : 'speaker'
+          const title = e.area && e.name.toLowerCase() === String(e.area).toLowerCase() ? `${e.name} ${kind}` : e.name
           emitWidget(ctx.sessionId, {
-            id: `media-${e.entity_id}`, type: 'media', title: e.name,
-            entity_id: e.entity_id, name: e.name, area: e.area, state: e.state,
+            id: `media-${e.entity_id}`, type: 'media', title,
+            entity_id: e.entity_id, name: e.name, kind, area: e.area, state: e.state,
             media_title: e.attributes.media_title, app: e.attributes.app_name,
             volume: e.attributes.volume_level != null ? Math.round(e.attributes.volume_level * 100) : undefined,
             artwork: pic ? `/v1/home/ha-image?path=${encodeURIComponent(pic)}` : undefined,
@@ -1263,7 +1268,14 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
         const [entries, flows] = await Promise.all([haConfigEntries(), haDiscoveredFlows()])
         const bad = entries.filter(e => e.state !== 'loaded')
         let out = 'Installed: ' + entries.map(e => `${e.title} (${e.domain}${e.state !== 'loaded' ? ` — ${e.state}` : ''})`).join(' · ')
-        if (flows.length) out += `\nDISCOVERED, awaiting setup: ${flows.map(f => f.handler).join(', ')} — use op:'pair' {integration:'<handler>'} to set one up.`
+        if (flows.length) {
+          // Direct-first: don't push HA pairing for devices the bridge already serves.
+          const COVERED = new Set(['ipp', 'brother', 'apple_tv'])
+          const needSetup = flows.filter(f => !COVERED.has(f.handler))
+          const covered = flows.filter(f => COVERED.has(f.handler))
+          if (needSetup.length) out += `\nDISCOVERED, awaiting setup: ${needSetup.map(f => f.handler).join(', ')} — use op:'pair' {integration:'<handler>'} to set one up.`
+          if (covered.length) out += `\nAlready usable directly (AirPlay/Print tools, no HA setup needed): ${covered.map(f => f.handler).join(', ')} — pair in HA only if the user wants deep control (ink levels, queues).`
+        }
         if (bad.length) out += `\nProblems: ${bad.map(e => `${e.domain} is ${e.state}`).join('; ')}.`
         return out
       }

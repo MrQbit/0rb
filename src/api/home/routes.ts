@@ -93,7 +93,16 @@ export async function tryHandleHomeRoute(method: string, pathname: string, req: 
         'shopping_list', 'google_translate', 'met', 'radio_browser', 'zone', 'person', 'update'])
       const visible = entries.filter(e => e.state !== 'loaded' || !INTERNAL.has(e.domain))
       // Human names for discovered handlers ("brother" → "Brother Printer").
-      const named = await Promise.all(discovered.map(async f => ({ ...f, title: await haIntegrationName(f.handler) })))
+      // Direct-first policy: devices the LAN bridge already covers (printers,
+      // AirPlay audio) are marked so the UI can say "works already — HA setup
+      // is optional deep control", keeping HA free of noise.
+      const { bridgeEnabled } = await import('../connectors/bridge.js')
+      const COVERED: Record<string, string> = bridgeEnabled()
+        ? { ipp: 'printing works directly', brother: 'printing works directly', apple_tv: 'audio streaming works directly' }
+        : {}
+      const named = await Promise.all(discovered.map(async f => ({
+        ...f, title: await haIntegrationName(f.handler), covered: COVERED[f.handler] ?? null,
+      })))
       return jsonResponse(200, { configured: true, entries: visible, discovered: named })
     } catch (e) {
       return jsonResponse(200, { configured: true, reachable: false, error: (e as Error).message, entries: [], discovered: [] })

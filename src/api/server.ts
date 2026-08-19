@@ -1687,13 +1687,16 @@ function handleStatus(ctx: RuntimeContext): Response {
   })
 }
 
-function handleInfo(ctx: RuntimeContext): Response {
+async function handleInfo(ctx: RuntimeContext): Promise<Response> {
   const ownerToken = process.env.ORB2_OWNER_TOKEN?.trim()
+  // Registered per-device hostname (real LE cert on :9444), when enrolled.
+  const deviceHost = await ctx.store.getKv('devicecert:hostname').catch(() => null)
   return jsonResponse(200, {
     agent_id: ctx.agentId,
     instance_id: getRelayReporter()?.getInstanceId() || null,
     version: process.env.ORB2_API_VERSION || 'dev',
     public_url: process.env.ORB2_PUBLIC_URL || null,
+    device_url: deviceHost ? `https://${deviceHost}:${process.env.ORB2_DEVICE_TLS_PORT || '9444'}` : null,
     auth_required: (process.env.ORB2_API_AUTH_REQUIRED ?? '0') === '1',
     single_user: process.env.ORB2_API_AUTH_REQUIRED !== '1',
     owner_token_hint: ownerToken ? ownerToken.slice(-4) : null,

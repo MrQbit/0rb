@@ -17,7 +17,7 @@
   <header id="topbar">
     <div class="left">
       <img class="brandlogo-r" src="/web/assets/orb2-logo.svg" alt="orb2" />
-      <span class="wordmark"><b>0</b>rb</span>
+      <span class="wordmark"><b>0</b>rb<sup class="sq">2</sup></span>
       <span id="liveDot" class="status-dot"></span>
     </div>
     <div class="right">
@@ -41,8 +41,7 @@
     </header>
     <div class="set-body">
       <nav class="set-nav">
-        <button class="set-navi active" data-sec="access"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.6 7.6a5.5 5.5 0 1 1-7.8 7.8 5.5 5.5 0 0 1 7.8-7.8zm0 0L19 3.4M15 7l2 2"/></svg>Access</button>
-        <button class="set-navi" data-sec="users"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>Allowed users</button>
+        <button class="set-navi active" data-sec="users"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>Users</button>
         <button class="set-navi" data-sec="channels"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Channels</button>
         <button class="set-navi" data-sec="voice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3"/></svg>Voice &amp; vision</button>
         <button class="set-navi" data-sec="smarthome"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/></svg>Smart home</button>
@@ -52,27 +51,8 @@
         <button class="set-navi" data-sec="system"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="14" height="14" rx="2"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/><circle cx="12" cy="12" r="2.5"/></svg>System</button>
       </nav>
       <div class="set-content">
-        <!-- Access -->
-        <div class="set-sec active" data-sec="access">
-          <h3>Remote access</h3>
-          <p class="set-muted">Reach orb2 from any device on your tailnet — with camera &amp; mic.</p>
-          <div class="set-card">
-            <div class="set-kv"><span>Tailscale</span><span id="tsState" class="set-muted small">Checking…</span></div>
-            <div class="set-row" id="tsUrlRow" style="display:none;"><a id="setPublicUrl" target="_blank" rel="noopener" class="set-url">—</a><button id="setCopyUrl" class="set-btn ghost">Copy</button></div>
-            <!-- Connect (shown when not connected) -->
-            <div id="tsConnect" class="set-form" style="display:none;margin-top:8px;">
-              <input id="tsAuthKey" type="password" placeholder="Auth key (tskey-auth-…)" autocomplete="off" />
-              <button id="tsUpBtn" class="set-btn">Connect</button>
-            </div>
-            <p id="tsHelp" class="set-muted small" style="display:none;margin-top:6px;">Generate a key at <a href="https://login.tailscale.com/admin/settings/keys" target="_blank" rel="noopener">login.tailscale.com</a> → <em>Generate auth key</em>. The orb joins your tailnet and serves itself over HTTPS.</p>
-            <!-- Disconnect (shown when connected) -->
-            <button id="tsDownBtn" class="set-btn ghost" style="display:none;margin-top:8px;">Disconnect</button>
-            <div id="tsMsg" class="set-muted small" style="margin-top:6px;"></div>
-          </div>
-          <div class="set-card"><div class="set-kv"><span>Local HTTPS</span><code id="setLanUrl">—</code></div><p class="set-muted small">Self-signed — accept the cert once for camera/mic on the LAN.</p></div>
-        </div>
         <!-- Users -->
-        <div class="set-sec" data-sec="users">
+        <div class="set-sec active" data-sec="users">
           <h3>Allowed users</h3>
           <p class="set-muted">Who can sign in. A code is sent by email, and by Telegram if a chat id is set.</p>
           <div class="set-card">
@@ -98,10 +78,17 @@
           <div id="setVoice" class="set-list"><div class="set-muted">Loading…</div></div>
           <p class="set-muted small">The orb listens (Whisper), thinks (the model), and speaks (Orpheus — expressive). Vision is handled by the multimodal model from your camera frames.</p>
         </div>
-        <!-- Smart home: Home Assistant status, integrations, device setup -->
+        <!-- Smart home: direct devices first, Home Assistant for deep control -->
         <div class="set-sec" data-sec="smarthome">
           <h3>Smart home</h3>
-          <p class="set-muted">Home Assistant runs inside the stack and powers every device the orb controls.</p>
+          <p class="set-muted">Speakers, TVs and printers work <strong>directly</strong> — nothing to set up. Home Assistant adds deep control for lights, locks, climate and everything else.</p>
+          <h4 class="set-h4">On your network — ready now</h4>
+          <div id="bridgeWrap" style="display:none;">
+            <div id="bridgeDevices" class="set-list"></div>
+            <p class="set-muted small">Ask the orb to speak or play music on a speaker, or to print — these need no setup at all.</p>
+          </div>
+          <div id="bridgeEmpty" class="set-muted small" style="display:none;">Looking for AirPlay devices and printers…</div>
+          <h4 class="set-h4">Home Assistant — deep control</h4>
           <div class="set-card">
             <div class="set-row"><span class="pill-dot" id="haDot"></span><div class="info-label" style="color:var(--ink);">Home Assistant</div><span id="haState" class="set-muted small"></span></div>
             <div class="set-row" style="margin-top:8px;">
@@ -129,11 +116,6 @@
           <div id="haAddForm"></div>
           <h4 class="set-h4">Devices</h4>
           <div id="haDevices" class="set-list"><div class="set-muted">Loading…</div></div>
-          <div id="bridgeWrap" style="display:none;">
-            <h4 class="set-h4">Directly on your network</h4>
-            <p class="set-muted small">AirPlay speakers, TVs and printers the orb reaches directly — nothing to set up. Ask the orb to speak or play music on a speaker, or print to a printer.</p>
-            <div id="bridgeDevices" class="set-list"></div>
-          </div>
         </div>
         <!-- Apps: searchable widget registry -->
         <div class="set-sec" data-sec="apps">
@@ -256,6 +238,24 @@
         <div class="set-sec" data-sec="system">
           <h3>System</h3>
           <p class="set-muted">The brain + the services that power orb2.</p>
+          <h4 class="set-h4">Remote access</h4>
+          <div class="set-card">
+            <div class="set-kv"><span>Tailscale</span><span id="tsState" class="set-muted small">Checking…</span></div>
+            <div class="set-row" id="tsUrlRow" style="display:none;"><a id="setPublicUrl" target="_blank" rel="noopener" class="set-url">—</a><button id="setCopyUrl" class="set-btn ghost">Copy</button></div>
+            <div id="tsConnect" class="set-form" style="display:none;margin-top:8px;">
+              <input id="tsAuthKey" type="password" placeholder="Auth key (tskey-auth-…)" autocomplete="off" />
+              <button id="tsUpBtn" class="set-btn">Connect</button>
+            </div>
+            <p id="tsHelp" class="set-muted small" style="display:none;margin-top:6px;">Generate a key at <a href="https://login.tailscale.com/admin/settings/keys" target="_blank" rel="noopener">login.tailscale.com</a> → <em>Generate auth key</em>. The orb joins your tailnet and serves itself over HTTPS.</p>
+            <button id="tsDownBtn" class="set-btn ghost" style="display:none;margin-top:8px;">Disconnect</button>
+            <div id="tsMsg" class="set-muted small" style="margin-top:6px;"></div>
+          </div>
+          <div class="set-card" id="devUrlCard" style="display:none;">
+            <div class="set-kv"><span>Device URL</span><a id="setDeviceUrl" target="_blank" rel="noopener" class="set-url">—</a></div>
+            <p class="set-muted small">This box's registered name with a real certificate — works on your home network (its address points at this house's LAN).</p>
+          </div>
+          <div class="set-card"><div class="set-kv"><span>Local HTTPS</span><code id="setLanUrl">—</code></div><p class="set-muted small">Self-signed — accept the cert once for camera/mic on the LAN.</p></div>
+          <h4 class="set-h4">Services</h4>
           <div id="setSystem" class="set-list"><div class="set-muted">Loading…</div></div>
           <details class="apps-conn" style="margin-top:14px;"><summary>Brain endpoint (run in the cloud)</summary>
             <div class="set-card" id="setBrainCfg"><div class="set-muted small">Loading…</div></div>
@@ -283,7 +283,7 @@
   <!-- chat panel (grows from the orb) -->
   <section id="panel" aria-label="chat">
     <div class="panel-head">
-      <div class="title"><b>0</b>rb <span id="brandModel" style="color:var(--ink-dim);font-size:11px;"></span></div>
+      <div class="title"><span class="brand"><b>0</b>rb<sup class="sq">2</sup></span> <span id="brandModel" style="color:var(--ink-dim);font-size:11px;"></span></div>
       <button class="panel-x" id="panelClose" aria-label="Collapse"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
     </div>
     <div id="messages"><div class="empty-hint">Ask me anything — or tap the orb to talk.</div></div>

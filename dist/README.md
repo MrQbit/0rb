@@ -96,6 +96,11 @@ Home Assistant ships in the stack and 0rb treats it as a backend:
 - **Watch the house** — house modes (home / away / night), arrival routines,
   instant safety alerts (smoke, water, locks), and device-health checks, all
   mode-aware so you're not spammed.
+- **Beyond HA: the LAN bridge** — AirPlay speakers/TVs and network (IPP)
+  printers are discovered and used **directly**: speak or stream audio on any
+  AirPlay device, print without drivers — zero setup, even for devices Home
+  Assistant doesn't know. The bridge also advertises the console over mDNS so
+  the native apps find the server automatically.
 
 ### Household
 

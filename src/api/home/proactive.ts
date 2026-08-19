@@ -135,6 +135,12 @@ async function checkDiscoveries(): Promise<void> {
   for (const [native, twins] of Object.entries(GENERIC_TWINS)) {
     if (handlers.has(native)) for (const t of twins) handlers.delete(t)
   }
+  // Direct-first policy: devices the LAN bridge already serves (printers,
+  // AirPlay audio) work with zero setup — don't nag the owner to ALSO pair
+  // them in HA. They stay visible in Settings → Smart home, quietly.
+  const { bridgeEnabled } = await import('../connectors/bridge.js')
+  if (bridgeEnabled()) for (const covered of ['ipp', 'brother', 'apple_tv']) handlers.delete(covered)
+  if (!handlers.size) return
   const what = [...handlers].map(nice).join(' and ')
   const first = [...handlers][0] || fresh[0]!.handler
   await notifyOwner(`I spotted something new on the network: ${what}. Want me to set it up? Just ask — e.g. "set up the ${first === 'webostv' ? 'TV' : first}".`)

@@ -444,7 +444,9 @@
     presentWidget(wpos, w, hGuess, place.scroll);
     // drag the widget by its header
     let d=null;
-    head.addEventListener('pointerdown',(e)=>{ if(e.target===x)return; d={sx:e.clientX,sy:e.clientY,ox:wpos.x,oy:wpos.y}; head.setPointerCapture(e.pointerId); });
+    // NOTE: the click lands on the svg INSIDE the button, so a strict
+    // `e.target===x` check misses and setPointerCapture eats the click.
+    head.addEventListener('pointerdown',(e)=>{ if(x.contains(e.target))return; d={sx:e.clientX,sy:e.clientY,ox:wpos.x,oy:wpos.y}; head.setPointerCapture(e.pointerId); });
     head.addEventListener('pointermove',(e)=>{ if(!d)return; wpos.x=d.ox+(e.clientX-d.sx); wpos.y=d.oy+(e.clientY-d.sy); wg.style.left=wpos.x+'px'; wg.style.top=wpos.y+'px'; });
     head.addEventListener('pointerup',()=>{ d=null; growWidgetCanvas(); });
     // lifecycle bookkeeping: track interaction so idle widgets can pill/stop
@@ -760,7 +762,7 @@
     else art.innerHTML=homeIcon('media_player');
     wrap.appendChild(art);
     const meta=document.createElement('div'); meta.className='meta';
-    meta.innerHTML=`<div class="now">${esc2(spec.media_title||spec.state||'idle')}</div><div class="src">${esc2([spec.app,spec.area].filter(Boolean).join(' · ')||spec.name||'')}</div>`;
+    meta.innerHTML=`<div class="now">${esc2(spec.media_title||spec.state||'idle')}</div><div class="src">${esc2([spec.kind,spec.area,spec.app].filter(Boolean).join(' · ')||spec.name||'')}</div>`;
     wrap.appendChild(meta);
     const ctl=document.createElement('div'); ctl.className='ctl';
     const btn=(label,action,title)=>{ const b=document.createElement('button'); b.className='wg-med-btn'; b.innerHTML=label; b.title=title;
@@ -1923,8 +1925,8 @@
     flows.innerHTML='';
     disc.forEach(f=>{
       const row=document.createElement('div'); row.className='set-item';
-      row.innerHTML=`<div class="grow"><div class="t">${esc(f.title||f.handler)}</div><div class="s">found on your network</div></div>`;
-      const setup=document.createElement('button'); setup.className='set-btn'; setup.textContent='Set up';
+      row.innerHTML=`<div class="grow"><div class="t">${esc(f.title||f.handler)}</div><div class="s">${f.covered?esc(f.covered)+' — HA setup is optional (deep control only)':'found on your network'}</div></div>`;
+      const setup=document.createElement('button'); setup.className=f.covered?'set-btn ghost':'set-btn'; setup.textContent='Set up';
       const dismiss=document.createElement('button'); dismiss.className='set-btn ghost'; dismiss.textContent='Dismiss';
       const formBox=document.createElement('div'); formBox.className='ha-flow-box'; formBox.style.display='none';
       setup.onclick=async()=>{
@@ -1971,14 +1973,15 @@
   }
   // Devices the LAN bridge reaches directly (AirPlay + IPP) — independent of HA.
   async function loadBridgeDevices(){
-    const wrap=$('#bridgeWrap'), list=$('#bridgeDevices');
+    const wrap=$('#bridgeWrap'), list=$('#bridgeDevices'), empty=$('#bridgeEmpty');
     if(!wrap) return;
     let d=null;
     try{ d=await (await fetch('/v1/bridge/devices',{credentials:'same-origin'})).json(); }catch{}
-    if(!d||!d.enabled){ wrap.style.display='none'; return; }
-    const rows=[...(d.speakers||[]).map(s=>({name:s.name, sub:(s.model||'AirPlay')+' · speaker', state:'ready'})),
-                ...(d.printers||[]).map(p=>({name:p.name, sub:'printer · '+p.address, state:'ready'}))];
+    if(!d||!d.enabled){ wrap.style.display='none'; if(empty){ empty.style.display=''; empty.textContent='The LAN bridge is not running — direct device access is off.'; } return; }
+    const rows=[...(d.speakers||[]).map(s=>({name:s.name, sub:(s.model||'AirPlay')+' · speak & play music', state:'ready'})),
+                ...(d.printers||[]).map(p=>({name:p.name, sub:'printer · print directly', state:'ready'}))];
     wrap.style.display=rows.length?'':'none';
+    if(empty) empty.style.display=rows.length?'none':'';
     list.innerHTML='';
     rows.forEach(r=>{
       const it=document.createElement('div'); it.className='set-item';
@@ -2022,6 +2025,11 @@
       conn.style.display = (s && s.available===false) ? 'none' : 'flex';
       help.style.display = (s && s.available===false) ? 'none' : 'block';
     }
+    // Registered device URL (real cert), when this box is enrolled.
+    try{ const info=await (await fetch('/v1/info',{credentials:'same-origin'})).json();
+      if(info.device_url){ const c=$('#devUrlCard'), a=$('#setDeviceUrl');
+        if(c&&a){ c.style.display=''; a.textContent=info.device_url.replace(/^https:\/\//,''); a.href=info.device_url; } }
+    }catch{}
   }
   async function tailscaleUp(){
     const key=($('#tsAuthKey').value||'').trim(); const msg=$('#tsMsg');
