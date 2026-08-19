@@ -1429,12 +1429,23 @@
   function renderCalendar(body, spec){
     const now=new Date();
     const ym=(spec.month||'').match(/^(\d{4})-(\d{2})/);
-    const year=ym?+ym[1]:now.getFullYear(), mon=ym?(+ym[2]-1):now.getMonth();
+    let year=ym?+ym[1]:now.getFullYear(), mon=ym?(+ym[2]-1):now.getMonth();
+    const off=spec._monthOffset|0;
+    if(off){ const d=new Date(year,mon+off,1); year=d.getFullYear(); mon=d.getMonth(); }
     const events=(spec.events||[]).reduce((m,e)=>{ const d=(e.date||'').slice(0,10); (m[d]=m[d]||[]).push(e); return m; },{});
     const c=document.createElement('div'); c.className='wg-cal';
     const first=new Date(year,mon,1), days=new Date(year,mon+1,0).getDate(), pad=first.getDay();
     const head=document.createElement('div'); head.className='wg-cal-head';
-    head.textContent=first.toLocaleString(undefined,{month:'long',year:'numeric'}); c.appendChild(head);
+    const nav=(txt,delta,label)=>{ const b=document.createElement('button'); b.className='wg-cal-nav'; b.setAttribute('aria-label',label);
+      b.innerHTML=txt;
+      b.onclick=()=>{ body.innerHTML=''; renderCalendar(body,{...spec,_monthOffset:off+delta}); };
+      return b; };
+    head.appendChild(nav('<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>',-1,'Previous month'));
+    const title=document.createElement('span'); title.textContent=first.toLocaleString(undefined,{month:'long',year:'numeric'});
+    if(off){ title.style.cursor='pointer'; title.title='Back to this month'; title.onclick=()=>{ body.innerHTML=''; renderCalendar(body,{...spec,_monthOffset:0}); }; }
+    head.appendChild(title);
+    head.appendChild(nav('<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>',1,'Next month'));
+    c.appendChild(head);
     const grid=document.createElement('div'); grid.className='wg-cal-grid';
     // Locale weekday labels (Sunday-first grid; 2023-01-01 was a Sunday).
     for(let i=0;i<7;i++){ const h=document.createElement('div'); h.className='wg-cal-dow';

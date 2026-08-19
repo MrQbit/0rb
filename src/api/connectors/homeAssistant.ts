@@ -139,6 +139,41 @@ export async function haFlowStatus(flowId: string): Promise<any> {
   return await haFetch(`/config/config_entries/flow/${flowId}`)
 }
 
+/**
+ * Compact behaviour digest from HA history: for each on/off-style entity,
+ * the hours of day when it typically turns ON (last `days` days). Feeds the
+ * agent's automation suggestions — data prep here, reasoning in the model.
+ */
+export async function haPatternDigest(days = 7): Promise<string> {
+  const entities = (await haStates(['light', 'switch', 'media_player', 'lock', 'climate'])).slice(0, 25)
+  if (!entities.length) return 'No devices to analyze.'
+  const start = new Date(Date.now() - days * 86_400_000).toISOString()
+  const ids = entities.map(e => e.entity_id).join(',')
+  let hist: any[]
+  try {
+    hist = (await haFetch(`/history/period/${start}?filter_entity_id=${encodeURIComponent(ids)}&minimal_response&no_attributes`)) as any[]
+  } catch (e) { return `History unavailable: ${(e as Error).message}` }
+  const lines: string[] = []
+  for (const series of hist ?? []) {
+    if (!Array.isArray(series) || !series.length) continue
+    const id = series[0].entity_id
+    const name = entities.find(e => e.entity_id === id)?.name || id
+    const onHours: number[] = []
+    for (const point of series) {
+      const st = String(point.state)
+      if (['on', 'playing', 'unlocked', 'heat', 'cool'].includes(st) && point.last_changed) {
+        onHours.push(new Date(point.last_changed).getHours())
+      }
+    }
+    if (onHours.length < 3) continue
+    const hist24 = new Array(24).fill(0)
+    for (const h of onHours) hist24[h]++
+    const peaks = hist24.map((c, h) => ({ h, c })).filter(x => x.c >= 2).sort((a, b) => b.c - a.c).slice(0, 3)
+    if (peaks.length) lines.push(`${name}: activates around ${peaks.map(p => `${p.h}:00 (${p.c}x)`).join(', ')} over ${days}d`)
+  }
+  return lines.length ? lines.join('\n') : 'Not enough activity history yet to find patterns.'
+}
+
 /** Create (or replace) an automation via HA's config API. */
 export async function haCreateAutomation(autoId: string, body: Record<string, any>): Promise<void> {
   await haFetch(`/config/automation/config/${autoId}`, { method: 'POST', body: JSON.stringify(body) })
