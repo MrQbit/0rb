@@ -188,9 +188,37 @@ export async function requestOtp(store: Store, emailRaw: string, via: 'email' | 
     else log.warn('otp_telegram_no_chat', { email })
   } else {
     sent = await sendCodeEmail(email, code)
+    // No SMTP (or it failed): fall back to the hosted OTP relay so a fresh
+    // install has working sign-in email with zero configuration. The relay
+    // (orb2.app, Resend behind it) can only send this one template. Opt out
+    // with ORB2_OTP_RELAY_URL="".
+    if (!sent) sent = await sendCodeViaRelay(email, code)
   }
   if (!sent) log.warn('otp_unsent_logging_code', { email, via, code, hint: 'configure ORB2_SMTP_* / map a Telegram chat id to deliver codes' })
   return { ok: true, sent, allowed: true }
+}
+
+/** Deliver a code through the hosted OTP relay (Resend on orb2.app). */
+async function sendCodeViaRelay(to: string, code: string): Promise<boolean> {
+  const url = process.env.ORB2_OTP_RELAY_URL ?? 'https://orb2.app/api/otp-send'
+  if (!url) return false
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ to, code }),
+      signal: AbortSignal.timeout(10_000),
+    })
+    if (!res.ok) {
+      log.warn('otp_relay_failed', { status: res.status, body: (await res.text().catch(() => '')).slice(0, 120) })
+      return false
+    }
+    log.info('otp_relay_sent', { to })
+    return true
+  } catch (err) {
+    log.warn('otp_relay_error', { error: (err as Error).message })
+    return false
+  }
 }
 
 /** Deliver a code over Telegram to a mapped chat id. */
