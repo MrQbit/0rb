@@ -910,3 +910,15 @@ body {
 .role-badge { font-size:9px; text-transform:uppercase; letter-spacing:.6px; padding:2px 7px; border-radius:6px;
   background:rgba(255,255,255,.06); color:var(--ink-dim); vertical-align:middle; margin-left:4px; }
 .role-badge.owner { background:rgba(118,185,0,.14); color:var(--nv-bright); }
+
+/* ── Home Assistant pairing flow — settings inline form + the setup widget ── */
+.ha-flow-box { margin:6px 0 10px; padding:12px 14px; background:rgba(255,255,255,.03); border:1px solid var(--line); border-radius:12px; display:flex; flex-direction:column; gap:8px; }
+.wg-setup { display:flex; flex-direction:column; gap:8px; }
+.ha-flow-field { display:flex; flex-direction:column; gap:4px; }
+.ha-flow-field > span { font-size:11px; text-transform:capitalize; color:var(--ink-dim); letter-spacing:.3px; }
+.ha-flow-field input[type=text], .ha-flow-field input[type=password], .ha-flow-field input[type=number], .ha-flow-field select {
+  background:rgba(255,255,255,.05); border:1px solid var(--line); border-radius:10px; padding:9px 12px; color:var(--ink); font:inherit; font-size:13px; outline:none; }
+.ha-flow-field input:focus, .ha-flow-field select:focus { border-color:var(--nv); }
+.ha-flow-err { color:#ff9b9b; font-size:12px; }
+.ha-flow-done { color:var(--nv-bright); font-size:13px; }
+.ha-flow-abort { color:var(--ink-dim); font-size:13px; }

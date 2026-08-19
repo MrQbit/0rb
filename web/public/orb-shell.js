@@ -392,6 +392,7 @@
     else if(spec.type==='home'){ wg.style.width='560px'; wg.style.height='480px'; }
     else if(spec.type==='document'){ wg.style.width='560px'; wg.style.height='520px'; }
     else if(spec.type==='wallet'){ wg.style.width='380px'; wg.style.height='420px'; }
+    else if(spec.type==='setup'){ wg.style.width='360px'; }
     else if(spec.type==='lights'){ wg.style.width='400px'; wg.style.height='460px'; }
     else if(spec.type==='media'){ wg.style.width='380px'; wg.style.height='320px'; }
     else if(spec.type==='climate'){ wg.style.width='300px'; wg.style.height='300px'; }
@@ -609,6 +610,7 @@
     else if(spec.type==='familyboard') renderFamilyBoard(body, spec);
     else if(spec.type==='briefing') renderBriefing(body, spec);
     else if(spec.type==='housemode') renderHouseMode(body, spec);
+    else if(spec.type==='setup') renderSetup(body, spec, wg);
     else if(_plugins[spec.type]) renderPlugin(body, spec, _plugins[spec.type]);
     else {
       // Freshly-minted custom widget? (CreateWidget installs plugins at
@@ -963,6 +965,50 @@
       };
       wrap.appendChild(b);
     });
+  }
+
+  // ── setup: a Home Assistant pairing flow, driven visually ──
+  // Shared by the setup widget (agent-initiated) and Settings → Smart home.
+  function haFlowForm(box, flow, integration, onFlow){
+    box.innerHTML='';
+    const f=flow||{};
+    if(f.type==='create_entry'){ box.innerHTML=`<div class="ha-flow-done">✓ ${esc2(f.title||integration||'Integration')} is set up — devices appear shortly.</div>`; if(onFlow) onFlow(f); return; }
+    if(f.type==='abort'){ box.innerHTML=`<div class="ha-flow-abort">${f.reason==='already_configured'?'Already set up — nothing to do.':'Setup stopped: '+esc2(f.reason||'unknown')+'.'}</div>`; if(onFlow) onFlow(f); return; }
+    if(f.type!=='form'||!f.flow_id){ box.innerHTML='<div class="set-muted small">Waiting on Home Assistant…</div>'; return; }
+    const head=document.createElement('div'); head.className='set-muted small'; head.textContent='Step: '+(f.step_id||'confirm'); box.appendChild(head);
+    if(f.errors){ const e=document.createElement('div'); e.className='ha-flow-err'; e.textContent=Object.entries(f.errors).map(([k,v])=>k==='base'?String(v):k+': '+v).join(' · '); box.appendChild(e); }
+    const inputs={};
+    (f.fields||[]).forEach(fd=>{
+      const row=document.createElement('label'); row.className='ha-flow-field';
+      const cap=document.createElement('span'); cap.textContent=fd.name.replace(/_/g,' ')+(fd.required?'':' (optional)'); row.appendChild(cap);
+      let inp;
+      if(fd.options&&fd.options.length){ inp=document.createElement('select'); fd.options.forEach(o=>{ const op=document.createElement('option'); op.value=o; op.textContent=o; inp.appendChild(op); }); }
+      else if(fd.type==='boolean'){ inp=document.createElement('input'); inp.type='checkbox'; }
+      else { inp=document.createElement('input'); inp.type=/code|token|password|secret|key/i.test(fd.name)?'password':(fd.type==='integer'?'number':'text'); inp.autocomplete='off'; }
+      row.appendChild(inp); box.appendChild(row); inputs[fd.name]={inp,fd};
+    });
+    const go=document.createElement('button'); go.className='set-btn'; go.textContent=(f.fields&&f.fields.length)?'Continue':'Confirm';
+    go.onclick=async()=>{
+      const data={};
+      for(const [name,io] of Object.entries(inputs)){
+        let v=io.inp.type==='checkbox'?io.inp.checked:io.inp.value;
+        if(v===''&&!io.fd.required) continue;
+        if(io.fd.type==='integer'&&v!=='') v=Number(v);
+        data[name]=v;
+      }
+      go.disabled=true; go.textContent='Working…';
+      try{
+        const r=await fetch('/v1/home/flow/'+encodeURIComponent(f.flow_id),{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({data})});
+        const j=await r.json().catch(()=>({}));
+        if(!r.ok){ toast(j.error||'Failed'); go.disabled=false; go.textContent='Continue'; return; }
+        haFlowForm(box, j.flow, integration, onFlow);
+      }catch{ toast('Failed'); go.disabled=false; go.textContent='Continue'; }
+    };
+    box.appendChild(go);
+  }
+  function renderSetup(body, spec, wg){
+    const wrap=document.createElement('div'); wrap.className='wg-setup'; body.appendChild(wrap);
+    haFlowForm(wrap, spec.flow, spec.integration, f=>{ if(wg&&wg._spec) wg._spec.flow=f; });
   }
 
   // ── briefing: the day at a glance ──
@@ -1831,6 +1877,102 @@
     loadTailscale();
     loadUsers(); loadChannels(); loadVoiceVision();
     loadCapabilities(); loadFiles(); loadIntegrations(); loadSystem(); loadApps();
+    loadSmartHome();
+    $('#haAddStart')?.addEventListener('click', haStartAdd);
+  }
+
+  // ── Smart home: HA status + integrations + pending setup + devices ──
+  async function loadSmartHome(){
+    const dot=$('#haDot'), state=$('#haState'), open=$('#haOpen'), tokForm=$('#haTokenForm');
+    const entries=$('#haEntries'), flowsWrap=$('#haFlowsWrap'), flows=$('#haFlows'), devs=$('#haDevices');
+    if(!dot) return;
+    open.href=`http://${location.hostname}:8123`;
+    let d=null;
+    try{ d=await (await fetch('/v1/home/integrations',{credentials:'same-origin'})).json(); }catch{}
+    if(!d||!d.configured){
+      dot.className='pill-dot'; state.textContent='Not connected';
+      tokForm.style.display=''; open.style.display='none'; flowsWrap.style.display='none';
+      entries.innerHTML='<div class="set-muted">Connect Home Assistant to see integrations and devices.</div>';
+      devs.innerHTML='<div class="set-muted">—</div>';
+      $('#haTokenSave').onclick=async()=>{
+        const t=($('#haToken').value||'').trim(); if(!t){ toast('Paste a token first'); return; }
+        try{
+          const r=await fetch('/v1/settings',{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({ORB2_HA_TOKEN:t})});
+          if(r.ok){ $('#haToken').value=''; toast('Connected — loading…'); setTimeout(loadSmartHome,800); }
+          else toast(r.status===403?'Owner only':'Failed');
+        }catch{ toast('Failed'); }
+      };
+      return;
+    }
+    tokForm.style.display='none'; open.style.display='';
+    if(d.reachable===false){
+      dot.className='pill-dot err'; state.textContent='Configured, but unreachable — '+(d.error||'check the service');
+      entries.innerHTML='<div class="set-muted">—</div>'; devs.innerHTML='<div class="set-muted">—</div>'; flowsWrap.style.display='none';
+      return;
+    }
+    dot.className='pill-dot ok';
+    const list=d.entries||[], disc=d.discovered||[];
+    state.textContent=`Connected · ${list.length} integration${list.length===1?'':'s'}`;
+    // Discovered-but-unconfigured: each row opens the real pairing form inline.
+    flowsWrap.style.display=disc.length?'':'none';
+    flows.innerHTML='';
+    disc.forEach(f=>{
+      const row=document.createElement('div'); row.className='set-item';
+      row.innerHTML=`<div class="grow"><div class="t">${esc(f.handler)}</div><div class="s">discovered${f.step_id?' · '+esc(f.step_id):''}</div></div>`;
+      const setup=document.createElement('button'); setup.className='set-btn'; setup.textContent='Set up';
+      const dismiss=document.createElement('button'); dismiss.className='set-btn ghost'; dismiss.textContent='Dismiss';
+      const formBox=document.createElement('div'); formBox.className='ha-flow-box'; formBox.style.display='none';
+      setup.onclick=async()=>{
+        formBox.style.display=''; formBox.innerHTML='<div class="set-muted small">Loading…</div>';
+        try{
+          const r=await fetch('/v1/home/flow/'+encodeURIComponent(f.flow_id),{credentials:'same-origin'});
+          const j=await r.json();
+          haFlowForm(formBox, j.flow, f.handler, fl=>{ if(fl&&fl.type==='create_entry') setTimeout(loadSmartHome,1200); });
+        }catch{ formBox.innerHTML='<div class="set-muted small">Failed to load the setup form.</div>'; }
+      };
+      dismiss.onclick=async()=>{
+        try{ await fetch('/v1/home/flow/'+encodeURIComponent(f.flow_id),{method:'DELETE',credentials:'same-origin'}); toast('Dismissed'); loadSmartHome(); }catch{ toast('Failed'); }
+      };
+      const btns=document.createElement('div'); btns.className='set-row'; btns.appendChild(setup); btns.appendChild(dismiss);
+      row.appendChild(btns); flows.appendChild(row); flows.appendChild(formBox);
+    });
+    entries.innerHTML=list.length?'':'<div class="set-muted">No integrations yet.</div>';
+    list.sort((a,b)=>String(a.title).localeCompare(String(b.title))).forEach(e=>{
+      const ok=e.state==='loaded';
+      const row=document.createElement('div'); row.className='set-item';
+      row.innerHTML=`<div class="grow"><div class="t">${esc(e.title||e.domain)}</div><div class="s">${esc(e.domain)}</div></div>`+
+        `<span class="set-muted small${ok?' ok-text':''}">${ok?'active':esc(e.state)}</span>`;
+      entries.appendChild(row);
+    });
+    // Devices — the clean set the orb actually controls, grouped by area.
+    devs.innerHTML='<div class="set-muted">Loading…</div>';
+    try{
+      const dd=await (await fetch('/v1/home/devices',{credentials:'same-origin'})).json();
+      const cards=dd.devices||[];
+      devs.innerHTML=cards.length?'':'<div class="set-muted">No devices yet — set up an integration above.</div>';
+      const byArea={};
+      cards.forEach(c=>{ (byArea[c.area||'Elsewhere']=byArea[c.area||'Elsewhere']||[]).push(c); });
+      Object.keys(byArea).sort().forEach(area=>{
+        const h=document.createElement('div'); h.className='set-muted small'; h.style.margin='8px 0 2px'; h.textContent=area; devs.appendChild(h);
+        byArea[area].forEach(c=>{
+          const row=document.createElement('div'); row.className='set-item';
+          row.innerHTML=`<div class="grow"><div class="t">${esc(c.name)}</div><div class="s">${esc(c.kind||c.domain||'')}</div></div>`+
+            `<span class="set-muted small">${esc(c.state||'')}</span>`;
+          devs.appendChild(row);
+        });
+      });
+    }catch{ devs.innerHTML='<div class="set-muted">Could not load devices.</div>'; }
+  }
+  async function haStartAdd(){
+    const name=($('#haAddName').value||'').trim().toLowerCase(); const box=$('#haAddForm');
+    if(!name){ toast('Name an integration, e.g. roomba'); return; }
+    box.innerHTML='<div class="set-muted small">Starting…</div>';
+    try{
+      const r=await fetch('/v1/home/flow/start',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({handler:name})});
+      const j=await r.json();
+      if(!r.ok){ box.innerHTML=''; toast(j.error||'Failed — is that the integration id?'); return; }
+      haFlowForm(box, j.flow, name, fl=>{ if(fl&&fl.type==='create_entry') setTimeout(loadSmartHome,1200); });
+    }catch{ box.innerHTML=''; toast('Failed'); }
   }
 
   // ── Access: live Tailscale status + connect/disconnect ──

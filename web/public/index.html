@@ -45,6 +45,7 @@
         <button class="set-navi" data-sec="users"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>Allowed users</button>
         <button class="set-navi" data-sec="channels"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Channels</button>
         <button class="set-navi" data-sec="voice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3"/></svg>Voice &amp; vision</button>
+        <button class="set-navi" data-sec="smarthome"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/></svg>Smart home</button>
         <button class="set-navi" data-sec="apps"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Apps</button>
         <button class="set-navi" data-sec="files"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Files</button>
         <button class="set-navi" data-sec="integrations"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7V3M15 7V3M9 21v-4M15 21v-4M5 7h14v6a5 5 0 0 1-5 5h-4a5 5 0 0 1-5-5z"/></svg>Integrations</button>
@@ -96,6 +97,38 @@
           <h3>Voice &amp; vision</h3>
           <div id="setVoice" class="set-list"><div class="set-muted">Loading…</div></div>
           <p class="set-muted small">The orb listens (Whisper), thinks (the model), and speaks (Orpheus — expressive). Vision is handled by the multimodal model from your camera frames.</p>
+        </div>
+        <!-- Smart home: Home Assistant status, integrations, device setup -->
+        <div class="set-sec" data-sec="smarthome">
+          <h3>Smart home</h3>
+          <p class="set-muted">Home Assistant runs inside the stack and powers every device the orb controls.</p>
+          <div class="set-card">
+            <div class="set-row"><span class="pill-dot" id="haDot"></span><div class="info-label" style="color:var(--ink);">Home Assistant</div><span id="haState" class="set-muted small"></span></div>
+            <div class="set-row" style="margin-top:8px;">
+              <a id="haOpen" class="set-btn ghost" target="_blank" rel="noopener" style="display:none;">Open Home Assistant →</a>
+            </div>
+            <div id="haTokenForm" style="display:none;">
+              <p class="set-muted small">Paste a long-lived access token (Home Assistant → your profile → Security → Long-lived access tokens) — or just paste it into chat and the orb files it for you.</p>
+              <div class="set-form">
+                <input id="haToken" type="password" placeholder="Long-lived access token" style="flex:2;" autocomplete="off" />
+                <button id="haTokenSave" class="set-btn">Connect</button>
+              </div>
+            </div>
+          </div>
+          <div id="haFlowsWrap" style="display:none;">
+            <h4 class="set-h4">Found on your network</h4>
+            <p class="set-muted small">Devices Home Assistant discovered that aren't set up yet.</p>
+            <div id="haFlows" class="set-list"></div>
+          </div>
+          <h4 class="set-h4">Installed integrations</h4>
+          <div id="haEntries" class="set-list"><div class="set-muted">Loading…</div></div>
+          <div class="set-form" style="margin-top:8px;">
+            <input id="haAddName" type="text" placeholder="Add an integration, e.g. roomba" autocomplete="off" />
+            <button id="haAddStart" class="set-btn ghost">Set up</button>
+          </div>
+          <div id="haAddForm"></div>
+          <h4 class="set-h4">Devices</h4>
+          <div id="haDevices" class="set-list"><div class="set-muted">Loading…</div></div>
         </div>
         <!-- Apps: searchable widget registry -->
         <div class="set-sec" data-sec="apps">

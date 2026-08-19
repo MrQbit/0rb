@@ -192,6 +192,41 @@ export async function haFlowStart(handler: string): Promise<any> {
   })
 }
 
+export interface FlowField { name: string; type: string; required: boolean; options?: string[] }
+export interface FlowView {
+  type: 'form' | 'create_entry' | 'abort' | 'unknown'
+  flow_id?: string
+  handler?: string
+  step_id?: string
+  title?: string
+  reason?: string
+  errors?: Record<string, string>
+  fields?: FlowField[]
+  placeholders?: Record<string, string>
+}
+
+/** Flatten HA's raw config-flow result into what a form UI needs: one field
+ *  list with types/required/options, plus step + error state. */
+export function normalizeFlowResult(raw: any): FlowView {
+  const type = (['form', 'create_entry', 'abort'].includes(raw?.type) ? raw.type : 'unknown') as FlowView['type']
+  const view: FlowView = { type, flow_id: raw?.flow_id, handler: raw?.handler, step_id: raw?.step_id }
+  if (raw?.title) view.title = String(raw.title)
+  if (raw?.reason) view.reason = String(raw.reason)
+  if (raw?.errors && Object.keys(raw.errors).length) view.errors = raw.errors
+  if (raw?.description_placeholders && Object.keys(raw.description_placeholders).length) view.placeholders = raw.description_placeholders
+  if (type === 'form') {
+    // 'expandable'/'section' are schema groupings (advanced options), not
+    // inputs — HA applies their defaults when omitted, so don't render them.
+    view.fields = (raw.data_schema || []).filter((f: any) => f?.name && !['expandable', 'section', 'constant'].includes(f.type)).map((f: any) => {
+      const field: FlowField = { name: String(f.name), type: String(f.type || 'string'), required: !!f.required }
+      const opts = f.selector && typeof f.selector === 'object' ? f.selector.select?.options : undefined
+      if (Array.isArray(opts)) field.options = opts.map((o: any) => String(typeof o === 'object' ? o.value : o))
+      return field
+    })
+  }
+  return view
+}
+
 export interface HaArea { area_id: string; name: string }
 export interface HaRegistryEntry {
   entity_id: string
