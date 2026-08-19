@@ -4,7 +4,7 @@ Directive: alternate loops until 3 consecutive clean checks EACH.
 Commit locally, DO NOT push. One change at a time, tested, deployed.
 
 ## Loop A — feature research (house-AI gaps → build with widgets)
-Clean checks: 0/3 (A9 found+built: device-health watch)
+Clean checks: 1/3 (iteration 10 sweep: all software-buildable categories covered; leftovers need hardware — energy metering — or unconnected accounts — package tracking via Gmail)
 Done:
 - A1 morning briefing (buildBriefing + Today widget + ORB2_BRIEFING_TIME) e20deef
 - A2 staple auto-reorder (every_days recurrence + revive sweep + nudge + ↻ badge) dfd9775
@@ -21,7 +21,7 @@ medication reminders, package tracking, meal planning, sleep sounds,
 guest mode, vacation mode, plant care, pet feeding, laundry timer flow.
 
 ## Loop B — UI scrutiny (details: every widget/button/icon/motion)
-Clean checks: 0/3
+Clean checks: 1/3 (iteration 10: code-inspectable list exhausted; pill telemetry / orb mic states / drag-overlap feel need a live browser — flagged for the owner's morning review)
 Done:
 - B1 SVG close buttons + resize grip cue b400e78
 - B2 stacking toasts (no more lost messages) dfd9775
