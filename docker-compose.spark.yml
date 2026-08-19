@@ -310,6 +310,11 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    # Device TLS: the api's own HTTPS listener (per-device Let's Encrypt
+    # cert at <id>.device.orb2.app). Host 9443 belongs to nginx, so the
+    # device-TLS listener publishes on 9444.
+    ports:
+      - "9444:9443"
     # Home Assistant runs with host networking (see above), so the api
     # reaches it through the host gateway rather than a service name.
     extra_hosts:
@@ -349,6 +354,14 @@ services:
       # service was retired. ORB2_VISION_URL is left unset; to fall back, re-add
       # the vision service and set ORB2_VISION_BACKEND=moondream + ORB2_VISION_URL.
       ORB2_VISION_BACKEND: "${ORB2_VISION_BACKEND:-llm}"
+      # Console shell for standalone serving (device TLS / no nginx).
+      ORB2_API_WEB_DIR: /opt/orb2/web
+      # Per-device HTTPS via the hosted device-DNS relay (all from .env).
+      ORB2_DEVICE_DOMAIN: "${ORB2_DEVICE_DOMAIN:-}"
+      ORB2_BROKER_URL: "${ORB2_BROKER_URL:-}"
+      ORB2_ENROLL_SECRET: "${ORB2_ENROLL_SECRET:-}"
+      ORB2_ACME_PRODUCTION: "${ORB2_ACME_PRODUCTION:-1}"
+      ORB2_DEVICE_LAN_IP: "${ORB2_DEVICE_LAN_IP:-}"
       # Smart home — Home Assistant (Home tool + dashboard + watcher).
       # URL defaults to the compose homeassistant service via the host
       # gateway; the token comes from .env after HA's first-run onboarding.

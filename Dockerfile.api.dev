@@ -20,6 +20,8 @@ RUN chown orb2:orb2 /home/orb2/.orb2/settings.json
 
 # API bundle
 COPY dist/api.mjs /opt/orb2/api.mjs
+# Console shell — lets the api serve the full app standalone (device TLS).
+COPY web/public/ /opt/orb2/web/
 
 # Skills (markdown definitions loaded at runtime)
 COPY dist/skills/ /opt/orb2/skills/

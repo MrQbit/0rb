@@ -1,7 +1,7 @@
 {
   "name": "0rb",
   "version": "0.1.25",
-  "description": "0rb — a self-hosted personal AI agent (the orb2 engine) for any LLM: local Ollama/vLLM, OpenAI, Gemini, and 200+ models via OpenRouter",
+  "description": "0rb \u2014 a self-hosted personal AI agent (the orb2 engine) for any LLM: local Ollama/vLLM, OpenAI, Gemini, and 200+ models via OpenRouter",
   "type": "module",
   "files": [
     "dist/api.mjs",
@@ -26,8 +26,6 @@
     "@anthropic-ai/foundry-sdk": "0.2.3",
     "@anthropic-ai/sdk": "0.95.1",
     "@commander-js/extra-typings": "12.1.0",
-    "@grpc/grpc-js": "^1.14.3",
-    "@grpc/proto-loader": "^0.8.0",
     "@mendable/firecrawl-js": "4.18.1",
     "@modelcontextprotocol/sdk": "1.29.0",
     "@opentelemetry/api": "1.9.1",

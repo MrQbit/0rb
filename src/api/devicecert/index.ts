@@ -112,7 +112,9 @@ export async function ensureDeviceCert(store: Store): Promise<DeviceCert | null>
     }
 
     // Keep the A record pointed at our current LAN IP (best-effort).
-    const ip = detectLanIp()
+    // In a container, auto-detection sees the bridge interface, not the LAN —
+    // operators set ORB2_DEVICE_LAN_IP (compose passes it from .env).
+    const ip = (process.env.ORB2_DEVICE_LAN_IP || '').trim() || detectLanIp()
     if (ip) { try { await setA(id, ip) } catch (e) { log.warn('devicecert_setA_failed', { error: (e as Error).message }) } }
 
     // Reuse a still-valid cert.

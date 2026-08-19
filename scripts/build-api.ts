@@ -331,14 +331,7 @@ if (!result.success) {
   process.exit(1)
 }
 
-// Copy the .proto descriptor alongside the bundle — the API server
-// transitively imports gRPC types from the same source tree.
 import { mkdirSync, copyFileSync, cpSync, readdirSync, rmSync } from 'fs'
-mkdirSync('./proto', { recursive: true })
-if (existsSync('./src/proto/orb2.proto')) {
-  mkdirSync('./proto', { recursive: true })
-  copyFileSync('./src/proto/orb2.proto', './proto/orb2.proto')
-}
 
 // SPA was extracted into the orb2-ui repo in v0.3.0. When src/web/ is
 // still present (during the split transition, or for local single-pod
@@ -381,4 +374,3 @@ if (existsSyncPre('./dist/canvas-worker.mjs')) {
 if (existsSyncPre('./dist/web')) {
   console.log(`✓ Copied SPA → dist/web/ (legacy single-pod mode)`)
 }
-console.log(`✓ Copied proto descriptor → proto/orb2.proto`)
