@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach } from 'bun:test'
+import { describe, test, expect, beforeEach, afterAll } from 'bun:test'
 import { cosine, foldCentroid, getProfile, observeUtterance, speakerContextLine, ENROLL_MIN, type SpeakerCheck } from './speakerid.ts'
 
 function makeMemStore() {
@@ -26,6 +26,10 @@ beforeEach(() => {
   // Point at nothing — tests inject embeddings by monkeypatching fetch.
   process.env.ORB2_STT_URL = 'http://stt.test'
 })
+
+// Restore the real fetch after this file — later suites do real network calls.
+const REAL_FETCH = globalThis.fetch
+afterAll(() => { globalThis.fetch = REAL_FETCH })
 
 function mockEmbed(vec: number[]) {
   globalThis.fetch = (async () =>
