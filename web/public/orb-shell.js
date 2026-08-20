@@ -2306,6 +2306,7 @@
     $('#setLanUrl').textContent = `https://${location.hostname}:9443`;
     $('#setCopyUrl').addEventListener('click',()=>{ navigator.clipboard?.writeText($('#setPublicUrl').textContent); toast('Copied'); });
     $('#setUserAdd').addEventListener('click', addUser);
+  $('#setUserInvite')&&$('#setUserInvite').addEventListener('click', makeInvite);
     $('#setMcpAdd').addEventListener('click', addMcp);
     $('#tsUpBtn')?.addEventListener('click', tailscaleUp);
     $('#tsDownBtn')?.addEventListener('click', tailscaleDown);
@@ -2665,7 +2666,7 @@
     return `<div class="app-card${needsSetup?' dim':''}" data-search="${esc(search)}">
       <div class="app-ic">${BRAND_SVG[w.id]||BRAND_SVG[w.provider]||esc(w.icon||'▢')}</div>
       <div class="app-meta"><div class="app-name">${esc(w.name)} <span class="app-cat">${esc(w.category)}</span></div>
-        <div class="app-desc">${esc(needsSetup ? (w.note||w.desc) : w.desc)}</div></div>
+        <div class="app-desc" title="${esc(needsSetup ? (w.note||w.desc) : w.desc)}">${esc(needsSetup ? (w.note||w.desc) : w.desc)}</div></div>
       ${action}
     </div>`;
   }
@@ -2999,8 +3000,11 @@
       list.innerHTML='';
       us.forEach((u,i)=>{ const it=document.createElement('div'); it.className='set-item';
         const role=u.role||(i===0?'owner':'member');
-        it.innerHTML=`<div class="grow"><div class="t">${esc(u.email)}${u.label?` · <span class="set-muted">${esc(u.label)}</span>`:''} <span class="role-badge${role==='owner'?' owner':''}">${esc(role)}</span></div>`+
-          `<div class="s">${u.telegram_chat_id?'Telegram: '+esc(u.telegram_chat_id):'email only'}${u.person_entity?' · presence: '+esc(u.person_entity):''}</div></div>`;
+        const dispName=[u.first_name,u.last_name].filter(Boolean).join(' ')||u.label||u.email.split('@')[0];
+        const initials=esc((dispName||'?').split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase());
+        it.innerHTML=`<span class="avatar"><img src="/v1/profile/avatar?email=${encodeURIComponent(u.email)}" alt="" onerror="this.remove()"/><i>${initials}</i></span>`+
+          `<div class="grow"><div class="t">${esc(dispName)} <span class="role-badge${role==='owner'?' owner':''}">${esc(role)}</span></div>`+
+          `<div class="s">${esc(u.email)}${u.telegram_chat_id?' · Telegram':''}${u.person_entity?' · presence: '+esc(u.person_entity):''}</div></div>`;
         const rl=document.createElement('button'); rl.className='set-btn ghost'; rl.textContent=role==='owner'?'Make member':'Make owner';
         rl.onclick=async()=>{
           const r=await fetch('/v1/auth/users',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({email:u.email,role:role==='owner'?'member':'owner'})});
@@ -3019,6 +3023,49 @@
             const d=await (await fetch('/v1/members/'+encodeURIComponent(u.email)+'/profile',{credentials:'same-origin'})).json();
             panel.innerHTML='';
             const sec=(t)=>{ const h=document.createElement('div'); h.className='set-h4'; h.style.paddingLeft='0'; h.textContent=t; panel.appendChild(h); };
+            // ── Profile (name + picture) ──
+            sec('Profile');
+            const pf=document.createElement('div'); pf.className='set-form';
+            const fn=document.createElement('input'); fn.placeholder='First name'; fn.value=u.first_name||'';
+            const ln=document.createElement('input'); ln.placeholder='Last name'; ln.value=u.last_name||'';
+            const psave=document.createElement('button'); psave.className='set-btn'; psave.textContent='Save';
+            psave.onclick=async()=>{ const r=await fetch('/v1/profile',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({email:u.email,first_name:fn.value,last_name:ln.value})});
+              if(r.ok){ toast('Profile saved'); loadUsers(); } else toast((await r.json().catch(()=>({}))).error||'Failed'); };
+            pf.append(fn,ln,psave); panel.appendChild(pf);
+            const av=document.createElement('div'); av.className='set-row';
+            const upl=document.createElement('button'); upl.className='set-btn ghost'; upl.textContent='Set picture';
+            upl.onclick=()=>{ const fi=document.createElement('input'); fi.type='file'; fi.accept='image/*';
+              fi.onchange=()=>{ const f=fi.files&&fi.files[0]; if(!f) return;
+                const img=new Image(); img.onload=async()=>{
+                  const c=document.createElement('canvas'); const S=256; c.width=S; c.height=S;
+                  const g=c.getContext('2d'); const m=Math.min(img.width,img.height);
+                  g.drawImage(img,(img.width-m)/2,(img.height-m)/2,m,m,0,0,S,S);
+                  const data=c.toDataURL('image/jpeg',0.85);
+                  const r=await fetch('/v1/profile/avatar',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({email:u.email,data})});
+                  if(r.ok){ toast('Picture set'); loadUsers(); } else toast((await r.json().catch(()=>({}))).error||'Failed');
+                }; img.src=URL.createObjectURL(f); };
+              fi.click(); };
+            av.appendChild(upl); panel.appendChild(av);
+            // ── Apps this member can use (owner-controlled) ──
+            sec('Apps');
+            if(role==='owner'){
+              const n=document.createElement('div'); n.className='set-muted small'; n.textContent='Owners always have full access.'; panel.appendChild(n);
+            } else {
+              try{
+                const apps=(await (await fetch('/v1/profile/apps',{credentials:'same-origin'})).json()).apps||[];
+                const off=new Set(u.disabled_apps||[]);
+                apps.forEach(a=>{
+                  const row=document.createElement('div'); row.className='set-row';
+                  row.innerHTML=`<div class="grow"><div class="t" style="font-size:12.5px;">${esc(a.label)}</div><div class="s set-muted small">${esc(a.desc)}</div></div>`;
+                  const sw=document.createElement('button'); sw.className='set-switch'+(off.has(a.id)?'':' on'); sw.innerHTML='<span class="knob"></span>';
+                  sw.onclick=async()=>{ if(off.has(a.id)) off.delete(a.id); else off.add(a.id);
+                    const r=await fetch('/v1/profile',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({email:u.email,disabled_apps:[...off]})});
+                    if(r.ok){ sw.classList.toggle('on'); u.disabled_apps=[...off]; }
+                    else { if(off.has(a.id)) off.delete(a.id); else off.add(a.id); toast((await r.json().catch(()=>({}))).error||'Owner-only'); } };
+                  row.appendChild(sw); panel.appendChild(row);
+                });
+              }catch{}
+            }
             sec('What Orb knows');
             const mem=document.createElement('div'); mem.className='member-mem';
             mem.textContent=d.memory&&d.memory.trim()?d.memory.slice(0,1200):'Nothing saved yet — Orb will note durable personal facts as it learns them.';
@@ -3050,6 +3097,17 @@
       });
     }catch{ list.innerHTML='<div class="set-muted">Failed to load.</div>'; }
   }
+  async function makeInvite(){
+    const msg=$('#setUserMsg');
+    try{
+      const d=await (await fetch('/v1/invites',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:'{}'})).json();
+      if(!d.url){ msg.textContent=d.error||'Owner-only.'; return; }
+      msg.innerHTML='Invite link (7 days, one use): <code style="user-select:all;word-break:break-all;">'+esc(d.url)+'</code> ';
+      const cp=document.createElement('button'); cp.className='set-btn ghost'; cp.textContent='Copy';
+      cp.onclick=()=>{ navigator.clipboard&&navigator.clipboard.writeText(d.url); toast('Copied'); };
+      msg.appendChild(cp);
+    }catch{ msg.textContent='Failed.'; }
+  }
   async function addUser(){
     const email=$('#setUserEmail').value.trim(), tg=$('#setUserTg').value.trim(), label=$('#setUserLabel').value.trim(), msg=$('#setUserMsg');
     if(!email){ msg.textContent='Email required.'; return; } msg.textContent='Saving…';
@@ -3077,19 +3135,23 @@
     const wa=document.createElement('div'); wa.className='set-card';
     wa.innerHTML=`<div class="set-row"><span class="pill-dot" id="waDot"></span><div class="info-label" style="color:var(--ink);">WhatsApp</div><span class="set-muted small" id="waState">checking…</span></div>`+
       `<p class="set-muted small">On your phone: WhatsApp ▸ Linked devices ▸ Link a device, then scan:</p>`+
-      `<div id="waQrWrap" style="display:none;"><img id="waQr" alt="WhatsApp QR" style="width:200px;border-radius:12px;background:#fff;padding:8px;display:block;"/></div>`+
+      `<div id="waQrWrap" style="display:none;"><img id="waQr" alt="WhatsApp QR" style="width:200px;border-radius:12px;background:#fff;padding:8px;display:block;"/>`+
+      `<div id="waWait" class="set-muted small" style="margin-top:8px;">Waiting for you to scan — the code refreshes by itself and stays valid.</div></div>`+
       `<div class="set-row" style="margin-top:8px;"><button class="set-btn ghost" id="waLink">Show QR</button></div>`;
     list.appendChild(wa);
-    const startWa=()=>{ $('#waQrWrap').style.display='block'; $('#waLink').textContent='Refreshing…'; bumpWaQr(); if(waPoll)clearInterval(waPoll); waPoll=setInterval(()=>{ bumpWaQr(); refreshWa(); },4000); };
+    const startWa=()=>{ $('#waQrWrap').style.display='block'; $('#waLink').style.display='none'; bumpWaQr(); if(waPoll)clearInterval(waPoll); waPoll=setInterval(()=>{ bumpWaQr(); refreshWa(); },4000); };
     $('#waLink').addEventListener('click', startWa);
     refreshWa(startWa);
   }
-  function bumpWaQr(){ const i=$('#waQr'); if(i) i.src='/v1/whatsapp/qr?t='+Date.now(); }
+  function bumpWaQr(){ const i=$('#waQr'); if(!i) return;
+    i.onerror=()=>{ const w=$('#waWait'); if(w) w.textContent='No QR from the bridge right now — it may be restarting; this retries automatically.'; };
+    i.onload=()=>{ const w=$('#waWait'); if(w) w.textContent='Waiting for you to scan — the code refreshes by itself and stays valid.'; };
+    i.src='/v1/whatsapp/qr?t='+Date.now(); }
   async function refreshWa(autoShow){
     try{ const d=await (await fetch('/v1/whatsapp/status',{credentials:'same-origin'})).json();
       const dot=$('#waDot'), st=$('#waState'), link=$('#waLink'); if(!dot)return;
       if(d.connected){ dot.className='pill-dot ok'; st.textContent='linked'+(d.me?` · ${d.me}`:''); if(link)link.style.display='none'; const w=$('#waQrWrap'); if(w)w.style.display='none'; if(waPoll){clearInterval(waPoll);waPoll=null;} }
-      else { dot.className='pill-dot err'; st.textContent=d.enabled?'not linked':'bridge offline'; if(link){link.style.display=''; if(!waPoll)link.textContent='Show QR';}
+      else { dot.className='pill-dot err'; st.textContent=d.enabled?(waPoll?'ready to scan':'not linked'):'bridge offline'; if(link&&!waPoll){link.style.display=''; link.textContent='Show QR';}
         // When the bridge is up but unlinked, surface the QR right away.
         if(d.enabled && !waPoll && typeof autoShow==='function') autoShow();
       }

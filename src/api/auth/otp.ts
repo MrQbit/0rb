@@ -83,6 +83,26 @@ export type AuthUser = {
   role?: UserRole
   /** HA person entity for presence-linked features (e.g. person.sarah). */
   person_entity?: string
+  first_name?: string
+  last_name?: string
+  /** App groups the owner has switched OFF for this member (see appGroups.ts). */
+  disabled_apps?: string[]
+}
+
+/** Display name: first name → label → email local part. */
+export function displayName(u: AuthUser): string {
+  const n = [u.first_name, u.last_name].filter(Boolean).join(' ').trim()
+  return n || (u.label && u.label.toLowerCase() !== 'owner' ? u.label : '') || u.email.split('@')[0]!
+}
+
+/** Update profile/permission fields on one user. */
+export async function updateUser(store: Store, email: string, patch: Partial<Pick<AuthUser, 'first_name' | 'last_name' | 'label' | 'disabled_apps' | 'person_entity'>>): Promise<AuthUser | null> {
+  const users = await getUsers(store)
+  const u = users.find(x => x.email === normalizeEmail(email))
+  if (!u) return null
+  Object.assign(u, patch)
+  await store.putKv(USERS_KEY, JSON.stringify(users), 60 * 60 * 24 * 365 * 5).catch(() => {})
+  return u
 }
 
 /**

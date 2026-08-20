@@ -121,6 +121,21 @@ export async function notifyUser(store: Store, email: string, text: string): Pro
  * model relays them at the start of its reply).
  */
 export async function familyPromptExtra(store: Store, ownerId: string): Promise<string> {
+  // Profiles v2: tell the agent who this is and which apps are off.
+  let profileNote = ''
+  try {
+    const email = ownerId.replace(/^user:/, '')
+    if (email.includes('@')) {
+      const { findUser, displayName } = await import('../auth/otp.js')
+      const u = await findUser(store, email)
+      if (u) {
+        const { APP_GROUPS } = await import('../auth/appGroups.js')
+        const off = (u.disabled_apps || []).map(a => APP_GROUPS[a]?.label || a)
+        profileNote = `\nYou are talking with ${displayName(u)}${u.role === 'owner' ? ' (household owner)' : ''}.`
+          + (off.length ? `\nApps turned OFF for this member by the owner: ${off.join(', ')}. If they ask for one of these, do NOT attempt it — explain kindly that it's switched off for their profile and the owner can enable it in Settings → Users.` : '')
+      }
+    }
+  } catch { /* optional */ }
   const email = emailFromOwnerId(ownerId)
   if (!email || !email.includes('@')) return ''
   try {
@@ -130,6 +145,7 @@ export async function familyPromptExtra(store: Store, ownerId: string): Promise<
     const idx = users.findIndex(x => x.email === u.email)
     const role = u.role ?? (idx === 0 ? 'owner' : 'member')
     let out = `\nCurrent user: ${u.label || email} <${email}> (household ${role}).`
+    out += profileNote
     const prefs = await getPrefs(store, email)
     const pk = Object.entries(prefs)
     if (pk.length) out += `\nTheir preferences: ${pk.map(([k, v]) => `${k}: ${v}`).join('; ')}.`

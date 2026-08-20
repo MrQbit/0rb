@@ -1,0 +1,40 @@
+import { chromium } from 'playwright';
+const b = await chromium.launch();
+const page = await (await b.newContext({ viewport: { width: 1100, height: 850 } })).newPage();
+await page.context().addCookies([{ name: 'orb2_session', value: process.env.ORB_SESSION, domain: 'localhost', path: '/' }]);
+await page.goto('http://localhost:9080/', { waitUntil: 'networkidle' });
+await page.waitForTimeout(2200);
+const S = process.env.SHOTS_DIR || '.';
+await page.locator('#gearBtn').click();
+await page.locator('.tm-item[data-act="settings"]').click();
+await page.waitForTimeout(1500);
+const avatars = await page.locator('#setUsersList .avatar').count();
+console.log('avatar circles:', avatars);
+await page.locator('#setUsersList .set-item', { hasText: 'ausiliom.us' }).locator('button:has-text("Details")').click();
+await page.waitForTimeout(1500);
+const toggles = await page.locator('.member-detail .set-switch').count();
+const nameField = await page.locator('.member-detail input[placeholder="First name"]').inputValue();
+console.log('app toggles:', toggles, '| first name shown:', nameField);
+await page.locator('#settingsPanel').screenshot({ path: S + '/profiles-details.png' });
+await page.locator('#setUserInvite').click();
+await page.waitForTimeout(1200);
+const inviteMsg = await page.locator('#setUserMsg').textContent();
+const m = (inviteMsg || '').match(/https?:\/\/\S+invite=[\w-]+/);
+console.log('invite link:', m ? 'minted' : 'MISSING', (m ? m[0].slice(-20) : inviteMsg || '').trim());
+await page.locator('#settingsPanel').screenshot({ path: S + '/profiles-invite.png' });
+// join flow with the real invite (local URL swap)
+if (m) {
+  const url = m[0].replace(/https?:\/\/[^/]+/, 'http://localhost:9080');
+  const p2 = await (await b.newContext()).newPage();
+  await p2.goto(url, { waitUntil: 'networkidle' });
+  await p2.waitForTimeout(1500);
+  const sub = await p2.locator('#subLine').textContent();
+  console.log('join page:', (sub || '').trim());
+  await p2.locator('#invName').fill('Testy');
+  await p2.locator('#invEmail').fill('invitee-test@example.com');
+  await p2.screenshot({ path: S + '/profiles-join.png' });
+  await p2.locator('#invJoin').click();
+  await p2.waitForTimeout(2500);
+  console.log('join result:', ((await p2.locator('#msg').textContent()) || '').trim().slice(0, 80));
+}
+await b.close();

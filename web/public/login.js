@@ -92,6 +92,47 @@
   }
   pollClaim();
 
+  // ── Invitation join mode (Profiles v2): ?invite=<token> ──
+  (function inviteMode(){
+    var token=new URLSearchParams(location.search).get('invite');
+    if(!token) return;
+    fetch('/v1/invites/'+encodeURIComponent(token),{credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if(!d.valid){ setMsg('This invitation is no longer valid — ask for a fresh one.', false); return; }
+        document.getElementById('subLine').textContent='You\u2019ve been invited to join '+(d.household||'this orb');
+        stepEmail.classList.add('hide'); stepCode.classList.add('hide');
+        var wrap=document.getElementById('step-invite');
+        if(!wrap){
+          wrap=document.createElement('div'); wrap.id='step-invite';
+          wrap.innerHTML='<label for="invName">Your first name</label>'+
+            '<input id="invName" type="text" autocomplete="given-name" placeholder="First name" />'+
+            '<label for="invEmail">Your email</label>'+
+            '<input id="invEmail" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" />'+
+            '<button type="button" id="invJoin">Join</button>';
+          document.querySelector('.card').insertBefore(wrap, msg);
+        }
+        document.getElementById('invJoin').onclick=function(){
+          var email=document.getElementById('invEmail').value.trim();
+          var name=document.getElementById('invName').value.trim();
+          if(!email){ setMsg('Enter your email', false); return; }
+          setMsg('Joining\u2026', true);
+          fetch('/v1/invites/accept',{method:'POST',headers:{'content-type':'application/json'},credentials:'same-origin',
+            body:JSON.stringify({token:token,email:email,first_name:name})})
+            .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+            .then(function(res){
+              if(!res.ok||!res.d.ok){ setMsg(res.d.error||'Could not join', false); return; }
+              wrap.classList.add('hide');
+              emailEl.value=email;
+              document.getElementById('emailEcho').textContent=email;
+              document.getElementById('viaEcho').textContent='email';
+              stepCode.classList.remove('hide'); codeEl.focus();
+              setMsg('Welcome! A sign-in code is on its way to '+email+'.', true);
+            }).catch(function(){ setMsg('Could not reach the server', false); });
+        };
+      }).catch(function(){});
+  })();
+
   var claimBtn = document.getElementById('claimBtn');
   function doClaim() {
     var email = document.getElementById('claimEmail').value.trim();

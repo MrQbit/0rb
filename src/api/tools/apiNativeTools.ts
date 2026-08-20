@@ -586,6 +586,20 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
       const { effectiveImpact, requestApproval, recordReceipt, actionKey } = await import('../policy/policy.js')
       const { summarizeAction, captureInverse } = await import('../policy/describe.js')
       const user = ctx.ownerId || 'owner'
+      // Per-member app permissions (Profiles v2): the owner may have switched
+      // this tool's app group OFF for this member. Owners are never limited.
+      try {
+        const email = user.replace(/^user:/, '')
+        const { appOf, disabledMessage } = await import('../auth/appGroups.js')
+        const app = appOf(name)
+        if (app && email.includes('@')) {
+          const { findUser } = await import('../auth/otp.js')
+          const u = await findUser(ctx.store, email)
+          if (u && u.role !== 'owner' && (u.disabled_apps || []).includes(app)) {
+            return disabledMessage(name)
+          }
+        }
+      } catch { /* permissions are best-effort deny-open for core stability */ }
       let impact: Awaited<ReturnType<typeof effectiveImpact>>
       try { impact = await effectiveImpact(ctx.store, user, name, args) } catch { impact = 'read' }
       if (impact === 'read') return run(args)

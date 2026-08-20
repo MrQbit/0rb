@@ -84,6 +84,103 @@ export async function handleAuthRoutes(
     return json(200, { ok: true, token: r.token }, { 'set-cookie': sessionCookie(r.token!) })
   }
 
+  // ── Profiles v2: identity, avatars, per-member app permissions ──
+  if (pathname === '/v1/profile' && method === 'POST') {
+    const me = sessionUser(req)
+    if (authEnabled() && !me) return json(401, { error: 'authentication required' })
+    const b = (await req.json().catch(() => ({}))) as any
+    // Members edit themselves; owners may edit anyone; only owners touch permissions.
+    const target = String(b.email || me || '').toLowerCase()
+    const owner = !authEnabled() || (me ? await isOwner(store, me) : false)
+    if (target !== (me || '').toLowerCase() && !owner) return json(403, { error: 'you can only edit your own profile' })
+    const patch: any = {}
+    if (typeof b.first_name === 'string') patch.first_name = b.first_name.trim().slice(0, 40)
+    if (typeof b.last_name === 'string') patch.last_name = b.last_name.trim().slice(0, 40)
+    if (Array.isArray(b.disabled_apps)) {
+      if (!owner) return json(403, { error: 'only an owner can change app access' })
+      const { APP_GROUPS } = await import('./appGroups.js')
+      if (await isOwner(store, target)) return json(400, { error: 'owners always have full access' })
+      patch.disabled_apps = b.disabled_apps.map(String).filter((a: string) => a in APP_GROUPS)
+    }
+    const { updateUser } = await import('./otp.js')
+    const u = await updateUser(store, target, patch)
+    return u ? json(200, { ok: true, user: u }) : json(404, { error: 'no such member' })
+  }
+  if (pathname === '/v1/profile/avatar') {
+    const me = sessionUser(req)
+    if (method === 'GET') {
+      const email = new URL(req.url).searchParams.get('email') || me || ''
+      const raw = await store.getKv(`profile:avatar:${email.toLowerCase()}`).catch(() => null)
+      if (!raw) return json(404, { error: 'no avatar' })
+      const m = raw.match(/^data:(image\/[a-z+]+);base64,(.+)$/)
+      if (!m) return json(404, { error: 'no avatar' })
+      return new Response(Buffer.from(m[2]!, 'base64'), { status: 200, headers: { 'content-type': m[1]!, 'cache-control': 'private, max-age=300' } })
+    }
+    if (method === 'POST') {
+      if (authEnabled() && !me) return json(401, { error: 'authentication required' })
+      const b = (await req.json().catch(() => ({}))) as any
+      const target = String(b.email || me || '').toLowerCase()
+      if (target !== (me || '').toLowerCase() && authEnabled() && me && !(await isOwner(store, me))) {
+        return json(403, { error: 'you can only change your own picture' })
+      }
+      const data = String(b.data || '')
+      if (!/^data:image\/(png|jpeg|webp);base64,/.test(data)) return json(400, { error: 'a png/jpeg/webp data-uri is required' })
+      if (data.length > 300_000) return json(400, { error: 'image too large — the console resizes to 256px, use that' })
+      await store.putKv(`profile:avatar:${target}`, data, 0)
+      return json(200, { ok: true })
+    }
+  }
+  // App-group catalog for the Settings toggles.
+  if (pathname === '/v1/profile/apps' && method === 'GET') {
+    const { APP_GROUPS } = await import('./appGroups.js')
+    return json(200, { apps: Object.entries(APP_GROUPS).map(([id, g]) => ({ id, label: g.label, desc: g.desc })) })
+  }
+
+  // ── Invitations: owner mints a link; opening it joins the household. ──
+  if (pathname === '/v1/invites' && method === 'POST') {
+    const me = sessionUser(req)
+    if (authEnabled() && (!me || !(await isOwner(store, me)))) return json(403, { error: 'owner only' })
+    const b = (await req.json().catch(() => ({}))) as any
+    const { createInvite } = await import('./invites.js')
+    const inv = await createInvite(store, me || 'owner', b?.note)
+    const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'orb.local'
+    const proto = /^(localhost|127\.)/.test(host) ? 'http' : 'https'
+    return json(200, { ...inv, url: `${proto}://${host}/login.html?invite=${inv.token}` })
+  }
+  if (pathname === '/v1/invites' && method === 'GET') {
+    const me = sessionUser(req)
+    if (authEnabled() && (!me || !(await isOwner(store, me)))) return json(403, { error: 'owner only' })
+    const { listInvites } = await import('./invites.js')
+    return json(200, { invites: await listInvites(store) })
+  }
+  {
+    const im = pathname.match(/^\/v1\/invites\/([A-Za-z0-9_-]{8,32})$/)
+    if (im && method === 'DELETE') {
+      const me = sessionUser(req)
+      if (authEnabled() && (!me || !(await isOwner(store, me)))) return json(403, { error: 'owner only' })
+      const { revokeInvite } = await import('./invites.js')
+      await revokeInvite(store, im[1]!)
+      return json(200, { ok: true })
+    }
+    // Public: the login page checks the invite and shows who's inviting.
+    if (im && method === 'GET') {
+      const { readInvite } = await import('./invites.js')
+      const inv = await readInvite(store, im[1]!)
+      return json(200, inv
+        ? { valid: true, household: process.env.ORB2_ADVERTISE_NAME || 'Orb', invited_by: inv.invited_by, note: inv.note }
+        : { valid: false })
+    }
+  }
+  // Public: accept — creates the member; sign-in still proves the email by OTP.
+  if (pathname === '/v1/invites/accept' && method === 'POST') {
+    const b = (await req.json().catch(() => ({}))) as any
+    const { acceptInvite } = await import('./invites.js')
+    const r = await acceptInvite(store, String(b.token || ''), String(b.email || ''), b.first_name ? String(b.first_name) : undefined)
+    if (!r.ok) return json(400, { error: r.error })
+    await requestOtp(store, String(b.email), 'email').catch(() => { /* they can request again */ })
+    return json(200, { ok: true, next: 'a sign-in code is on its way to that email' })
+  }
+
   // ── User database (allowed users) — reads for any session; WRITES are
   //    owner-only (members must not add users, change roles, or evict). ──
   if (pathname === '/v1/auth/users') {
