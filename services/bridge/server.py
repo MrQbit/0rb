@@ -529,6 +529,26 @@ async def main():
     await azc.async_register_service(svc)
     log.info("advertising _orb2._tcp as '%s' at %s:%s", name, ip, props["http"])
 
+    # S1: claim orb.local — an _http._tcp service whose server name is
+    # orb.local. makes the responder publish the A record, so browsers and
+    # apps on the LAN resolve http://orb.local:9080 with zero setup. The
+    # cooperating-responder rules mean a second orb on the network would
+    # conflict; allow_name_change is not available for the host record, so
+    # we just log if registration fails rather than fight over it.
+    try:
+        web_svc = ServiceInfo(
+            "_http._tcp.local.",
+            f"{name} Console._http._tcp.local.",
+            addresses=[socket.inet_aton(ip)],
+            port=int(props["http"]),
+            properties={"path": "/"},
+            server="orb.local.",
+        )
+        await azc.async_register_service(web_svc, cooperating_responders=True)
+        log.info("claimed orb.local -> %s", ip)
+    except Exception as e:
+        log.warning("could not claim orb.local: %s", e)
+
     AsyncServiceBrowser(azc.zeroconf, ["_ipp._tcp.local."], handlers=[on_ipp_change])
 
     async def rescan():

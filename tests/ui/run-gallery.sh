@@ -13,3 +13,12 @@ docker run --rm --network host \
   mcr.microsoft.com/playwright:v1.49.0-noble \
   sh -c "cd /cap && npm init -y >/dev/null 2>&1 && npm i playwright@1.49.0 >/dev/null 2>&1 && node gallery.mjs"
 echo "Shots: tests/ui/shots/gallery/ — review every one."
+
+# Plugin sandbox: a runtime plugin must render inside its CSP-locked frame
+# (postMessage-only, no network). Fails the run if the frame is empty or leaky.
+docker run --rm --network host \
+  -e ORB_SESSION="$ORB_SESSION" -e ORB_BASE="${ORB_BASE:-http://localhost:9080}" -e SHOTS_DIR=/shots \
+  -v "$SHOTS":/shots \
+  -v "$(pwd)/tests/ui/plugin-check.mjs":/cap/check.mjs \
+  mcr.microsoft.com/playwright:v1.49.0-noble \
+  sh -c "cd /cap && npm init -y >/dev/null 2>&1 && npm i playwright@1.49.0 >/dev/null 2>&1 && node check.mjs"

@@ -1383,7 +1383,10 @@
     if(spec.url){ renderApp(body, spec); return; }
     if(typeof spec.html==='string' && spec.html){
       const f=document.createElement('iframe'); f.className='wg-app';
-      f.setAttribute('sandbox','allow-scripts'); f.srcdoc=spec.html; body.appendChild(f); return;
+      f.setAttribute('sandbox','allow-scripts');
+      // CSP inside the sandbox: inline-only, no network — model-authored code
+      // can compute and draw, never call out. (MCP Apps 2026-01-26 contract.)
+      f.srcdoc='<!doctype html>'+'<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; script-src \'unsafe-inline\'; style-src \'unsafe-inline\'; img-src data:;">'+spec.html; body.appendChild(f); return;
     }
     const e=document.createElement('div'); e.className='wg-empty'; e.textContent='Nothing to show.'; body.appendChild(e);
   }
@@ -1493,12 +1496,21 @@
     }catch{}
   }
   async function renderPlugin(body, spec, plugin){
-    try{
-      const mod = await import(`/v1/widgets/plugins/${plugin.id}/render.js`);
-      const fn = mod.render || mod.default;
-      if(typeof fn!=='function') throw new Error('plugin exports no render()');
-      await fn(body, spec, { esc });   // small helper surface for plugins
-    }catch(e){ const n=document.createElement('div'); n.className='wg-note'; n.textContent='“'+(plugin.name||spec.type)+'” plugin failed: '+e.message; body.appendChild(n); }
+    // v0.2 §14: plugin code runs in a sandboxed iframe served with its own
+    // CSP (no network, no inline script surprises); the spec crosses the
+    // boundary only by postMessage. srcdoc is unusable here — it inherits
+    // the console's CSP, which forbids inline scripts.
+    const f=document.createElement('iframe'); f.className='wg-app';
+    f.setAttribute('sandbox','allow-scripts');
+    f.src='/v1/widgets/frame?plugin='+encodeURIComponent(plugin.id);
+    const send=()=>{ try{ f.contentWindow.postMessage({type:'orb-spec', spec}, '*'); }catch(_){} };
+    const onMsg=(e)=>{
+      if(!f.isConnected){ window.removeEventListener('message', onMsg); return; }
+      if(e.source===f.contentWindow && e.data && e.data.type==='orb-ready') send();
+    };
+    window.addEventListener('message', onMsg);
+    f.addEventListener('load', send);
+    body.appendChild(f);
   }
   function renderTable(body, spec){
     const cols=spec.columns||[], rows=spec.rows||[];
