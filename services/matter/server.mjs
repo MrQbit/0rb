@@ -11,13 +11,15 @@
  * commands → /v1/matter/control | /v1/matter/mode.
  */
 import http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
 import { Endpoint, Environment, ServerNode } from "@matter/main";
 import { AggregatorEndpoint } from "@matter/main/endpoints";
 import {
   DimmableLightDevice, OnOffLightDevice, OnOffPlugInUnitDevice, OccupancySensorDevice,
   TemperatureSensorDevice, HumiditySensorDevice, ContactSensorDevice, DoorLockDevice,
 } from "@matter/main/devices";
-import { BridgedDeviceBasicInformationServer } from "@matter/main/behaviors";
+import { BridgedDeviceBasicInformationServer, OccupancySensingServer } from "@matter/main/behaviors";
 
 const API = (process.env.ORB2_API_URL || "http://127.0.0.1:9080").replace(/\/+$/, "");
 const TOKEN = process.env.ORB2_MATTER_TOKEN || "";
@@ -159,10 +161,16 @@ async function setSensor(entry, value) {
 
 const peopleEps = new Map();
 async function addPerson(name, home) {
-  const ep = new Endpoint(OccupancySensorDevice.with(BridgedDeviceBasicInformationServer), {
+  // OccupancySensorDevice ships with only `identify` — the sensing cluster
+  // itself must be added explicitly or presence writes roll back.
+  const ep = new Endpoint(OccupancySensorDevice.with(OccupancySensingServer, BridgedDeviceBasicInformationServer), {
     id: `person_${safeId(name)}`,
     bridgedDeviceBasicInformation: { nodeLabel: label(`${name} Home`), reachable: true },
-    occupancySensing: { occupancy: { occupied: !!home } },
+    occupancySensing: {
+      occupancy: { occupied: !!home },
+      occupancySensorType: 3,                                  // physical contact
+      occupancySensorTypeBitmap: { pir: false, ultrasonic: false, physicalContact: true },
+    },
   });
   await aggregator.add(ep);
   peopleEps.set(name, ep);
@@ -246,6 +254,42 @@ http.createServer((req, res) => {
     } catch (e) { out.error = String(e.message).slice(0, 120); }
     out.devices = bridged.size;
     res.end(JSON.stringify(out));
+    return;
+  }
+  // Backup & migration (v0.2 S4): the fabric IS the Apple Home pairing —
+  // exporting/importing /data lets a rebuilt orb keep its place in the home.
+  const STORAGE = process.env.ORB2_MATTER_STORAGE || "/data";
+  if (req.url === "/export") {
+    const files = [];
+    const walk = (dir) => {
+      for (const name of fs.readdirSync(dir)) {
+        const p = path.join(dir, name);
+        const st = fs.statSync(p);
+        if (st.isDirectory()) walk(p);
+        else if (st.size <= 5 * 1024 * 1024) files.push({ path: path.relative(STORAGE, p), b64: fs.readFileSync(p).toString("base64") });
+      }
+    };
+    try { walk(STORAGE); res.end(JSON.stringify({ files })); }
+    catch (e) { res.statusCode = 500; res.end(JSON.stringify({ error: String(e.message) })); }
+    return;
+  }
+  if (req.url === "/import" && req.method === "POST") {
+    let body = "";
+    req.on("data", (c) => { body += c; if (body.length > 64 * 1024 * 1024) req.destroy(); });
+    req.on("end", () => {
+      try {
+        const { files } = JSON.parse(body);
+        for (const f of files || []) {
+          const dest = path.resolve(STORAGE, f.path);
+          if (!dest.startsWith(path.resolve(STORAGE))) continue;
+          fs.mkdirSync(path.dirname(dest), { recursive: true });
+          fs.writeFileSync(dest, Buffer.from(f.b64, "base64"));
+        }
+        res.end(JSON.stringify({ ok: true, files: (files || []).length, restarting: true }));
+        // the node must reboot onto the restored fabric; docker restarts us
+        setTimeout(() => process.exit(0), 500);
+      } catch (e) { res.statusCode = 400; res.end(JSON.stringify({ error: String(e.message) })); }
+    });
     return;
   }
   res.statusCode = 404;

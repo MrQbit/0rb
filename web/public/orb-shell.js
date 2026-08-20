@@ -2345,6 +2345,44 @@
           document.getElementById('setClose')?.click(); window.__orbFirstRunTick?.(); }catch{} };
         row.appendChild(b); $('#setSystem').appendChild(row);
       }
+      // Backup & migration (v0.2 S4).
+      if($('#setSystem')&&!document.getElementById('bkExport')){
+        const row=document.createElement('div'); row.className='set-item';
+        row.innerHTML=`<div class="grow"><div class="t">Backup</div><div class="s">everything that makes this orb yours — treat the file like house keys</div></div>`;
+        const ex=document.createElement('button'); ex.id='bkExport'; ex.className='set-btn ghost'; ex.textContent='Export';
+        ex.onclick=async()=>{
+          const pass=prompt('Choose a passphrase (8+ characters). You will need it to restore — there is no recovery.');
+          if(!pass) return; if(pass.length<8){ toast('Passphrase too short'); return; }
+          ex.disabled=true;
+          try{
+            const r=await fetch('/v1/backup/export',{method:'POST',credentials:'same-origin',
+              headers:{'content-type':'application/json'},body:JSON.stringify({passphrase:pass})});
+            if(!r.ok){ toast((await r.json()).error||'Export failed'); return; }
+            const a=document.createElement('a'); a.href=URL.createObjectURL(await r.blob());
+            a.download=(r.headers.get('content-disposition')||'').match(/filename="(.+)"/)?.[1]||'orb.orbbackup';
+            a.click(); toast('Backup downloaded');
+          }catch{ toast('Export failed'); } finally{ ex.disabled=false; }
+        };
+        const im=document.createElement('button'); im.className='set-btn ghost'; im.textContent='Restore';
+        im.onclick=()=>{
+          const fi=document.createElement('input'); fi.type='file'; fi.accept='.orbbackup';
+          fi.onchange=async()=>{
+            const f=fi.files&&fi.files[0]; if(!f) return;
+            const pass=prompt('Passphrase for this backup:'); if(!pass) return;
+            try{
+              const buf=new Uint8Array(await f.arrayBuffer());
+              let bin=''; for(let i=0;i<buf.length;i+=0x8000) bin+=String.fromCharCode.apply(null,buf.subarray(i,i+0x8000));
+              const r=await fetch('/v1/backup/restore',{method:'POST',credentials:'same-origin',
+                headers:{'content-type':'application/json'},body:JSON.stringify({passphrase:pass,data_b64:btoa(bin)})});
+              const d=await r.json();
+              if(r.ok&&d.ok){ toast(`Restored ${d.kv} entries, ${d.files} files${d.matter?', Matter fabric':''} — reloading`); setTimeout(()=>location.reload(),1800); }
+              else toast(d.error||'Restore failed');
+            }catch{ toast('Restore failed'); }
+          };
+          fi.click();
+        };
+        row.append(ex,im); $('#setSystem').appendChild(row);
+      }
     }catch{}
   }
   // ── Device-URL remote mode: home-network A record vs DynDNS + router port ──

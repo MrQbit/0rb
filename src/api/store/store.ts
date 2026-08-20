@@ -52,6 +52,9 @@ export interface Store {
   putKv(key: string, value: string, ttlSeconds: number): Promise<void>
   getKv(key: string): Promise<string | null>
   delKv(key: string): Promise<void>
+  // Enumerate kv pairs whose (un-namespaced) key starts with prefix.
+  // Powers backup export (v0.2 S4); prefer specific prefixes over ''.
+  scanKv(prefix: string): Promise<Array<{ key: string; value: string }>>
   // Atomic read-and-delete. Used by worker dispatch to guarantee
   // exactly-once consumption of a per-turn task payload even if two
   // worker pods race for the same turnId.
@@ -236,6 +239,14 @@ class MemoryStore implements Store {
   }
   async delKv(key: string) {
     this.kv.delete(`${PREFIX}kv:${key}`)
+  }
+  async scanKv(prefix: string): Promise<Array<{ key: string; value: string }>> {
+    const out: Array<{ key: string; value: string }> = []
+    const p = `${PREFIX}kv:${prefix}`
+    for (const [k, e] of this.kv) {
+      if (k.startsWith(p) && this.notExpired(e)) out.push({ key: k.slice(`${PREFIX}kv:`.length), value: e.v })
+    }
+    return out
   }
   async getDelKv(key: string): Promise<string | null> {
     const k = `${PREFIX}kv:${key}`
@@ -451,6 +462,22 @@ class RedisStore implements Store {
   }
   async delKv(key: string) {
     await this.client.del(this.k(`kv:${key}`))
+  }
+  async scanKv(prefix: string): Promise<Array<{ key: string; value: string }>> {
+    const out: Array<{ key: string; value: string }> = []
+    const ns = this.k('kv:')
+    let cursor = '0'
+    do {
+      const reply = await this.client.send('SCAN', [cursor, 'MATCH', `${ns}${prefix}*`, 'COUNT', '500'])
+      if (!Array.isArray(reply) || reply.length < 2) break
+      cursor = String(reply[0])
+      const keys = reply[1] as string[]
+      for (const k of keys) {
+        const v = await this.client.get(k)
+        if (typeof v === 'string') out.push({ key: k.slice(ns.length), value: v })
+      }
+    } while (cursor !== '0')
+    return out
   }
   async getDelKv(key: string): Promise<string | null> {
     const k = this.k(`kv:${key}`)

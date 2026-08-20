@@ -1260,6 +1260,22 @@ async function dispatch(
     if (authResp) return authResp
   }
 
+  // Pre-claim restore (v0.2 S4): a fresh box may be rebuilt from a backup
+  // before any owner exists. Once owned, this falls through to the
+  // owner-gated handler behind the identity gate.
+  if (pathname === '/v1/backup/restore' && method === 'POST') {
+    const { getUsers } = await import('./auth/otp.js')
+    if ((await getUsers(ctx.store)).length === 0) {
+      const b = await req.json().catch(() => ({})) as any
+      const { decryptBackup, restoreBackup } = await import('./setup/backup.js')
+      try {
+        const payload = decryptBackup(Buffer.from(String(b.data_b64 || ''), 'base64'), String(b.passphrase || ''))
+        const result = await restoreBackup(ctx.store, payload)
+        return jsonResponse(200, { ok: true, ...result, created_at: payload.created_at })
+      } catch (e) { return jsonResponse(400, { error: (e as Error).message }) }
+    }
+  }
+
   // Matter sidecar callbacks (token-gated, no session) — the pairing proxy
   // stays behind the identity gate with everything else console-facing.
   if (pathname.startsWith('/v1/matter/') && pathname !== '/v1/matter/pairing') {
@@ -1818,6 +1834,38 @@ async function dispatch(
         status: 200, headers: { 'content-type': 'audio/wav', 'cache-control': 'no-store' },
       })
     } catch { return jsonResponse(502, { error: 'tts unreachable' }) }
+  }
+  // ─── Backup & migration (v0.2 S4) — the file is house keys; owner only. ───
+  if (pathname === '/v1/backup/export' && method === 'POST') {
+    const user = (attributionFor(identity).oid || '').replace(/^user:/, '')
+    const { isOwner } = await import('./auth/otp.js')
+    if (!user || !(await isOwner(ctx.store, user))) return jsonResponse(403, { error: 'owner only' })
+    const b = await req.json().catch(() => ({})) as any
+    const pass = String(b.passphrase || '')
+    if (pass.length < 8) return jsonResponse(400, { error: 'passphrase of at least 8 characters required' })
+    const { buildBackup, encryptBackup } = await import('./setup/backup.js')
+    const blob = encryptBackup(await buildBackup(ctx.store), pass)
+    return new Response(new Uint8Array(blob), { status: 200, headers: {
+      'content-type': 'application/octet-stream',
+      'content-disposition': `attachment; filename="orb-${new Date().toISOString().slice(0, 10)}.orbbackup"`,
+      'cache-control': 'no-store',
+    } })
+  }
+  if (pathname === '/v1/backup/restore' && method === 'POST') {
+    const user = (attributionFor(identity).oid || '').replace(/^user:/, '')
+    const { getUsers, isOwner } = await import('./auth/otp.js')
+    const fresh = (await getUsers(ctx.store)).length === 0
+    if (!fresh && (!user || !(await isOwner(ctx.store, user)))) return jsonResponse(403, { error: 'owner only' })
+    const b = await req.json().catch(() => ({})) as any
+    const pass = String(b.passphrase || '')
+    const data = String(b.data_b64 || '')
+    if (!pass || !data) return jsonResponse(400, { error: 'passphrase and data_b64 required' })
+    const { decryptBackup, restoreBackup } = await import('./setup/backup.js')
+    try {
+      const payload = decryptBackup(Buffer.from(data, 'base64'), pass)
+      const result = await restoreBackup(ctx.store, payload)
+      return jsonResponse(200, { ok: true, ...result, created_at: payload.created_at })
+    } catch (e) { return jsonResponse(400, { error: (e as Error).message }) }
   }
   // ─── The morning deck (v0.2 §3) ───
   if (pathname.startsWith('/v1/deck')) {
