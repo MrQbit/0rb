@@ -1,0 +1,15 @@
+import { chromium } from 'playwright';
+const b = await chromium.launch();
+const page = await (await b.newContext()).newPage();
+await page.context().addCookies([{ name: 'orb2_session', value: process.env.ORB_SESSION, domain: 'localhost', path: '/' }]);
+await page.goto('http://localhost:9080/', { waitUntil: 'networkidle' });
+await page.waitForTimeout(2500);
+await page.locator('#chatInput, textarea').first().fill('show me the sonos media controls');
+await page.keyboard.press('Enter');
+await page.waitForTimeout(25000);
+const titles = await page.locator('.wg .wg-title').allTextContents();
+const media = titles.filter(t => /sonos|tv/i.test(t));
+console.log('media widgets:', media.join(' | ') || '(none)');
+await page.screenshot({ path: (process.env.SHOTS_DIR||'.') + '/bug3-media-sonos.png' });
+await b.close();
+process.exit(media.length === 1 && /sonos/i.test(media[0]) ? 0 : 1);

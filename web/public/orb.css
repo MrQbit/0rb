@@ -86,8 +86,8 @@ body {
 .wg.pill .wg-pillinfo{ padding:0 13px 9px; font-size:11px; color:var(--nv-bright); white-space:nowrap; max-width:200px; overflow:hidden; text-overflow:ellipsis; }
 .wg.pill:hover{ border-color:var(--glass-edge); box-shadow:var(--shadow),0 0 16px rgba(118,185,0,.25); }
 .wg.pill.stale{ opacity:.7; } .wg.pill.stale .wg-pillinfo{ color:var(--ink-dim); }
-.wg-head { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:9px 12px; border-bottom:1px solid var(--line); cursor:move; user-select:none; }
-.wg-title { font-size:12px; color:var(--ink); letter-spacing:.3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wg-head { display:flex; align-items:center; gap:6px; padding:9px 12px; border-bottom:1px solid var(--line); cursor:move; user-select:none; }
+.wg-title { flex:1 1 auto; min-width:0; font-size:12px; color:var(--ink); letter-spacing:.3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-right:auto; }
 .wg-x { background:none; border:0; color:var(--ink-dim); cursor:pointer; line-height:0; flex:none; padding:3px; border-radius:6px; transition:color .15s, background .15s; }
 .wg-x:hover { color:var(--ink); background:rgba(255,255,255,.07); }
 .wg-x svg { pointer-events:none; }  /* clicks must hit the button, not the icon */
@@ -1053,9 +1053,12 @@ sup.sq { font-size:.58em; color:var(--nv); font-weight:700; margin-left:1px; tra
 @keyframes skshine { from{background-position:200% 0;} to{background-position:-200% 0;} }
 @media (prefers-reduced-motion: reduce){ .wg-skel .sk{ animation:none; } }
 /* pin affordance */
-.wg-pin { background:none; border:0; color:var(--ink-dim); cursor:pointer; line-height:0; flex:none; padding:3px; border-radius:6px; opacity:.55; transition:color .15s, opacity .15s; }
-.wg-pin:hover { color:var(--ink); opacity:1; }
+/* Pin sits with Close at the right edge of the header — same hit target,
+   same weight; accent only when active (pinned). */
+.wg-pin { background:none; border:0; color:var(--ink-dim); cursor:pointer; line-height:0; flex:none; padding:3px; border-radius:6px; opacity:.55; transition:color .15s, opacity .15s, background .15s; }
+.wg-pin:hover { color:var(--ink); opacity:1; background:rgba(255,255,255,.06); }
 .wg-pin.on { color:var(--nv); opacity:1; }
+.wg-pin.on svg path { fill:currentColor; }
 .wg-pin svg { pointer-events:none; }
 /* the morning deck */
 .wg-deck { display:flex; flex-direction:column; gap:12px; }
@@ -1069,8 +1072,10 @@ sup.sq { font-size:.58em; color:var(--nv); font-weight:700; margin-left:1px; tra
 .member-mem { font-size:12.5px; color:var(--ink); white-space:pre-wrap; max-height:220px; overflow:auto;
   background:rgba(255,255,255,.04); border-radius:9px; padding:10px 12px; margin-bottom:8px; }
 /* provenance badge — metadata-grade, never colored loud */
-.prov-badge { display:inline-block; margin:6px 0 0 2px; font-size:9.5px; letter-spacing:.05em;
-  text-transform:uppercase; color:var(--ink-dim); opacity:.55; }
+.prov-badge { display:inline; margin-left:7px; font-size:9px; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--ink-dim); opacity:.38; vertical-align:baseline;
+  white-space:nowrap; user-select:none; }
+.prov-badge:hover { opacity:.8; }
 .prov-badge.cloud::before { content:'▵ '; }
 .prov-badge.local::before { content:'▪ '; }
 

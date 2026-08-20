@@ -180,21 +180,21 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
     },
     {
       name: 'MusicSearch',
-      description: "Search Spotify for music — songs, artists, albums (connected app). PREFER this whenever the user wants to play/find music. Shows a results widget; clicking a track opens a Spotify player (full track if the listener is signed into Spotify, else a 30s preview). Returns the top tracks.",
+      description: "Search Spotify for music — songs, artists, albums. PREFER this whenever the user wants to play/find music — NEVER try Home Assistant for music search. Shows a results widget; clicking a track opens a Spotify player. If Spotify isn't configured yet the tool says exactly what to set up — relay that to the user instead of improvising.",
       input_schema: { type: 'object', properties: { query: { type: 'string', description: 'Song, artist, or album to find.' } }, required: ['query'] },
-      available: spotifyEnabled(),
+      available: true,
     },
     {
       name: 'MusicPlay',
-      description: "Play music on the user's Spotify (requires their connected Spotify account + Premium). Pass a 'query' (song/artist) to find and play the top match, or a Spotify track 'uri'. Plays on the user's active device or the in-browser player. Use this when the user says 'play …'. Also shows the track widget.",
-      input_schema: { type: 'object', properties: { query: { type: 'string', description: 'Song/artist to play.' }, uri: { type: 'string', description: 'Spotify track URI (spotify:track:...) if known.' } } },
-      available: spotifyEnabled(),
+      description: "Play music on the user's Spotify (their connected account + Premium). Pass a 'query' (song/artist) to find and play the top match, or a Spotify track 'uri'. Pass 'device' when the user names WHERE to play ('on the Sonos', 'living room') — speakers like Sonos appear as Spotify Connect devices and playback moves there. Use this when the user says 'play …'. If Spotify isn't configured/connected the tool says exactly what's missing — relay it.",
+      input_schema: { type: 'object', properties: { query: { type: 'string', description: 'Song/artist to play.' }, uri: { type: 'string', description: 'Spotify track URI (spotify:track:...) if known.' }, device: { type: 'string', description: "Where to play: a Spotify Connect device name ('sonos', 'living room'). Omit to use the active device." } } },
+      available: true,
     },
     {
       name: 'MusicControl',
       description: "Control the user's Spotify playback (connected account): play, pause, next, previous, or set volume (0-100). Use for 'pause', 'skip', 'resume', 'turn it down', etc.",
       input_schema: { type: 'object', properties: { action: { type: 'string', enum: ['play', 'pause', 'next', 'previous', 'volume'] }, volume: { type: 'number', description: 'for action=volume: 0-100.' } }, required: ['action'] },
-      available: spotifyEnabled(),
+      available: true,
     },
     {
       name: 'WebSearch',
@@ -426,7 +426,7 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
       name: 'Home',
       description: "Control and check the home's devices through Home Assistant — lights, switches/plugs, thermostats (climate), locks, window shades/blinds (cover), TVs & speakers (media_player), robot vacuums, fans, and door/window & motion sensors. This is how Orb acts as the house. Use op:'list' to see what's available (optionally a `type`), op:'status' to check a device by name, and op:'control' to change one: action on/off/toggle for lights/plugs/switches; lock/unlock for locks; open/close (or set with `value` 0-100) for shades; set with `value` for a thermostat's target temperature; play/pause/on/off (or set volume with `value` 0-100) for media; start/stop/dock for a vacuum. Always refer to devices by their friendly name (e.g. \"kitchen lights\", \"front door\").",
       input_schema: { type: 'object', properties: {
-        op: { type: 'string', enum: ['list', 'status', 'control', 'media', 'lights', 'climate', 'vacuum', 'covers', 'security', 'plugs', 'scenes', 'sensors', 'camera', 'presence', 'automations', 'printer', 'energy', 'mode'], description: "list = overview dashboard; status/control = one device; each FUNCTION op shows a focused widget: media (TV/speaker remote), lights (room-grouped), climate (thermostats), vacuum, covers (shades/blinds), security (locks + door/window/motion sensors), plugs (switches/outlets), scenes, sensors (readings: temperature/humidity/battery), camera (snapshots), presence (who's home/away), automations (list HA automations with on/off + run), printer (3D printer: live camera, progress, temps, pause/stop); energy (power draw now + today, per metered device); mode {mode:'home'|'away'|'vacation'|'guest', secure?:true} sets the HOUSE MODE — away/vacation = instant alerts incl. motion; guest = mute door nagging; secure:true when leaving also locks every lock and turns lights off (say what was done). Use for 'we're leaving', 'back home', 'guests are over'. ALWAYS prefer the function widget matching what the user is focused on — the overview dashboard (list) is for 'show me everything'." },
+        op: { type: 'string', enum: ['list', 'status', 'control', 'media', 'lights', 'climate', 'vacuum', 'covers', 'security', 'plugs', 'scenes', 'sensors', 'camera', 'presence', 'automations', 'printer', 'energy', 'mode'], description: "list = overview dashboard; status/control = one device; each FUNCTION op shows a focused widget: media (remote for ONE device — when the user names a device ('the sonos', 'the tv') you MUST pass it as query so only that remote shows; bare media = all players), lights (room-grouped), climate (thermostats), vacuum, covers (shades/blinds), security (locks + door/window/motion sensors), plugs (switches/outlets), scenes, sensors (readings: temperature/humidity/battery), camera (snapshots), presence (who's home/away), automations (list HA automations with on/off + run), printer (3D printer: live camera, progress, temps, pause/stop); energy (power draw now + today, per metered device); mode {mode:'home'|'away'|'vacation'|'guest', secure?:true} sets the HOUSE MODE — away/vacation = instant alerts incl. motion; guest = mute door nagging; secure:true when leaving also locks every lock and turns lights off (say what was done). Use for 'we're leaving', 'back home', 'guests are over'. ALWAYS prefer the function widget matching what the user is focused on — the overview dashboard (list) is for 'show me everything'." },
         query: { type: 'string', description: "Device name for status/control (e.g. 'living room lights', 'front door', 'bedroom thermostat')." },
         type: { type: 'string', enum: ['light', 'switch', 'climate', 'lock', 'cover', 'media_player', 'vacuum', 'fan', 'sensor', 'camera'], description: 'Optional device type filter for list.' },
         action: { type: 'string', enum: ['on', 'off', 'toggle', 'lock', 'unlock', 'open', 'close', 'play', 'pause', 'start', 'stop', 'dock', 'set'], description: 'What to do for op:control.' },
@@ -685,7 +685,9 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
       return `Showed ${res.length} YouTube results for "${q}" (each plays on click). Top: ${res.slice(0, 3).map(r => r.title).join('; ')}.`
     } catch (e) { return `[ERROR] YouTube search failed: ${(e as Error).message}` }
   })
+  const SPOTIFY_SETUP = "Spotify isn't set up on this orb yet. It needs a free app credential: developer.spotify.com \u2192 Create app \u2192 copy the Client ID and Client Secret into Settings \u2192 Apps \u2192 Spotify. After that, each listener taps Connect Spotify there to link their account. Tell the user exactly this \u2014 do not try Home Assistant for music."
   add('MusicSearch', { readOnly: true }, async args => {
+    if (!spotifyEnabled()) return SPOTIFY_SETUP
     const q = String(args?.query || '').trim()
     if (!q) return 'Provide a query.'
     try {
@@ -699,7 +701,8 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
     } catch (e) { return `[ERROR] Spotify search failed: ${(e as Error).message}` }
   })
   add('MusicPlay', { destructive: false }, async args => {
-    if (!(await getUserToken(ctx.store))) return 'Connect your Spotify account first (Settings → Apps → Connect Spotify).'
+    if (!spotifyEnabled()) return SPOTIFY_SETUP
+    if (!(await getUserToken(ctx.store))) return "Spotify is set up but this account isn't linked yet — the user just needs to tap Connect Spotify in Settings → Apps."
     try {
       let uri = String(args?.uri || '').trim()
       let label = ''
@@ -714,14 +717,32 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
         const m = hits[0].embed.match(/track\/([A-Za-z0-9]+)/); if (m) uri = `spotify:track:${m[1]}`
         label = `${hits[0].title} — ${hits[0].artist}`
       }
-      const r = await spotifyApi(ctx.store, '/me/player/play', { method: 'PUT', body: JSON.stringify(uri ? { uris: [uri] } : {}) })
-      if (r.status === 404) return `Showing "${label}". Open Spotify (or the orb2 player) so there's an active device, then I can start it.`
+      // Where to play: speakers (Sonos, TVs) show up as Spotify Connect
+      // devices — match the asked-for name and route playback there.
+      let deviceId = ''
+      let deviceName = ''
+      const wantDev = String((args as any)?.device || '').trim().toLowerCase()
+      if (wantDev) {
+        const dr = await spotifyApi(ctx.store, '/me/player/devices')
+        const devices: any[] = dr.ok ? ((await dr.json()) as any).devices || [] : []
+        const hit = devices.find(d => String(d.name).toLowerCase().includes(wantDev))
+          || devices.find(d => wantDev.split(/\s+/).some(w => String(d.name).toLowerCase().includes(w)))
+        if (!hit) {
+          const names = devices.map(d => d.name).join(', ') || 'none'
+          return `Spotify doesn't see a device matching "${(args as any).device}". Its visible devices right now: ${names}. (A Sonos appears once the Spotify app has been linked to it; otherwise open Spotify on any device.)${label ? ` Showing "${label}".` : ''}`
+        }
+        deviceId = hit.id; deviceName = hit.name
+      }
+      const path = '/me/player/play' + (deviceId ? `?device_id=${encodeURIComponent(deviceId)}` : '')
+      const r = await spotifyApi(ctx.store, path, { method: 'PUT', body: JSON.stringify(uri ? { uris: [uri] } : {}) })
+      if (r.status === 404) return `Showing "${label}". Spotify has no active device — open Spotify anywhere (or name a speaker) and I can start it.`
       if (!r.ok && r.status !== 204) return `Spotify play returned ${r.status}. ${label ? `Showing "${label}".` : ''}`
-      return `Playing${label ? ` "${label}"` : ''} on your Spotify.`
+      return `Playing${label ? ` "${label}"` : ''}${deviceName ? ` on ${deviceName}` : ' on your Spotify'}.`
     } catch (e) { return `[ERROR] ${(e as Error).message}` }
   })
   add('MusicControl', { destructive: false }, async args => {
-    if (!(await getUserToken(ctx.store))) return 'Connect your Spotify account first (Settings → Apps → Connect Spotify).'
+    if (!spotifyEnabled()) return SPOTIFY_SETUP
+    if (!(await getUserToken(ctx.store))) return "Spotify is set up but this account isn't linked yet — the user just needs to tap Connect Spotify in Settings → Apps."
     const action = String(args?.action || '')
     try {
       let r: Response
@@ -1066,8 +1087,15 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
       if (op === 'media') {
         const q = String(args?.query || '').trim()
         let players = await haJoinAreas(await haStates(['media_player']))
-        if (q) players = haResolve(players, q, 'media_player')
-        if (!players.length) return 'No media players found.'
+        if (q) {
+          players = haResolve(players, q, 'media_player')
+          // The user named a device — show THAT remote, not the whole rack.
+          if (players.length > 1) players = players.slice(0, 1)
+        } else {
+          // No name given: whatever is actually playing belongs on top.
+          players = [...players].sort((a, b) => Number(b.state === 'playing') - Number(a.state === 'playing'))
+        }
+        if (!players.length) return `No media player matching "${q}". Ask op:'media' with no query to list them all.`
         for (const e of players.slice(0, 4)) {
           const pic = e.attributes.entity_picture
           // Say WHAT the device is: a Sonos named "Living Room" and a TV in

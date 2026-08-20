@@ -178,11 +178,14 @@
             else if(evt==='canvas_close') hideCanvas();
             else if(evt==='widget') spawnWidget(d);
             else if(evt==='text_chunk'){ full+=d.text; out.textContent=full; messages.scrollTop=messages.scrollHeight; }
-            else if(evt==='done'&&d.provenance){
-              // Provenance (v0.2 §8): quiet metadata — which tier answered.
+            else if(evt==='done'&&d.provenance&&full.trim()){
+              // Provenance (v0.2 §8): QUIET metadata — a faint inline mark at
+              // the end of the answer, never its own bubble/line. Skipped
+              // entirely on widget-only turns (no text = nothing to annotate).
               const b=document.createElement('span'); b.className='prov-badge '+(d.provenance.tier||'local');
-              b.title=d.provenance.model||''; b.textContent=d.provenance.tier==='cloud'?'cloud':'local';
-              out.parentElement&&out.parentElement.appendChild(b);
+              b.title='Answered by the '+(d.provenance.tier==='cloud'?'cloud model':'local model')+(d.provenance.model?' · '+d.provenance.model:'');
+              b.textContent=d.provenance.tier==='cloud'?'cloud':'local';
+              out.appendChild(b);
             }
             evt='';
           } else if(line==='') evt='';
@@ -444,7 +447,7 @@
     const ttl=document.createElement('span'); ttl.className='wg-title'; ttl.textContent = spec.title || titleFor(spec); ttl.title = ttl.textContent;
     const pin=document.createElement('button'); pin.className='wg-pin'+(pinnedIds.has(String(spec.id||''))?' on':''); pin.setAttribute('aria-label','Pin');
     pin.title='Pin — keep this widget';
-    pin.innerHTML='<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M5 10l7-7 7 7-2 2v3l-5 2-5-2v-3z"/></svg>';
+    pin.innerHTML='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h12v17l-6-4.5L6 21z"/></svg>';
     pin.onclick=(e)=>{ e.stopPropagation(); togglePin(wg._spec||spec, pin); };
     const x=document.createElement('button'); x.className='wg-x'; x.setAttribute('aria-label','Close');
     x.innerHTML='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>'; x.onclick=()=>{ widgets.delete(wid);

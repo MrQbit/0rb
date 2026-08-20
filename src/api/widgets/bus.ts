@@ -26,6 +26,15 @@ export function recentSpecs(sessionId: string): WidgetSpec[] {
 
 export function emitWidget(sessionId: string, spec: WidgetSpec): void {
   const set = listeners.get(sessionId)
+  // Console CONTROL events (type ui-*: open settings, etc.) are not widgets:
+  // they bypass catalog validation and the recent cache (not pinnable) and
+  // go straight to the client. Without this, validation silently ate them —
+  // the agent said "opened Settings" while nothing happened.
+  if (String(spec.type || '').startsWith('ui-')) {
+    if (!set) return
+    for (const fn of set) { try { fn(spec) } catch { /* ignore */ } }
+    return
+  }
   // Catalog validation (v0.2 §5): unknown fields are stripped, unknown types
   // pass only for registered runtime plugins, attention tiers can only be
   // lowered. A skeleton (pending:true) skips field checks by design.
