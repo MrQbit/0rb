@@ -1867,6 +1867,62 @@ async function dispatch(
       return jsonResponse(200, { ok: true, ...result, created_at: payload.created_at })
     } catch (e) { return jsonResponse(400, { error: (e as Error).message }) }
   }
+  // ─── Spotify player surface (powers the dedicated spotify widget) ───
+  if (pathname.startsWith('/v1/spotify/')) {
+    const member = (attributionFor(identity).oid || '').replace(/^user:/, '')
+    const { getUserToken, spotifyApi } = await import('./connectors/spotifyOAuth.js')
+    if (pathname === '/v1/spotify/overview' && method === 'GET') {
+      if (!(await getUserToken(ctx.store, member))) return jsonResponse(200, { connected: false })
+      const j = async (path: string) => { try { const r = await spotifyApi(ctx.store, path, undefined, member); return r.status === 204 ? null : r.ok ? await r.json() : null } catch { return null } }
+      const [player, devices, playlists] = await Promise.all([
+        j('/me/player'), j('/me/player/devices'), j('/me/playlists?limit=12'),
+      ])
+      return jsonResponse(200, {
+        connected: true,
+        now: player?.item ? {
+          title: player.item.name,
+          artist: (player.item.artists || []).map((a: any) => a.name).join(', '),
+          art: player.item.album?.images?.[1]?.url || player.item.album?.images?.[0]?.url || null,
+          playing: !!player.is_playing,
+          device: player.device?.name || null,
+          volume: player.device?.volume_percent ?? null,
+        } : null,
+        devices: ((devices as any)?.devices || []).map((d: any) => ({ id: d.id, name: d.name, type: d.type, active: !!d.is_active })),
+        playlists: ((playlists as any)?.items || []).map((p: any) => ({ name: p.name, uri: p.uri, tracks: p.tracks?.total ?? 0, image: p.images?.[p.images.length - 1]?.url || null })),
+      })
+    }
+    if (pathname === '/v1/spotify/cmd' && method === 'POST') {
+      const b = await req.json().catch(() => ({})) as any
+      const act = String(b.action || '')
+      try {
+        let r: Response
+        if (act === 'play') r = await spotifyApi(ctx.store, '/me/player/play', { method: 'PUT' }, member)
+        else if (act === 'pause') r = await spotifyApi(ctx.store, '/me/player/pause', { method: 'PUT' }, member)
+        else if (act === 'next') r = await spotifyApi(ctx.store, '/me/player/next', { method: 'POST' }, member)
+        else if (act === 'previous') r = await spotifyApi(ctx.store, '/me/player/previous', { method: 'POST' }, member)
+        else if (act === 'volume') r = await spotifyApi(ctx.store, `/me/player/volume?volume_percent=${Math.max(0, Math.min(100, Number(b.value) || 0))}`, { method: 'PUT' }, member)
+        else if (act === 'transfer' && b.device_id) r = await spotifyApi(ctx.store, '/me/player', { method: 'PUT', body: JSON.stringify({ device_ids: [String(b.device_id)], play: true }) }, member)
+        else if (act === 'play_uri' && b.uri) {
+          const uri = String(b.uri)
+          const body = uri.includes(':track:') ? { uris: [uri] } : { context_uri: uri }
+          const dev = b.device_id ? `?device_id=${encodeURIComponent(String(b.device_id))}` : ''
+          r = await spotifyApi(ctx.store, `/me/player/play${dev}`, { method: 'PUT', body: JSON.stringify(body) }, member)
+        }
+        else return jsonResponse(400, { error: 'unknown action' })
+        if (r.status === 404) return jsonResponse(409, { error: 'no active Spotify device — pick one below or open Spotify anywhere' })
+        return jsonResponse(r.ok || r.status === 204 ? 200 : 502, r.ok || r.status === 204 ? { ok: true } : { error: `spotify ${r.status}` })
+      } catch (e) { return jsonResponse(502, { error: (e as Error).message }) }
+    }
+    if (pathname === '/v1/spotify/search' && method === 'GET') {
+      const q = new URL(req.url).searchParams.get('q') || ''
+      if (!q.trim()) return jsonResponse(400, { error: 'q required' })
+      try {
+        const { spotifySearch } = await import('./connectors/spotify.js')
+        const hits = await spotifySearch(q, 8, ctx.store, member)
+        return jsonResponse(200, { tracks: hits.map(h => ({ title: h.title, artist: h.artist, uri: h.uri, thumbnail: h.thumbnail })) })
+      } catch (e) { return jsonResponse(502, { error: (e as Error).message }) }
+    }
+  }
   // ─── Apple account (CalDAV via app-specific password) ───
   if (pathname.startsWith('/v1/apple/')) {
     const member = (attributionFor(identity).oid || 'owner').replace(/^user:/, '')

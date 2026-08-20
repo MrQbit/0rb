@@ -136,7 +136,7 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
       input_schema: {
         type: 'object',
         properties: {
-          type: { type: 'string', enum: ['chart', 'results', 'video', 'music', 'table', 'stats', 'gallery', 'image', 'embed', 'calculator', 'weather', 'calendar', 'map', 'code', 'mail', 'vercel', 'html', 'note', 'document', 'wallet', 'shopping'], description: 'Widget kind.' },
+          type: { type: 'string', enum: ['chart', 'results', 'video', 'music', 'table', 'stats', 'gallery', 'image', 'embed', 'calculator', 'weather', 'calendar', 'map', 'code', 'mail', 'vercel', 'html', 'note', 'document', 'wallet', 'shopping', 'spotify'], description: "Widget kind. spotify = the full Spotify player (now playing, devices, playlists, search) — it populates itself, just pass {type:'spotify', id:'spotify'}; use when the user asks to see/open the music player. For TV remotes use the Home tool op:'tv' instead." },
           id: { type: 'string', description: "STRONGLY use a STABLE, SEMANTIC id per logical widget — e.g. 'map', 'weather', 'route', 'calendar', 'mail'. To CHANGE or EXTEND what is already shown (a different city's weather, add a hotel to the route, a new route), re-emit with the SAME id — this updates that widget IN PLACE and brings it back into view (even if it scrolled away or collapsed). NEVER open a second widget of the same kind; reuse its id. Omit only for a genuinely new, distinct thing." },
           html: { type: 'string', description: 'html: complete self-contained HTML document (with any CDN <script>/<link>) for a bespoke app.' },
           title: { type: 'string', description: 'Widget title shown in its header.' },
@@ -186,7 +186,7 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
     },
     {
       name: 'MusicPlay',
-      description: "Play music on the user's Spotify (their connected account + Premium). Pass a 'query' (song/artist) to find and play the top match, or a Spotify track 'uri'. Pass 'device' when the user names WHERE to play ('on the Sonos', 'living room') — speakers like Sonos appear as Spotify Connect devices and playback moves there. Use this when the user says 'play …'. If Spotify isn't configured/connected the tool says exactly what's missing — relay it.",
+      description: "Play music on the user's Spotify (their connected account + Premium). Pass a 'query' (song/artist) to find and play the top match, or a Spotify track 'uri'. Pass 'device' when the user names WHERE to play ('on the Sonos', 'living room') — speakers like Sonos appear as Spotify Connect devices and playback moves there. Also shows the Spotify widget (now playing, devices, playlists). Use this when the user says 'play …'. If Spotify isn't connected the tool says exactly what's missing — relay it.",
       input_schema: { type: 'object', properties: { query: { type: 'string', description: 'Song/artist to play.' }, uri: { type: 'string', description: 'Spotify track URI (spotify:track:...) if known.' }, device: { type: 'string', description: "Where to play: a Spotify Connect device name ('sonos', 'living room'). Omit to use the active device." } } },
       available: true,
     },
@@ -426,10 +426,11 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
       name: 'Home',
       description: "Control and check the home's devices through Home Assistant — lights, switches/plugs, thermostats (climate), locks, window shades/blinds (cover), TVs & speakers (media_player), robot vacuums, fans, and door/window & motion sensors. This is how Orb acts as the house. Use op:'list' to see what's available (optionally a `type`), op:'status' to check a device by name, and op:'control' to change one: action on/off/toggle for lights/plugs/switches; lock/unlock for locks; open/close (or set with `value` 0-100) for shades; set with `value` for a thermostat's target temperature; play/pause/on/off (or set volume with `value` 0-100) for media; start/stop/dock for a vacuum. Always refer to devices by their friendly name (e.g. \"kitchen lights\", \"front door\").",
       input_schema: { type: 'object', properties: {
-        op: { type: 'string', enum: ['list', 'status', 'control', 'media', 'lights', 'climate', 'vacuum', 'covers', 'security', 'plugs', 'scenes', 'sensors', 'camera', 'presence', 'automations', 'printer', 'energy', 'mode'], description: "list = overview dashboard; status/control = one device; each FUNCTION op shows a focused widget: media (remote for ONE device — when the user names a device ('the sonos', 'the tv') you MUST pass it as query so only that remote shows; bare media = all players), lights (room-grouped), climate (thermostats), vacuum, covers (shades/blinds), security (locks + door/window/motion sensors), plugs (switches/outlets), scenes, sensors (readings: temperature/humidity/battery), camera (snapshots), presence (who's home/away), automations (list HA automations with on/off + run), printer (3D printer: live camera, progress, temps, pause/stop); energy (power draw now + today, per metered device); mode {mode:'home'|'away'|'vacation'|'guest', secure?:true} sets the HOUSE MODE — away/vacation = instant alerts incl. motion; guest = mute door nagging; secure:true when leaving also locks every lock and turns lights off (say what was done). Use for 'we're leaving', 'back home', 'guests are over'. ALWAYS prefer the function widget matching what the user is focused on — the overview dashboard (list) is for 'show me everything'." },
+        op: { type: 'string', enum: ['list', 'status', 'control', 'media', 'lights', 'climate', 'vacuum', 'covers', 'security', 'plugs', 'scenes', 'sensors', 'camera', 'tv', 'presence', 'automations', 'printer', 'energy', 'mode'], description: "list = overview dashboard; status/control = one device; each FUNCTION op shows a focused widget: media (SPEAKER/receiver remote — when the user names a device pass it as query; TVs automatically get the TV remote instead), tv (dedicated TV remote: power, INPUT/source switching, volume, transport — use for anything TV: 'switch to HDMI 2', 'TV volume'), lights (room-grouped), climate (thermostats), vacuum, covers (shades/blinds), security (locks + door/window/motion sensors), plugs (switches/outlets), scenes, sensors (readings: temperature/humidity/battery), camera (snapshots), presence (who's home/away), automations (list HA automations with on/off + run), printer (3D printer: live camera, progress, temps, pause/stop); energy (power draw now + today, per metered device); mode {mode:'home'|'away'|'vacation'|'guest', secure?:true} sets the HOUSE MODE — away/vacation = instant alerts incl. motion; guest = mute door nagging; secure:true when leaving also locks every lock and turns lights off (say what was done). Use for 'we're leaving', 'back home', 'guests are over'. ALWAYS prefer the function widget matching what the user is focused on — the overview dashboard (list) is for 'show me everything'." },
         query: { type: 'string', description: "Device name for status/control (e.g. 'living room lights', 'front door', 'bedroom thermostat')." },
         type: { type: 'string', enum: ['light', 'switch', 'climate', 'lock', 'cover', 'media_player', 'vacuum', 'fan', 'sensor', 'camera'], description: 'Optional device type filter for list.' },
-        action: { type: 'string', enum: ['on', 'off', 'toggle', 'lock', 'unlock', 'open', 'close', 'play', 'pause', 'start', 'stop', 'dock', 'set'], description: 'What to do for op:control.' },
+        action: { type: 'string', enum: ['on', 'off', 'toggle', 'lock', 'unlock', 'open', 'close', 'play', 'pause', 'start', 'stop', 'dock', 'set', 'source'], description: 'What to do for op:control. source = switch a TV input (pass the input name in `source`).' },
+        source: { type: 'string', description: "For action:'source' — the TV input name exactly as listed (e.g. 'HDMI 1', 'Netflix')." },
         value: { type: 'number', description: 'Numeric arg for set: brightness/position/volume 0-100, or thermostat temperature.' },
         ask: { type: 'string', description: "op:camera only — a question about what the camera sees ('is the package still on the porch?'); the orb grabs a fresh frame and answers." },
       }, required: ['op'] },
@@ -455,7 +456,7 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
     },
     {
       name: 'AirPlay',
-      description: "The DEFAULT way to speak or play audio on speakers & TVs: AirPlay devices found DIRECTLY on the network, zero setup (works even for devices Home Assistant doesn't know). op:'list' shows every AirPlay device (and network printer) the LAN bridge sees. op:'say' {device, text} speaks a message on a speaker (TTS, e.g. \"tell the living room dinner is ready\"). op:'play' {device, url} streams an audio URL (internet radio, a music file). op:'stop' stops playback; op:'volume' {device, level:0-100}. Refer to devices by name (e.g. 'living room'). PREFER this over the Home tool for playback/announcements; fall back to Home (HA) only for what AirPlay can't do — TV power/inputs, media browsing, grouped scenes.",
+      description: "The DEFAULT way to speak or play audio on speakers & TVs: AirPlay devices found DIRECTLY on the network, zero setup (works even for devices Home Assistant doesn't know). op:'list' shows every AirPlay device (and network printer) the LAN bridge sees. op:'say' {device, text} speaks a message on a speaker (TTS, e.g. \"tell the living room dinner is ready\"). op:'play' {device, url} streams an audio URL (internet radio, a music file). op:'stop' stops playback; op:'volume' {device, level:0-100}. Refer to devices by name (e.g. 'living room'). PREFER this for ANNOUNCEMENTS and for streaming a URL (radio, a file). For MUSIC the user asks for by name, use MusicPlay (Spotify) instead. For TV power/inputs use Home op:'tv'.",
       input_schema: { type: 'object', properties: {
         op: { type: 'string', enum: ['list', 'say', 'play', 'stop', 'volume'] },
         device: { type: 'string', description: "Speaker/TV name (fuzzy matched), e.g. 'living room'." },
@@ -721,8 +722,8 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
         if (!q) return 'Provide a song/artist to play.'
         const hits = await spotifySearch(q, 1, ctx.store, ctx.ownerId?.replace(/^user:/, ''))
         if (!hits.length) return `No Spotify track found for "${q}".`
-        // emit the track widget for visual
-        emitWidget(ctx.sessionId, { id: `sp-now`, type: 'music', title: `${hits[0].title} — ${hits[0].artist}`, url: hits[0].embed } as any)
+        // the dedicated Spotify widget shows now-playing, devices, playlists
+        emitWidget(ctx.sessionId, { id: 'spotify', type: 'spotify', title: 'Spotify', connected: true } as any)
         // derive the track uri from the embed url
         const m = hits[0].embed.match(/track\/([A-Za-z0-9]+)/); if (m) uri = `spotify:track:${m[1]}`
         label = `${hits[0].title} — ${hits[0].artist}`
@@ -761,7 +762,8 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
       else if (action === 'previous') r = await spotifyApi(ctx.store, '/me/player/previous', { method: 'POST' }, ctx.ownerId?.replace(/^user:/, ''))
       else if (action === 'volume') r = await spotifyApi(ctx.store, `/me/player/volume?volume_percent=${Math.max(0, Math.min(100, Number(args?.volume) || 50))}`, { method: 'PUT' }, ctx.ownerId?.replace(/^user:/, ''))
       else return `Unknown action "${action}".`
-      if (r.status === 404) return 'No active Spotify device — open Spotify or the orb2 player first.'
+      if (r.status === 404) return 'No active Spotify device — open Spotify anywhere, or name a speaker to play on.'
+      emitWidget(ctx.sessionId, { id: 'spotify', type: 'spotify', title: 'Spotify', connected: true } as any)
       return `Done (${action}).`
     } catch (e) { return `[ERROR] ${(e as Error).message}` }
   })
@@ -1093,6 +1095,17 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
         } as any)
         return `Showed the lights widget — ${all.length} light(s) in ${groups.size} room(s), ${all.filter(e => e.state === 'on').length} on.`
       }
+      const emitTvWidget = (e: any) => {
+        const pic = e.attributes.entity_picture
+        emitWidget(ctx.sessionId, {
+          id: `tv-${e.entity_id}`, type: 'tv', title: e.name,
+          entity_id: e.entity_id, name: e.name, area: e.area, state: e.state,
+          source: e.attributes.source, sources: e.attributes.source_list || [],
+          app: e.attributes.app_name,
+          volume: e.attributes.volume_level != null ? Math.round(e.attributes.volume_level * 100) : undefined,
+          artwork: pic ? `/v1/home/ha-image?path=${encodeURIComponent(pic)}` : undefined,
+        } as any)
+      }
       if (op === 'media') {
         const q = String(args?.query || '').trim()
         let players = await haJoinAreas(await haStates(['media_player']))
@@ -1105,12 +1118,13 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
           players = [...players].sort((a, b) => Number(b.state === 'playing') - Number(a.state === 'playing'))
         }
         if (!players.length) return `No media player matching "${q}". Ask op:'media' with no query to list them all.`
+        const emitted: string[] = []
         for (const e of players.slice(0, 4)) {
           const pic = e.attributes.entity_picture
-          // Say WHAT the device is: a Sonos named "Living Room" and a TV in
-          // the Living Room area are indistinguishable by name alone.
           const dc = String(e.attributes.device_class || '').toLowerCase()
-          const kind = dc === 'tv' || /\btv\b/i.test(e.name) ? 'TV' : dc === 'receiver' ? 'receiver' : 'speaker'
+          const isTv = dc === 'tv' || /\btv\b/i.test(e.name)
+          if (isTv) { emitTvWidget(e); emitted.push(`${e.name} (TV remote)`); continue }
+          const kind = dc === 'receiver' ? 'receiver' : 'speaker'
           const title = e.area && e.name.toLowerCase() === String(e.area).toLowerCase() ? `${e.name} ${kind}` : e.name
           emitWidget(ctx.sessionId, {
             id: `media-${e.entity_id}`, type: 'media', title,
@@ -1119,8 +1133,18 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
             volume: e.attributes.volume_level != null ? Math.round(e.attributes.volume_level * 100) : undefined,
             artwork: pic ? `/v1/home/ha-image?path=${encodeURIComponent(pic)}` : undefined,
           } as any)
+          emitted.push(e.name)
         }
-        return `Showed media remote${players.length > 1 ? 's' : ''} for: ${players.slice(0, 4).map(p => p.name).join(', ')}.`
+        return `Showed remote${emitted.length > 1 ? 's' : ''} for: ${emitted.join(', ')}.`
+      }
+      if (op === 'tv') {
+        const q = String(args?.query || '').trim()
+        let tvs = (await haJoinAreas(await haStates(['media_player'])))
+          .filter(e => String(e.attributes.device_class || '').toLowerCase() === 'tv' || /\btv\b/i.test(e.name))
+        if (q) tvs = haResolve(tvs, q, 'media_player').slice(0, 1)
+        if (!tvs.length) return 'No TV found among the media players.'
+        for (const e of tvs.slice(0, 2)) emitTvWidget(e)
+        return `Showed the TV remote for ${tvs.slice(0, 2).map(t => t.name).join(', ')} — power, inputs (${(tvs[0]!.attributes.source_list || []).slice(0, 5).join(', ') || 'none listed'}), volume.`
       }
       if (op === 'vacuum') {
         const vs = await haJoinAreas(await haStates(['vacuum']))

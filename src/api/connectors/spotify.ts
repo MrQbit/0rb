@@ -26,7 +26,7 @@ async function spotifyToken(): Promise<string> {
   return tokenCache.token
 }
 
-export type SpTrack = { title: string; artist: string; url: string; embed: string; thumbnail?: string }
+export type SpTrack = { title: string; artist: string; url: string; embed: string; thumbnail?: string; uri?: string }
 
 /** Search works with EITHER the house app credential (client-credentials)
  *  or, in relay mode, a linked member's own token. */
@@ -51,6 +51,7 @@ async function searchWith(tok: string, query: string, max = 8): Promise<SpTrack[
   if (!r.ok) throw new Error(`spotify http ${r.status}`)
   const d = (await r.json()) as any
   return (d.tracks?.items || []).map((t: any) => ({
+    uri: t.uri,
     title: t.name,
     artist: (t.artists || []).map((a: any) => a.name).join(', '),
     url: t.external_urls?.spotify || '',

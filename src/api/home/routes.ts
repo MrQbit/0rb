@@ -191,6 +191,13 @@ export async function tryHandleHomeRoute(method: string, pathname: string, req: 
     const value = typeof body?.value === 'number' ? body.value : undefined
     if (!entityId) return jsonResponse(400, { error: 'entity_id required' })
     const domain = entityId.split('.')[0] || ''
+    // TV input switching (string-valued, so outside serviceFor's numeric shape)
+    if (domain === 'media_player' && action === 'source' && typeof body?.source === 'string' && body.source) {
+      try {
+        await haCallService(domain, 'select_source', entityId, { source: body.source })
+        return jsonResponse(200, { ok: true, entity_id: entityId, action, source: body.source })
+      } catch (e) { return jsonResponse(502, { error: (e as Error).message }) }
+    }
     const plan = serviceFor(domain, action, value)
     if (!plan) return jsonResponse(400, { error: `cannot ${action} a ${domain}` })
     try {

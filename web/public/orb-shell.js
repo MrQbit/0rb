@@ -421,6 +421,8 @@
     else if(spec.type==='timers'){ wg.style.width='340px'; wg.style.maxHeight='340px'; }
     else if(spec.type==='presence'){ wg.style.width='340px'; wg.style.maxHeight='260px'; }
     else if(spec.type==='energy'){ wg.style.width='360px'; wg.style.maxHeight='340px'; }
+    else if(spec.type==='tv'){ wg.style.width='380px'; wg.style.maxHeight='420px'; }
+    else if(spec.type==='spotify'){ wg.style.width='380px'; wg.style.maxHeight='520px'; }
     else if(spec.type==='automations'){ wg.style.width='420px'; wg.style.maxHeight='400px'; }
     else if(spec.type==='printer3d'){ wg.style.width='480px'; wg.style.height='560px'; }
     else if(spec.type==='familyboard'){ wg.style.width='420px'; wg.style.maxHeight='440px'; }
@@ -719,6 +721,8 @@
     else if(spec.type==='timers') renderTimers(body, spec, wg);
     else if(spec.type==='presence') renderPresence(body, spec);
     else if(spec.type==='energy') renderEnergy(body, spec);
+    else if(spec.type==='tv') renderTv(body, spec);
+    else if(spec.type==='spotify') renderSpotify(body, spec, wg);
     else if(spec.type==='automations') renderAutomations(body, spec);
     else if(spec.type==='printer3d') renderPrinter3d(body, spec, wg);
     else if(spec.type==='familyboard') renderFamilyBoard(body, spec);
@@ -896,6 +900,129 @@
     vol.onchange=async()=>{ try{ const r=await fetch('/v1/home/control',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({entity_id:spec.entity_id,action:'set',value:Number(vol.value)})});
       if(!r.ok) toast('Failed'); }catch{ toast('Failed'); } };
     volRow.appendChild(vol); wrap.appendChild(volRow);
+  }
+
+
+  // ── TV: a real TV remote — power, inputs, transport, volume ──
+  function renderTv(body, spec){
+    const wrap=document.createElement('div'); wrap.className='wg-media wg-tv'; body.appendChild(wrap);
+    const ctlCall=async(payload)=>{ try{ const r=await fetch('/v1/home/control',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify(Object.assign({entity_id:spec.entity_id},payload))});
+      if(!r.ok) toast('Failed'); return r.ok; }catch{ toast('Failed'); return false; } };
+    const art=document.createElement('div'); art.className='art';
+    const artUrl=spec.artwork&&safeUrl(spec.artwork);
+    if(artUrl){ const im=document.createElement('img'); im.src=artUrl; im.alt=''; im.onerror=()=>im.remove(); art.appendChild(im); }
+    else art.innerHTML=homeIcon('media_player');
+    wrap.appendChild(art);
+    const meta=document.createElement('div'); meta.className='meta';
+    meta.innerHTML=`<div class="now">${esc2(spec.app||spec.source||spec.state||'off')}</div><div class="src">${esc2([spec.area,spec.state].filter(Boolean).join(' · '))}</div>`;
+    wrap.appendChild(meta);
+    // inputs — the reason this widget exists
+    const srcs=(spec.sources||[]).slice(0,12);
+    if(srcs.length){
+      const row=document.createElement('div'); row.className='wg-tv-srcs';
+      srcs.forEach(name=>{
+        const b=document.createElement('button'); b.className='wg-tv-src'+(name===spec.source?' on':''); b.textContent=name; b.title='Switch input to '+name;
+        b.onclick=async()=>{ if(await ctlCall({action:'source',source:name})){ row.querySelectorAll('.wg-tv-src').forEach(x=>x.classList.remove('on')); b.classList.add('on'); meta.querySelector('.now').textContent=name; } };
+        row.appendChild(b);
+      });
+      wrap.appendChild(row);
+    }
+    const ctl=document.createElement('div'); ctl.className='ctl';
+    const svg=p=>`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+    const btn=(label,action,title)=>{ const b=document.createElement('button'); b.className='wg-med-btn'; b.innerHTML=label; b.title=title; b.onclick=()=>ctlCall({action}); return b; };
+    ctl.appendChild(btn(svg('<path d="M19 20 9 12l10-8zM7 4v16"/>'),'prev','Previous'));
+    ctl.appendChild(btn(svg('<path d="m5 4 8 8-8 8z"/><path d="M17 5v14"/>'),'toggle','Play/Pause'));
+    ctl.appendChild(btn(svg('<path d="m5 4 10 8-10 8zM17 4v16"/>'),'next','Next'));
+    const pw=document.createElement('button'); pw.className='wg-med-btn pw'; pw.innerHTML=svg('<path d="M12 3v9"/><path d="M6.6 6.6a8 8 0 1 0 10.8 0"/>'); pw.title='Power';
+    pw.onclick=()=>ctlCall({action:(spec.state==='off')?'on':'off'});
+    ctl.appendChild(pw);
+    wrap.appendChild(ctl);
+    const volRow=document.createElement('div'); volRow.className='vol';
+    volRow.innerHTML='<span class="vlbl">vol</span>';
+    const vol=document.createElement('input'); vol.type='range'; vol.min=0; vol.max=100; vol.value=spec.volume!=null?spec.volume:30; vol.setAttribute('aria-label','TV volume');
+    vol.onchange=()=>ctlCall({action:'set',value:Number(vol.value)});
+    volRow.appendChild(vol); wrap.appendChild(volRow);
+  }
+
+  // ── Spotify: now playing + transport + Connect devices + playlists + search ──
+  function renderSpotify(body, spec, wg){
+    const wrap=document.createElement('div'); wrap.className='wg-sp'; body.appendChild(wrap);
+    const cmd=async(payload)=>{ try{ const r=await fetch('/v1/spotify/cmd',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});
+      if(r.status===409){ toast('No active device — pick one in the widget'); return false; }
+      if(!r.ok) toast('Failed'); return r.ok; }catch{ toast('Failed'); return false; } };
+    const draw=(d)=>{
+      wrap.replaceChildren();
+      if(!d||!d.connected){
+        wrap.innerHTML='<div class="wg-empty">Spotify isn’t linked yet.<br>Settings → Apps → Your accounts → Spotify → Connect.</div>';
+        return;
+      }
+      const now=d.now;
+      const head=document.createElement('div'); head.className='wg-media';
+      const art=document.createElement('div'); art.className='art';
+      if(now&&now.art){ const im=document.createElement('img'); im.src=now.art; im.alt=''; im.onerror=()=>im.remove(); art.appendChild(im); }
+      else art.innerHTML='<svg viewBox="0 0 24 24" width="26" height="26"><path fill="#1DB954" d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0z"/></svg>';
+      head.appendChild(art);
+      const meta=document.createElement('div'); meta.className='meta';
+      meta.innerHTML=now?`<div class="now">${esc2(now.title)}</div><div class="src">${esc2(now.artist)}${now.device?' · '+esc2(now.device):''}</div>`
+        :'<div class="now">Nothing playing</div><div class="src">pick a playlist or search below</div>';
+      head.appendChild(meta);
+      const ctl=document.createElement('div'); ctl.className='ctl';
+      const svg=p=>`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+      const btn=(label,action,title)=>{ const b=document.createElement('button'); b.className='wg-med-btn'; b.innerHTML=label; b.title=title;
+        b.onclick=async()=>{ if(await cmd({action})) setTimeout(refresh,600); }; return b; };
+      ctl.appendChild(btn(svg('<path d="M19 20 9 12l10-8zM7 4v16"/>'),'previous','Previous'));
+      ctl.appendChild(btn(svg(now&&now.playing?'<path d="M8 5v14M16 5v14"/>':'<path d="m6 4 14 8-14 8z"/>'),now&&now.playing?'pause':'play',now&&now.playing?'Pause':'Play'));
+      ctl.appendChild(btn(svg('<path d="m5 4 10 8-10 8zM17 4v16"/>'),'next','Next'));
+      head.appendChild(ctl);
+      if(now&&now.volume!=null){
+        const volRow=document.createElement('div'); volRow.className='vol'; volRow.innerHTML='<span class="vlbl">vol</span>';
+        const vol=document.createElement('input'); vol.type='range'; vol.min=0; vol.max=100; vol.value=now.volume; vol.setAttribute('aria-label','Spotify volume');
+        vol.onchange=()=>cmd({action:'volume',value:Number(vol.value)});
+        volRow.appendChild(vol); head.appendChild(volRow);
+      }
+      wrap.appendChild(head);
+      // where it plays — Spotify Connect devices (Sonos, TV, phone…)
+      if((d.devices||[]).length){
+        const dv=document.createElement('div'); dv.className='wg-sp-devs';
+        d.devices.forEach(x=>{
+          const b=document.createElement('button'); b.className='wg-tv-src'+(x.active?' on':''); b.textContent=x.name; b.title='Play here';
+          b.onclick=async()=>{ if(await cmd({action:'transfer',device_id:x.id})) setTimeout(refresh,800); };
+          dv.appendChild(b);
+        });
+        wrap.appendChild(dv);
+      }
+      // search
+      const se=document.createElement('div'); se.className='wg-sp-search';
+      const inp=document.createElement('input'); inp.placeholder='Search songs & artists…'; inp.className='wg-sp-in';
+      const res=document.createElement('div'); res.className='wg-sp-res';
+      let t=null;
+      inp.oninput=()=>{ clearTimeout(t); const q=inp.value.trim(); if(!q){ res.replaceChildren(); return; }
+        t=setTimeout(async()=>{ try{
+          const d2=await (await fetch('/v1/spotify/search?q='+encodeURIComponent(q),{credentials:'same-origin'})).json();
+          res.replaceChildren();
+          (d2.tracks||[]).slice(0,6).forEach(tr=>{
+            const row=document.createElement('button'); row.className='wg-sp-row';
+            row.innerHTML=(tr.thumbnail?`<img src="${esc2(tr.thumbnail)}" alt=""/>`:'')+`<span class="t">${esc2(tr.title)}</span><span class="a">${esc2(tr.artist)}</span>`;
+            row.onclick=async()=>{ if(await cmd({action:'play_uri',uri:tr.uri})){ inp.value=''; res.replaceChildren(); setTimeout(refresh,700); } };
+            res.appendChild(row);
+          });
+        }catch{} },350); };
+      se.append(inp,res); wrap.appendChild(se);
+      // playlists
+      if((d.playlists||[]).length){
+        const pl=document.createElement('div'); pl.className='wg-sp-pls';
+        d.playlists.forEach(x=>{
+          const row=document.createElement('button'); row.className='wg-sp-row';
+          row.innerHTML=(x.image?`<img src="${esc2(x.image)}" alt=""/>`:'')+`<span class="t">${esc2(x.name)}</span><span class="a">${x.tracks} tracks</span>`;
+          row.onclick=async()=>{ if(await cmd({action:'play_uri',uri:x.uri})) setTimeout(refresh,700); };
+          pl.appendChild(row);
+        });
+        wrap.appendChild(pl);
+      }
+    };
+    const refresh=async()=>{ try{ draw(await (await fetch('/v1/spotify/overview',{credentials:'same-origin'})).json()); }catch{ draw(null); } };
+    if(spec.now||spec.devices) draw(spec); else refresh();
+    if(wg&&!wg._spTimer){ wg._spTimer=setInterval(()=>{ if(!wg.isConnected){ clearInterval(wg._spTimer); return; } refresh(); }, 30000); }
   }
 
   // ── shopping: list + buy options ──
