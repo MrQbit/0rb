@@ -15,9 +15,17 @@ export type WidgetSpec = {
 type Listener = (spec: WidgetSpec) => void
 const listeners = new Map<string, Set<Listener>>()
 
+// Recent specs per session (cap 20) — lets "pin that" find what's on screen.
+const recent = new Map<string, Map<string, WidgetSpec>>()
+export function recentSpec(sessionId: string, id: string): WidgetSpec | undefined {
+  return recent.get(sessionId)?.get(id)
+}
+export function recentSpecs(sessionId: string): WidgetSpec[] {
+  return [...(recent.get(sessionId)?.values() ?? [])]
+}
+
 export function emitWidget(sessionId: string, spec: WidgetSpec): void {
   const set = listeners.get(sessionId)
-  if (!set) return
   // Catalog validation (v0.2 §5): unknown fields are stripped, unknown types
   // pass only for registered runtime plugins, attention tiers can only be
   // lowered. A skeleton (pending:true) skips field checks by design.
@@ -36,6 +44,13 @@ export function emitWidget(sessionId: string, spec: WidgetSpec): void {
     }
     out = v.spec as WidgetSpec
   } catch { /* validation is best-effort; never drop UI on internal errors */ }
+  if (out.id) {
+    let m = recent.get(sessionId)
+    if (!m) { m = new Map(); recent.set(sessionId, m) }
+    m.set(String(out.id), out)
+    while (m.size > 20) { m.delete(m.keys().next().value as string) }
+  }
+  if (!set) return
   for (const fn of set) { try { fn(out) } catch { /* ignore */ } }
 }
 

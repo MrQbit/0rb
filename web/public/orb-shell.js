@@ -364,6 +364,9 @@
     // Update in place if a widget with this id already exists (the agent
     // re-emits the same id to "update the widget", not make a new one).
     if(spec.id && widgets.has(spec.id)){
+      if(pinnedIds.has(String(spec.id)) && !spec.pending){
+        fetch('/v1/pins/'+encodeURIComponent(spec.id),{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({spec})}).catch(()=>{});
+      }
       const ex = widgets.get(spec.id);
       const ttl = ex.querySelector('.wg-title'); if(ttl){ ttl.textContent = spec.title || titleFor(spec); ttl.title = ttl.textContent; }
       if(ex._chart){ try{ ex._chart.destroy(); }catch{} ex._chart=null; }
@@ -431,6 +434,10 @@
     wg.style.left=wpos.x+'px'; wg.style.top=wpos.y+'px';
     const head=document.createElement('div'); head.className='wg-head';
     const ttl=document.createElement('span'); ttl.className='wg-title'; ttl.textContent = spec.title || titleFor(spec); ttl.title = ttl.textContent;
+    const pin=document.createElement('button'); pin.className='wg-pin'+(pinnedIds.has(String(spec.id||''))?' on':''); pin.setAttribute('aria-label','Pin');
+    pin.title='Pin — keep this widget';
+    pin.innerHTML='<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M5 10l7-7 7 7-2 2v3l-5 2-5-2v-3z"/></svg>';
+    pin.onclick=(e)=>{ e.stopPropagation(); togglePin(wg._spec||spec, pin); };
     const x=document.createElement('button'); x.className='wg-x'; x.setAttribute('aria-label','Close');
     x.innerHTML='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>'; x.onclick=()=>{ widgets.delete(wid);
       if(wg._chart){try{wg._chart.destroy();}catch{}}
@@ -438,7 +445,7 @@
       if(wg._mapRo){try{wg._mapRo.disconnect();}catch{}}
       if(wg._ro){try{wg._ro.disconnect();}catch{}}
       wg.remove(); growWidgetCanvas(); };
-    head.append(ttl, x); wg.appendChild(head);
+    head.append(ttl, pin, x); wg.appendChild(head);
     const body=document.createElement('div'); body.className='wg-body'; wg.appendChild(body);
     // Attach BEFORE rendering: size-aware renderers (Leaflet maps, charts)
     // measure their container at init — a detached element measures 0x0,
@@ -452,7 +459,7 @@
     let d=null;
     // NOTE: the click lands on the svg INSIDE the button, so a strict
     // `e.target===x` check misses and setPointerCapture eats the click.
-    head.addEventListener('pointerdown',(e)=>{ if(x.contains(e.target))return; d={sx:e.clientX,sy:e.clientY,ox:wpos.x,oy:wpos.y}; head.setPointerCapture(e.pointerId); });
+    head.addEventListener('pointerdown',(e)=>{ if(x.contains(e.target)||pin.contains(e.target))return; d={sx:e.clientX,sy:e.clientY,ox:wpos.x,oy:wpos.y}; head.setPointerCapture(e.pointerId); });
     head.addEventListener('pointermove',(e)=>{ if(!d)return; wpos.x=d.ox+(e.clientX-d.sx); wpos.y=d.oy+(e.clientY-d.sy); wg.style.left=wpos.x+'px'; wg.style.top=wpos.y+'px'; });
     head.addEventListener('pointerup',()=>{ d=null; growWidgetCanvas(); });
     // lifecycle bookkeeping: track interaction so idle widgets can pill/stop
@@ -465,6 +472,28 @@
   //    Keeps the page light: idle widgets shrink to a named pill with a bit of
   //    live info; hours-stale ones free their heavy resources entirely and
   //    re-render from spec the instant you touch them. Tunable below. ──
+  // ── Pinned widgets (v0.2 §6): restore on load, keep copies fresh ──
+  const pinnedIds=new Set();
+  async function loadPins(){
+    try{
+      const d=await (await fetch('/v1/pins',{credentials:'same-origin'})).json();
+      (d.pins||[]).forEach(spec=>{ pinnedIds.add(String(spec.id)); try{ spawnWidget(spec); }catch{} });
+    }catch{}
+  }
+  setTimeout(loadPins, 1200);
+  async function togglePin(spec, btn){
+    const id=String(spec.id||'');
+    if(!id) return;
+    if(pinnedIds.has(id)){
+      try{ await fetch('/v1/pins/'+encodeURIComponent(id),{method:'DELETE',credentials:'same-origin'});
+        pinnedIds.delete(id); btn.classList.remove('on'); toast('Unpinned'); }catch{ toast('Failed'); }
+    } else {
+      try{ const r=await fetch('/v1/pins',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({spec})});
+        if(r.ok){ pinnedIds.add(id); btn.classList.add('on'); toast('Pinned — it will persist'); } else toast('Failed');
+      }catch{ toast('Failed'); }
+    }
+  }
+
   // Debug/test hook: the widget gallery harness (tests/ui/gallery.mjs)
   // spawns every widget type with fixture specs through the REAL renderer.
   try { window.__orbSpawnWidget = spawnWidget; } catch { /* strict contexts */ }

@@ -132,7 +132,7 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
     },
     {
       name: 'Widget',
-      description: "The ONLY way to SHOW the user something visual — ALWAYS use this instead of describing structured data in prose, and instead of any other display tool. Multiple widgets can be open at once and the user drags them around. Pick the best 'type':\n• chart — bar/line/pie/doughnut from labels+datasets (use this for ANY chart/graph; do NOT write chart HTML by hand).\n• results — a list of search results/recommendations; each item has title/subtitle/thumbnail and an optional action (e.g. a video the user clicks to play, or a link).\n• video — play one video (youtube/vimeo/direct url).\n• table — columns + rows.\n• stats — a row of metric cards (label/value/sub).\n• gallery — a grid of images (click to enlarge).\n• image — one image with a caption.\n• embed — embed an external interactive page by URL (e.g. a Sketchfab 3D model, an OpenStreetMap map, a CodeSandbox). Use this to 'find me a 3D model' etc.\n• calculator — an interactive calculator (no data needed; use when the user wants to do math themselves).\n• weather — a weather card. PREFER the dedicated **Weather** tool (it fetches real data for a location and renders this card for you). Only build it directly if you already have the data: pass `location`, `current` ({temp, condition, humidity, wind}) and optional `forecast` ([{day, high, low, condition}]).\n• calendar — a month calendar with event dots + an agenda: pass optional `month` (YYYY-MM) and `events` ([{date: YYYY-MM-DD, time, title}]). Use for schedules/agendas.\n• map — an interactive map: pass `center` ([lat,lng]) + `zoom`, `markers` ([{lat, lng, label}]) for places, and `route` ([[lat,lng],…]) for a path/route. Use for 'where is…', directions, 'show me on a map'. To change the route, add a stop, or drop a hotel pin, re-emit the SAME id with the updated markers/route — it updates the one map, never a new one.\n• code — DISPLAY source code read-only with syntax highlighting + line numbers + copy (pass `code` and optional `language`/`filename`). Use this to SHOW code you wrote/found. (To RUN a bespoke app instead, use Canvas / the `html` type — code is display-only.)\n• mail — an inbox preview: `messages` ([{from, subject, snippet, date, unread}]).\n• vercel — deployment status: `deployments` ([{name, state, branch, url, created}]).\n• embed — embed an external interactive page by URL (e.g. a Sketchfab 3D model, an OpenStreetMap map, a CodeSandbox). Use this to 'find me a 3D model' etc.\n• html — a bespoke custom interactive app you hand-write: pass complete self-contained HTML in `html` (include any CDN libs like three.js/d3 in <script>). Renders in a draggable app card. Use this ONLY when no other type fits (a generated 3D scene, a simulation, a custom UI).\n• note — formatted markdown/text.",
+      description: "The ONLY way to SHOW the user something visual — ALWAYS use this instead of describing structured data in prose, and instead of any other display tool. Multiple widgets can be open at once and the user drags them around. Pick the best 'type':\n• chart — bar/line/pie/doughnut from labels+datasets (use this for ANY chart/graph; do NOT write chart HTML by hand).\n• results — a list of search results/recommendations; each item has title/subtitle/thumbnail and an optional action (e.g. a video the user clicks to play, or a link).\n• video — play one video (youtube/vimeo/direct url).\n• table — columns + rows.\n• stats — a row of metric cards (label/value/sub).\n• gallery — a grid of images (click to enlarge).\n• image — one image with a caption.\n• embed — embed an external interactive page by URL (e.g. a Sketchfab 3D model, an OpenStreetMap map, a CodeSandbox). Use this to 'find me a 3D model' etc.\n• calculator — an interactive calculator (no data needed; use when the user wants to do math themselves).\n• weather — a weather card. PREFER the dedicated **Weather** tool (it fetches real data for a location and renders this card for you). Only build it directly if you already have the data: pass `location`, `current` ({temp, condition, humidity, wind}) and optional `forecast` ([{day, high, low, condition}]).\n• calendar — a month calendar with event dots + an agenda: pass optional `month` (YYYY-MM) and `events` ([{date: YYYY-MM-DD, time, title}]). Use for schedules/agendas.\n• map — an interactive map: pass `center` ([lat,lng]) + `zoom`, `markers` ([{lat, lng, label}]) for places, and `route` ([[lat,lng],…]) for a path/route. Use for 'where is…', directions, 'show me on a map'. To change the route, add a stop, or drop a hotel pin, re-emit the SAME id with the updated markers/route — it updates the one map, never a new one.\n• code — DISPLAY source code read-only with syntax highlighting + line numbers + copy (pass `code` and optional `language`/`filename`). Use this to SHOW code you wrote/found. (To RUN a bespoke app instead, use Canvas / the `html` type — code is display-only.)\n• mail — an inbox preview: `messages` ([{from, subject, snippet, date, unread}]).\n• vercel — deployment status: `deployments` ([{name, state, branch, url, created}]).\n• embed — embed an external interactive page by URL (e.g. a Sketchfab 3D model, an OpenStreetMap map, a CodeSandbox). Use this to 'find me a 3D model' etc.\n• html — a bespoke custom interactive app you hand-write: pass complete self-contained HTML in `html` (include any CDN libs like three.js/d3 in <script>). Renders in a draggable app card. Use this ONLY when no other type fits (a generated 3D scene, a simulation, a custom UI).\n• note — formatted markdown/text. op:'pin' {id} pins a widget to the user's board (it persists and appears on idle/kiosk screens); op:'unpin' {id} removes it. Re-emitting a PINNED id with changed fields UPDATES the user's pinned copy — that's how 'add humidity to my weather card' works.",
       input_schema: {
         type: 'object',
         properties: {
@@ -602,6 +602,21 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
   }
 
   add('Widget', { readOnly: true }, async args => {
+    // Pin/unpin (v0.2 §6): a pinned widget becomes a durable per-member object.
+    if (args?.op === 'pin' || args?.op === 'unpin') {
+      const { recentSpec } = await import('../widgets/bus.js')
+      const { pinWidget, unpinWidget, updatePinned } = await import('../widgets/pins.js')
+      const user = (ctx.ownerId || 'owner').replace(/^user:/, '')
+      const pid = String(args?.id || '').trim()
+      if (!pid) return 'Which widget? Give its id.'
+      if (args.op === 'unpin') {
+        return (await unpinWidget(ctx.store, user, pid)) ? `Unpinned ${pid}.` : `${pid} wasn't pinned.`
+      }
+      const spec = recentSpec(ctx.sessionId, pid)
+      if (!spec) return `I don't have a widget "${pid}" on screen to pin.`
+      if (!(await updatePinned(ctx.store, user, spec))) await pinWidget(ctx.store, user, spec)
+      return `Pinned ${pid} — it'll persist and appear on your idle board. Re-emit the same id with changes to update it.`
+    }
     const id = (typeof args?.id === 'string' && args.id.trim()) ? args.id.trim() : `w-${Date.now().toString(36)}`
     // Bespoke HTML app → write a self-contained file to the workspace and
     // render it as an 'app' iframe widget (served with the permissive canvas
@@ -637,6 +652,11 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
       }
     }
     emitWidget(ctx.sessionId, { ...args, id } as any)
+    // Edit-by-diff: if this id is pinned, the pinned copy follows the edit.
+    try {
+      const { updatePinned } = await import('../widgets/pins.js')
+      await updatePinned(ctx.store, (ctx.ownerId || 'owner').replace(/^user:/, ''), { ...args, id })
+    } catch { /* pins are best-effort */ }
     const verb = (typeof args?.id === 'string' && args.id.trim()) ? 'Updated' : 'Displayed a'
     return `${verb} ${args?.type || 'widget'} widget (id: ${id}). To update THIS SAME widget later, call Widget again with id:"${id}".`
   })

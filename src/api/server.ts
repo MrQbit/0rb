@@ -1683,6 +1683,30 @@ async function dispatch(
     const r = await tryHandleMatterRoute(method, pathname, req, ctx.store)
     if (r) return r
   }
+  // ─── Pinned widgets + the composed board (v0.2 §6) ───
+  if (pathname.startsWith('/v1/pins') || pathname === '/v1/board') {
+    const { listPins, pinWidget, unpinWidget, updatePinned, revertPinned, composeBoard } = await import('./widgets/pins.js')
+    const user = (attributionFor(identity).oid || 'owner').replace(/^user:/, '')
+    if (pathname === '/v1/pins' && method === 'GET') return jsonResponse(200, { pins: await listPins(ctx.store, user) })
+    if (pathname === '/v1/pins' && method === 'POST') {
+      const b = await req.json().catch(() => ({})) as any
+      return (await pinWidget(ctx.store, user, b?.spec)) ? jsonResponse(200, { ok: true }) : jsonResponse(400, { error: 'spec with id+type required' })
+    }
+    const pm = pathname.match(/^\/v1\/pins\/([^/]+?)(\/revert)?$/)
+    if (pm) {
+      const id = decodeURIComponent(pm[1]!)
+      if (pm[2] && method === 'POST') {
+        const spec = await revertPinned(ctx.store, user, id)
+        return spec ? jsonResponse(200, { ok: true, spec }) : jsonResponse(400, { error: 'no earlier version' })
+      }
+      if (method === 'PUT') {
+        const b = await req.json().catch(() => ({})) as any
+        return (await updatePinned(ctx.store, user, b?.spec)) ? jsonResponse(200, { ok: true }) : jsonResponse(404, { error: 'not pinned' })
+      }
+      if (method === 'DELETE') return (await unpinWidget(ctx.store, user, id)) ? jsonResponse(200, { ok: true }) : jsonResponse(404, { error: 'not pinned' })
+    }
+    if (pathname === '/v1/board' && method === 'GET') return jsonResponse(200, { widgets: await composeBoard(ctx.store, user) })
+  }
   // ─── Widget catalog (the design system as data; v0.2 §5) ───
   if (method === 'GET' && pathname === '/v1/widgets/catalog') {
     const { catalogJson } = await import('./widgets/catalog.js')

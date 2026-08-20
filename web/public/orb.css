@@ -1052,3 +1052,8 @@ sup.sq { font-size:.58em; color:var(--nv); font-weight:700; margin-left:1px; tra
 .wg-skel .w62{width:62%;} .wg-skel .w88{width:88%;} .wg-skel .w45{width:45%;}
 @keyframes skshine { from{background-position:200% 0;} to{background-position:-200% 0;} }
 @media (prefers-reduced-motion: reduce){ .wg-skel .sk{ animation:none; } }
+/* pin affordance */
+.wg-pin { background:none; border:0; color:var(--ink-dim); cursor:pointer; line-height:0; flex:none; padding:3px; border-radius:6px; opacity:.55; transition:color .15s, opacity .15s; }
+.wg-pin:hover { color:var(--ink); opacity:1; }
+.wg-pin.on { color:var(--nv); opacity:1; }
+.wg-pin svg { pointer-events:none; }
