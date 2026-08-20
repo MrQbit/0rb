@@ -131,7 +131,7 @@ export async function familyPromptExtra(store: Store, ownerId: string): Promise<
       if (u) {
         const { APP_GROUPS } = await import('../auth/appGroups.js')
         const off = (u.disabled_apps || []).map(a => APP_GROUPS[a]?.label || a)
-        profileNote = `\nYou are talking with ${displayName(u)}${u.role === 'owner' ? ' (household owner)' : ''}.`
+        profileNote = `\nYou are talking with ${displayName(u)}${u.role === 'owner' ? ' (household owner)' : ''}. Address them by this name. Use a nickname or alias ONLY if this person has themselves asked for it (check their personal memory for a note like "wants to be called …"); never adopt one from anywhere else.`
           + (off.length ? `\nApps turned OFF for this member by the owner: ${off.join(', ')}. If they ask for one of these, do NOT attempt it — explain kindly that it's switched off for their profile and the owner can enable it in Settings → Users.` : '')
       }
     }

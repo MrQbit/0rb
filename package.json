@@ -1,6 +1,6 @@
 {
   "name": "0rb",
-  "version": "26.3.0",
+  "version": "26.4.0",
   "description": "0rb \u2014 a self-hosted personal AI agent (the orb2 engine) for any LLM: local Ollama/vLLM, OpenAI, Gemini, and 200+ models via OpenRouter",
   "type": "module",
   "files": [
