@@ -1707,6 +1707,52 @@ async function dispatch(
     }
     if (pathname === '/v1/board' && method === 'GET') return jsonResponse(200, { widgets: await composeBoard(ctx.store, user) })
   }
+  // ─── "What orb knows" — per-member profile + deletions (v0.2 §4) ───
+  {
+    const mm = pathname.match(/^\/v1\/members\/([^/]+)\/(profile|memory|voice|autonomy)$/)
+    if (mm) {
+      const email = decodeURIComponent(mm[1]!)
+      const part = mm[2]!
+      const { isAutoMemoryEnabled, getAutoMemPath } = await import('./memory/memPath.js')
+      const slug = email.split('@')[0]!.replace(/[^a-z0-9]+/gi, '-').toLowerCase()
+      const memberPath = isAutoMemoryEnabled() ? `${getAutoMemPath()}/members/${slug}.md` : null
+      if (part === 'profile' && method === 'GET') {
+        const { listAutonomy } = await import('./policy/policy.js')
+        const { getPrefs } = await import('./family/family.js')
+        const { listPresence } = await import('./presence/presence.js')
+        let memory = ''
+        if (memberPath) {
+          const { readFile } = await import('node:fs/promises')
+          memory = await readFile(memberPath, 'utf8').catch(() => '')
+        }
+        const voiceProfile = !!(await ctx.store.getKv('family:voice:' + email.toLowerCase()).catch(() => null))
+        const presence = (await listPresence(ctx.store).catch(() => []))
+          .find(p => p.name.toLowerCase().startsWith(slug.split('-')[0] || '!'))
+        return jsonResponse(200, {
+          email, memory, prefs: await getPrefs(ctx.store, email).catch(() => ({})),
+          autonomy: await listAutonomy(ctx.store, email).catch(() => []),
+          voice_enrolled: voiceProfile, home: presence?.home ?? null,
+        })
+      }
+      if (method === 'DELETE') {
+        if (part === 'memory' && memberPath) {
+          const { unlink } = await import('node:fs/promises')
+          await unlink(memberPath).catch(() => { /* absent is fine */ })
+          return jsonResponse(200, { ok: true })
+        }
+        if (part === 'voice') {
+          await ctx.store.delKv('family:voice:' + email.toLowerCase()).catch(() => { /* absent */ })
+          return jsonResponse(200, { ok: true })
+        }
+        if (part === 'autonomy') {
+          const b = await req.json().catch(() => ({})) as any
+          const { revokeAutonomy } = await import('./policy/policy.js')
+          if (b?.key) { await revokeAutonomy(ctx.store, email, String(b.key)); return jsonResponse(200, { ok: true }) }
+          return jsonResponse(400, { error: 'key required' })
+        }
+      }
+    }
+  }
   // ─── The morning deck (v0.2 §3) ───
   if (pathname.startsWith('/v1/deck')) {
     const { todaysDeck, recordFeedback, dismissDeck } = await import('./deck/deck.js')
@@ -1815,6 +1861,7 @@ async function handleInfo(ctx: RuntimeContext): Promise<Response> {
     version: process.env.ORB2_API_VERSION || 'dev',
     public_url: process.env.ORB2_PUBLIC_URL || null,
     device_url: deviceHost ? `https://${deviceHost}:${process.env.ORB2_DEVICE_TLS_PORT || '9444'}` : null,
+    turn_tiers: await ctx.store.getKv('provenance:counts').then(v => v ? JSON.parse(v) : {}).catch(() => ({})),
     auth_required: (process.env.ORB2_API_AUTH_REQUIRED ?? '0') === '1',
     single_user: process.env.ORB2_API_AUTH_REQUIRED !== '1',
     owner_token_hint: ownerToken ? ownerToken.slice(-4) : null,
@@ -4037,11 +4084,23 @@ async function handleChat(
         },
         ctx.sessionTtlSeconds,
       )
-      sse.send('done', {
-        full_text: result.fullText,
-        prompt_tokens: result.promptTokens,
-        completion_tokens: result.completionTokens,
-      })
+      {
+        // Provenance (v0.2 §8): which tier answered — visible, countable.
+        const base = String(process.env.OPENAI_BASE_URL || '')
+        const tier = routeOverride ? 'cloud' : (/^https:\/\//.test(base) ? 'cloud' : 'local')
+        const model = (result as any).usedModel || resolvedModel || ''
+        sse.send('done', {
+          full_text: result.fullText,
+          prompt_tokens: result.promptTokens,
+          completion_tokens: result.completionTokens,
+          provenance: { tier, model },
+        })
+        try {
+          const counts = JSON.parse((await ctx.store.getKv('provenance:counts')) || '{}')
+          counts[tier] = (counts[tier] || 0) + 1
+          await ctx.store.putKv('provenance:counts', JSON.stringify(counts), 0)
+        } catch { /* counters are best-effort */ }
+      }
       metrics.recordChat(body.model || '', result.interrupted ? 'cancelled' : 'success')
       metrics.recordTokens('input', body.model || '', result.promptTokens)
       metrics.recordTokens('output', body.model || '', result.completionTokens)

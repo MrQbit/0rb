@@ -178,6 +178,12 @@
             else if(evt==='canvas_close') hideCanvas();
             else if(evt==='widget') spawnWidget(d);
             else if(evt==='text_chunk'){ full+=d.text; out.textContent=full; messages.scrollTop=messages.scrollHeight; }
+            else if(evt==='done'&&d.provenance){
+              // Provenance (v0.2 §8): quiet metadata — which tier answered.
+              const b=document.createElement('span'); b.className='prov-badge '+(d.provenance.tier||'local');
+              b.title=d.provenance.model||''; b.textContent=d.provenance.tier==='cloud'?'cloud':'local';
+              out.parentElement&&out.parentElement.appendChild(b);
+            }
             evt='';
           } else if(line==='') evt='';
         }
@@ -2249,6 +2255,14 @@
     try{ const info=await (await fetch('/v1/info',{credentials:'same-origin'})).json();
       if(info.device_url){ const c=$('#devUrlCard'), a=$('#setDeviceUrl');
         if(c&&a){ c.style.display=''; a.textContent=info.device_url.replace(/^https:\/\//,''); a.href=info.device_url; loadRemoteMode(); } }
+      // Where answers come from (v0.2 §8) — quiet accountability.
+      const t=info.turn_tiers||{};
+      if((t.rules||t.local||t.cloud)&&$('#setSystem')){
+        const row=document.createElement('div'); row.className='set-item';
+        row.innerHTML=`<div class="grow"><div class="t">Answers by tier</div><div class="s">instant rules · local brain · cloud</div></div>`+
+          `<code>${t.rules||0} · ${t.local||0} · ${t.cloud||0}</code>`;
+        $('#setSystem').appendChild(row);
+      }
     }catch{}
   }
   // ── Device-URL remote mode: home-network A record vs DynDNS + router port ──
@@ -2573,7 +2587,43 @@
         del.onclick=async()=>{ if(!confirm('Remove '+u.email+'?'))return;
           const r=await fetch('/v1/auth/users',{method:'DELETE',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({email:u.email})});
           if(r.ok) loadUsers(); else toast('Owner-only action'); };
-        it.appendChild(rl); it.appendChild(del); list.appendChild(it);
+        const info=document.createElement('button'); info.className='set-btn ghost'; info.textContent='Details';
+        const panel=document.createElement('div'); panel.className='member-detail'; panel.style.display='none';
+        info.onclick=async()=>{
+          if(panel.style.display===''){ panel.style.display='none'; return; }
+          panel.style.display=''; panel.innerHTML='<div class="set-muted small">Loading…</div>';
+          try{
+            const d=await (await fetch('/v1/members/'+encodeURIComponent(u.email)+'/profile',{credentials:'same-origin'})).json();
+            panel.innerHTML='';
+            const sec=(t)=>{ const h=document.createElement('div'); h.className='set-h4'; h.style.paddingLeft='0'; h.textContent=t; panel.appendChild(h); };
+            sec('What Orb knows');
+            const mem=document.createElement('div'); mem.className='member-mem';
+            mem.textContent=d.memory&&d.memory.trim()?d.memory.slice(0,1200):'Nothing saved yet — Orb will note durable personal facts as it learns them.';
+            panel.appendChild(mem);
+            if(d.memory&&d.memory.trim()){ const fm=document.createElement('button'); fm.className='set-btn danger'; fm.textContent='Forget everything about me';
+              fm.onclick=async()=>{ if(!confirm('Delete this personal memory file?'))return;
+                await fetch('/v1/members/'+encodeURIComponent(u.email)+'/memory',{method:'DELETE',credentials:'same-origin'}); info.onclick(); info.onclick(); };
+              panel.appendChild(fm); }
+            const pk=Object.entries(d.prefs||{});
+            if(pk.length){ sec('Preferences'); const pv=document.createElement('div'); pv.className='set-muted small';
+              pv.textContent=pk.map(([k,v])=>k+': '+v).join(' · '); panel.appendChild(pv); }
+            sec('Voice');
+            const vr=document.createElement('div'); vr.className='set-row';
+            vr.innerHTML='<span class="set-muted small">'+(d.voice_enrolled?'Voice recognized — learned from normal use':'Not enrolled yet — it learns automatically as they talk')+'</span>';
+            if(d.voice_enrolled){ const vd=document.createElement('button'); vd.className='set-btn ghost'; vd.textContent='Re-learn';
+              vd.onclick=async()=>{ await fetch('/v1/members/'+encodeURIComponent(u.email)+'/voice',{method:'DELETE',credentials:'same-origin'}); toast('Voice profile reset'); };
+              vr.appendChild(vd); }
+            panel.appendChild(vr);
+            if((d.autonomy||[]).length){ sec('Always-allowed actions');
+              d.autonomy.forEach(k=>{ const ar=document.createElement('div'); ar.className='set-row';
+                ar.innerHTML='<span class="set-muted small" style="flex:1;">'+esc(k)+'</span>';
+                const rv=document.createElement('button'); rv.className='set-btn ghost'; rv.textContent='Revoke';
+                rv.onclick=async()=>{ await fetch('/v1/members/'+encodeURIComponent(u.email)+'/autonomy',{method:'DELETE',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({key:k})}); ar.remove(); toast('Revoked'); };
+                ar.appendChild(rv); panel.appendChild(ar); });
+            }
+          }catch{ panel.innerHTML='<div class="set-muted small">Could not load.</div>'; }
+        };
+        it.appendChild(info); it.appendChild(rl); it.appendChild(del); list.appendChild(it); list.appendChild(panel);
       });
     }catch{ list.innerHTML='<div class="set-muted">Failed to load.</div>'; }
   }

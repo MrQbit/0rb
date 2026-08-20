@@ -283,6 +283,11 @@ class WhisperSession implements VoiceSession {
         const fast = await tryFastPath(this.store, this.email || 'owner', transcript)
         if (fast) {
           this.send.json({ type: 'agent_response', text: fast, provenance: 'rules' })
+          try {
+            const counts = JSON.parse((await this.store.getKv('provenance:counts')) || '{}')
+            counts.rules = (counts.rules || 0) + 1
+            await this.store.putKv('provenance:counts', JSON.stringify(counts), 0)
+          } catch { /* best effort */ }
           this.ttsStarted = false
           this.ttsCancelled = false
           const spokenFast = cleanForTts(fast)

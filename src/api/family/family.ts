@@ -133,6 +133,22 @@ export async function familyPromptExtra(store: Store, ownerId: string): Promise<
     const prefs = await getPrefs(store, email)
     const pk = Object.entries(prefs)
     if (pk.length) out += `\nTheir preferences: ${pk.map(([k, v]) => `${k}: ${v}`).join('; ')}.`
+    // Personal memory (v0.2 §4): this member's own memory file rides into
+    // their turns; the agent maintains it like MEMORY.md, scoped to them.
+    try {
+      const { isAutoMemoryEnabled, getAutoMemPath } = await import('../memory/memPath.js')
+      if (isAutoMemoryEnabled()) {
+        const { readFile } = await import('node:fs/promises')
+        const slug = email.split('@')[0]!.replace(/[^a-z0-9]+/gi, '-').toLowerCase()
+        const memberPath = `${getAutoMemPath()}/members/${slug}.md`
+        const content = await readFile(memberPath, 'utf8').catch(() => '')
+        if (content.trim()) {
+          out += `\nPERSONAL MEMORY for this user (their file: ${memberPath} — keep it updated with Write/Edit; personal facts go THERE, household facts in MEMORY.md):\n${content.slice(0, 1600)}`
+        } else {
+          out += `\nPERSONAL MEMORY: none saved yet for this user. When you learn a durable personal fact about them (preferences, routines, people), save it to ${memberPath} (create the file; same format as MEMORY.md). Household facts stay in MEMORY.md.`
+        }
+      }
+    } catch { /* memory optional */ }
     const due = await takePendingNotes(store, email, 'next')
     if (due.length) {
       const lines = await Promise.all(due.map(async n => `- from ${await memberName(store, n.from)}: "${n.text}"`))
