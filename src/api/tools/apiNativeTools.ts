@@ -476,6 +476,17 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
       available: bridgeEnabled(),
     },
     {
+      name: 'Routines',
+      description: "Scheduled agent tasks the user can SEE and manage — 'every Sunday at 5pm plan the week's meals', 'every morning at 7 check the weather and my calendar'. op:'create' {instruction, schedule} (schedule in plain words: 'daily at 7:30' | 'every sunday at 17:00' | 'every 45 minutes'); op:'list'; op:'pause'/'resume'/'delete' {id}. Each run is a full agent turn as this user (their tools, memory, and approval rules) and leaves a receipt.",
+      input_schema: { type: 'object', properties: {
+        op: { type: 'string', enum: ['create', 'list', 'pause', 'resume', 'delete'] },
+        instruction: { type: 'string', description: 'What to do each run, in natural language.' },
+        schedule: { type: 'string', description: "Plain words: 'daily at 7:30', 'every sunday at 17:00', 'every 45 minutes'." },
+        id: { type: 'string' },
+      }, required: ['op'] },
+      available: true,
+    },
+    {
       name: 'Receipts',
       description: "The household action ledger — everything Orb has DONE (who asked, what changed, when), with undo. op:'list' shows recent actions as a widget; op:'undo' reverses the most recent undoable action (or a specific one by id) — use when the user says 'undo that', 'turn it back', 'what did you just do?'.",
       input_schema: { type: 'object', properties: {
@@ -1584,6 +1595,29 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
     } catch (e) {
       return `[Print bridge] ${(e as Error).message}`
     }
+  })
+  add('Routines', {}, async args => {
+    const { listRoutines, addRoutine, setRoutineEnabled, removeRoutine, parseSchedule } = await import('../routines/routines.js')
+    const user = (ctx.ownerId || 'owner').replace(/^user:/, '')
+    const op = String(args?.op || 'list')
+    if (op === 'create') {
+      const instruction = String(args?.instruction || '').trim()
+      const sched = parseSchedule(String(args?.schedule || ''))
+      if (!instruction) return 'What should the routine do?'
+      if (!sched) return "I couldn't read that schedule — say it like 'daily at 7:30', 'every sunday at 17:00', or 'every 45 minutes'."
+      const r = await addRoutine(ctx.store, user, instruction, sched)
+      return `Routine created (${r.id}): “${instruction}” — ${args.schedule}. It runs as you, with your approval rules; see it under Settings → Users.`
+    }
+    if (op === 'list') {
+      const rs = await listRoutines(ctx.store, user)
+      if (!rs.length) return 'No routines yet.'
+      return rs.map(r => `${r.id}: “${r.instruction.slice(0, 70)}” — ${JSON.stringify(r.schedule)}${r.enabled ? '' : ' (paused)'}${r.lastResult ? ` · last: ${r.lastResult.slice(0, 60)}` : ''}`).join('\n')
+    }
+    const id = String(args?.id || '')
+    if (op === 'pause') return (await setRoutineEnabled(ctx.store, id, false)) ? 'Paused.' : 'No such routine.'
+    if (op === 'resume') return (await setRoutineEnabled(ctx.store, id, true)) ? 'Resumed.' : 'No such routine.'
+    if (op === 'delete') return (await removeRoutine(ctx.store, id)) ? 'Deleted.' : 'No such routine.'
+    return 'Unknown op.'
   })
   add('Receipts', { readOnly: true }, async args => {
     const { listReceipts, undoReceipt } = await import('../policy/policy.js')

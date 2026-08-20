@@ -258,6 +258,11 @@ async function checkDeviceHealth(): Promise<void> {
 async function tick(): Promise<void> {
   // Discovery queue changes rarely — check every 5th poll (~5 min default).
   if (discoveryTicks++ % 5 === 0) await checkDiscoveries().catch(() => { /* best effort */ })
+  // Routines: run whatever is due (caps inside; v0.2 §9).
+  if (pushStore) {
+    const { tickRoutines } = await import('../routines/routines.js')
+    await tickRoutines(pushStore).catch(() => { /* best effort */ })
+  }
   // Morning decks assemble once per day from 05:30 (v0.2 §3).
   if (pushStore && new Date().getHours() >= 5) {
     const { assembleDaily } = await import('../deck/deck.js')

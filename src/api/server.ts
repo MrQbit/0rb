@@ -1753,6 +1753,21 @@ async function dispatch(
       }
     }
   }
+  // ─── Routines listing/manage for the Settings surface (v0.2 §9) ───
+  if (pathname === '/v1/routines' && method === 'GET') {
+    const { listRoutines } = await import('./routines/routines.js')
+    const user = (attributionFor(identity).oid || 'owner').replace(/^user:/, '')
+    return jsonResponse(200, { routines: await listRoutines(ctx.store, user) })
+  }
+  {
+    const rm = pathname.match(/^\/v1\/routines\/(rt-[A-Za-z0-9-]+)$/)
+    if (rm && method === 'POST') {
+      const b = await req.json().catch(() => ({})) as any
+      const { setRoutineEnabled, removeRoutine } = await import('./routines/routines.js')
+      if (b?.action === 'delete') return (await removeRoutine(ctx.store, rm[1]!)) ? jsonResponse(200, { ok: true }) : jsonResponse(404, {})
+      return (await setRoutineEnabled(ctx.store, rm[1]!, b?.action !== 'pause')) ? jsonResponse(200, { ok: true }) : jsonResponse(404, {})
+    }
+  }
   // ─── The morning deck (v0.2 §3) ───
   if (pathname.startsWith('/v1/deck')) {
     const { todaysDeck, recordFeedback, dismissDeck } = await import('./deck/deck.js')
