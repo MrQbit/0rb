@@ -274,6 +274,31 @@ class WhisperSession implements VoiceSession {
       // The user only ever sees the clean transcript; the paralinguistic
       // cues ride in a separate channel into the prompt.
       this.send.json({ type: 'transcript', text: transcript, final: true, emotion: heard.emotion || undefined })
+
+      // ── Deterministic fast-path: lights/timers/modes never wait for the
+      // model (and can never be broken by it). Falls through on anything
+      // ambiguous. (v0.2 §1)
+      try {
+        const { tryFastPath } = await import('./fastpath.js')
+        const fast = await tryFastPath(this.store, this.email || 'owner', transcript)
+        if (fast) {
+          this.send.json({ type: 'agent_response', text: fast, provenance: 'rules' })
+          this.ttsStarted = false
+          this.ttsCancelled = false
+          const spokenFast = cleanForTts(fast)
+          if (spokenFast) {
+            if (ttsUrl()) {
+              await this.streamSentence(spokenFast).catch(() => { /* speech is best-effort */ })
+              if (this.ttsStarted && this.ttsActive && !this.closed) this.send.json({ type: 'audio_end' })
+              this.ttsActive = false
+            } else {
+              await this.speak(spokenFast)
+            }
+          }
+          return
+        }
+      } catch { /* the model path always remains */ }
+
       let vocalContext = buildVocalContext(heard)
       // Give the voice check a short grace window — never stall the reply.
       const check = await Promise.race([speakerP, new Promise<null>(r => setTimeout(() => r(null), 350))])
