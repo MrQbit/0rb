@@ -1768,6 +1768,57 @@ async function dispatch(
       return (await setRoutineEnabled(ctx.store, rm[1]!, b?.action !== 'pause')) ? jsonResponse(200, { ok: true }) : jsonResponse(404, {})
     }
   }
+  // ─── Narrated first-run (v0.2 S3) ───
+  if (pathname === '/v1/firstrun' && method === 'GET') {
+    const { firstRunView } = await import('./setup/firstrun.js')
+    return jsonResponse(200, await firstRunView(ctx.store))
+  }
+  if (pathname === '/v1/firstrun' && method === 'POST') {
+    const b = await req.json().catch(() => ({})) as any
+    const fr = await import('./setup/firstrun.js')
+    if (b?.action === 'restart') return jsonResponse(200, await fr.startFirstRun(ctx.store))
+    if (b?.action === 'dismiss') return jsonResponse(200, await fr.dismissFirstRun(ctx.store))
+    if (b?.action === 'name') {
+      const name = String(b.name || '').trim().slice(0, 40)
+      if (name) {
+        process.env.ORB2_ADVERTISE_NAME = name
+        await ctx.store.putKv('setting:ORB2_ADVERTISE_NAME', name, 0).catch(() => {})
+      }
+      return jsonResponse(200, await fr.advanceFirstRun(ctx.store))
+    }
+    if (b?.action === 'add-member') {
+      const { addUser } = await import('./auth/otp.js')
+      const email = String(b.email || '').trim()
+      if (!email.includes('@')) return jsonResponse(400, { error: 'valid email required' })
+      await addUser(ctx.store, { email, role: 'member' })
+      return jsonResponse(200, await fr.firstRunView(ctx.store))
+    }
+    return jsonResponse(200, await fr.advanceFirstRun(ctx.store)) // 'next' / 'skip'
+  }
+  if (pathname === '/v1/firstrun/say' && method === 'POST') {
+    // Narration for the console when no voice session is open: TTS → WAV.
+    const b = await req.json().catch(() => ({})) as any
+    const text = String(b.text || '').slice(0, 300)
+    const base = (process.env.ORB2_TTS_URL || '').replace(/\/+$/, '')
+    if (!text || !base) return jsonResponse(503, { error: 'tts unavailable' })
+    try {
+      const res = await fetch(`${base}/tts`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ text, voice: process.env.ORB2_TTS_VOICE || undefined }),
+      })
+      if (!res.ok) return jsonResponse(502, { error: `tts http ${res.status}` })
+      const pcm = new Uint8Array(await res.arrayBuffer())
+      const rate = Number(res.headers.get('x-sample-rate')) || 24000
+      const hdr = Buffer.alloc(44)
+      hdr.write('RIFF', 0); hdr.writeUInt32LE(36 + pcm.length, 4); hdr.write('WAVEfmt ', 8)
+      hdr.writeUInt32LE(16, 16); hdr.writeUInt16LE(1, 20); hdr.writeUInt16LE(1, 22)
+      hdr.writeUInt32LE(rate, 24); hdr.writeUInt32LE(rate * 2, 28); hdr.writeUInt16LE(2, 32); hdr.writeUInt16LE(16, 34)
+      hdr.write('data', 36); hdr.writeUInt32LE(pcm.length, 40)
+      return new Response(Buffer.concat([hdr, Buffer.from(pcm)]), {
+        status: 200, headers: { 'content-type': 'audio/wav', 'cache-control': 'no-store' },
+      })
+    } catch { return jsonResponse(502, { error: 'tts unreachable' }) }
+  }
   // ─── The morning deck (v0.2 §3) ───
   if (pathname.startsWith('/v1/deck')) {
     const { todaysDeck, recordFeedback, dismissDeck } = await import('./deck/deck.js')

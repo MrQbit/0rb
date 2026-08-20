@@ -505,6 +505,66 @@
   // spawns every widget type with fixture specs through the REAL renderer.
   try { window.__orbSpawnWidget = spawnWidget; } catch { /* strict contexts */ }
 
+  // ── Narrated first-run (v0.2 S3): three optional moments on a fresh orb.
+  //    Server state drives it; every step skippable; "Later" dismisses. ──
+  async function sayLine(text){
+    try{
+      const r=await fetch('/v1/firstrun/say',{method:'POST',credentials:'same-origin',
+        headers:{'content-type':'application/json'},body:JSON.stringify({text})});
+      if(!r.ok) return;
+      const a=new Audio(URL.createObjectURL(await r.blob()));
+      a.play().catch(()=>{});  // autoplay may need a gesture; the card carries the words anyway
+    }catch{}
+  }
+  async function firstRunTick(){
+    let v=null;
+    try{ v=await (await fetch('/v1/firstrun',{credentials:'same-origin'})).json(); }catch{ return; }
+    if(!v||!v.active){ document.getElementById('firstrun-card')?.remove(); return; }
+    renderFirstRun(v);
+  }
+  function frPost(body){ return fetch('/v1/firstrun',{method:'POST',credentials:'same-origin',
+    headers:{'content-type':'application/json'},body:JSON.stringify(body)}).then(()=>firstRunTick()); }
+  function renderFirstRun(v){
+    document.getElementById('firstrun-card')?.remove();
+    const card=document.createElement('div'); card.className='fr-card'; card.id='firstrun-card';
+    const words=document.createElement('div'); words.className='fr-words'; words.textContent=v.narration||''; card.appendChild(words);
+    const body=document.createElement('div'); body.className='fr-body'; card.appendChild(body);
+    if(v.step==='name'){
+      const inp=document.createElement('input'); inp.className='fr-input'; inp.placeholder=v.orbName||'Orb'; inp.maxLength=40;
+      const go=document.createElement('button'); go.className='fr-btn'; go.textContent='That’s your name';
+      go.onclick=()=>frPost({action:'name',name:inp.value.trim()||v.orbName||'Orb'});
+      inp.addEventListener('keydown',e=>{ if(e.key==='Enter') go.click(); });
+      body.append(inp,go);
+    } else if(v.step==='members'){
+      const list=document.createElement('div'); list.className='fr-list';
+      (v.members||[]).forEach(m=>{ const r=document.createElement('div'); r.className='fr-row';
+        r.textContent=m.email+(m.role==='owner'?' — owner':''); list.appendChild(r); });
+      const inp=document.createElement('input'); inp.className='fr-input'; inp.placeholder='family@example.com'; inp.type='email';
+      const add=document.createElement('button'); add.className='fr-btn ghost'; add.textContent='Add';
+      add.onclick=()=>{ const e=inp.value.trim(); if(e){ inp.value=''; frPost({action:'add-member',email:e}); } };
+      inp.addEventListener('keydown',e=>{ if(e.key==='Enter') add.click(); });
+      const next=document.createElement('button'); next.className='fr-btn'; next.textContent='Next';
+      next.onclick=()=>frPost({action:'next'});
+      body.append(list,inp,add,next);
+    } else if(v.step==='devices'){
+      const list=document.createElement('div'); list.className='fr-list';
+      const devs=v.devices||[];
+      if(!devs.length){ const r=document.createElement('div'); r.className='fr-row dim'; r.textContent='Nothing discovered yet — devices show up in Settings → Home as they appear.'; list.appendChild(r); }
+      devs.forEach(d=>{ const r=document.createElement('div'); r.className='fr-row';
+        r.textContent=`${d.name}${d.detail?' — '+d.detail:''}`; list.appendChild(r); });
+      const done=document.createElement('button'); done.className='fr-btn'; done.textContent='Sounds good';
+      done.onclick=()=>frPost({action:'next'});
+      body.append(list,done);
+    }
+    const later=document.createElement('button'); later.className='fr-btn link'; later.textContent='Later';
+    later.onclick=()=>frPost({action:'dismiss'});
+    card.appendChild(later);
+    document.body.appendChild(card);
+    sayLine(v.narration||'');
+  }
+  setTimeout(firstRunTick, 1600);
+  try { window.__orbFirstRunTick = firstRunTick; } catch { /* strict contexts */ }
+
   const IDLE_TO_PILL = 120000;          // 2 min idle → collapse to a pill
   const IDLE_TO_STALE = 60*60*1000;     // 1 h idle → fully stop (free memory)
   function markTouched(wg){ wg._lastTouch=Date.now(); if(wg._state==='pill'||wg._state==='stale') expandFromPill(wg); }
@@ -2274,6 +2334,16 @@
         row.innerHTML=`<div class="grow"><div class="t">Answers by tier</div><div class="s">instant rules · local brain · cloud</div></div>`+
           `<code>${t.rules||0} · ${t.local||0} · ${t.cloud||0}</code>`;
         $('#setSystem').appendChild(row);
+      }
+      // Re-run the first-run introduction (v0.2 S3) any time.
+      if($('#setSystem')&&!document.getElementById('frRerun')){
+        const row=document.createElement('div'); row.className='set-item';
+        row.innerHTML=`<div class="grow"><div class="t">Introduction</div><div class="s">name the orb, add people, review devices</div></div>`;
+        const b=document.createElement('button'); b.id='frRerun'; b.className='set-btn ghost'; b.textContent='Run again';
+        b.onclick=async()=>{ try{ await fetch('/v1/firstrun',{method:'POST',credentials:'same-origin',
+          headers:{'content-type':'application/json'},body:JSON.stringify({action:'restart'})});
+          document.getElementById('setClose')?.click(); window.__orbFirstRunTick?.(); }catch{} };
+        row.appendChild(b); $('#setSystem').appendChild(row);
       }
     }catch{}
   }

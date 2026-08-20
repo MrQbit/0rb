@@ -50,5 +50,7 @@ export async function redeemClaim(store: Store, codeIn: string, emailRaw: string
   // burn before minting — a race must fail closed, not mint two owners
   await store.putKv(KEY, JSON.stringify({ code: '', exp: 0 }), 0)
   await addUser(store, { email, role: 'owner', label: 'Owner' })
+  // a freshly claimed orb introduces itself (v0.2 S3)
+  try { const { startFirstRun } = await import('../setup/firstrun.js'); await startFirstRun(store) } catch { /* optional */ }
   return { ok: true, token: signSession(email) }
 }
