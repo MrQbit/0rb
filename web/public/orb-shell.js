@@ -2643,7 +2643,7 @@
       try{
         const st=await (await fetch('/v1/oauth/spotify/status',{credentials:'same-origin'})).json();
         const dot=$('#spAcctDot'), lbl=$('#spAcctState');
-        if(dot){ dot.className='pill-dot'+(st.connected?' ok':''); lbl.textContent=st.connected?'your account is linked':(st.configured?'app credential set — link your account':'needs the house app credential first'); }
+        if(dot){ dot.className='pill-dot'+(st.connected?' ok':''); lbl.textContent=st.connected?'your account is linked':(st.mode==='relay'?'ready — tap Connect':(st.mode==='own'?'house app set — link your account':'linking service not reachable yet')); }
       }catch{}
     })();
     const sp=$('#spSave'); if(sp && !sp.dataset.w){ sp.dataset.w='1'; sp.onclick=()=>{ const id=$('#spId').value.trim(), sec=$('#spSecret').value.trim(); if(id&&sec){ put({ORB2_SPOTIFY_CLIENT_ID:id,ORB2_SPOTIFY_CLIENT_SECRET:sec},'Spotify connected'); $('#spId').value=''; $('#spSecret').value=''; } }; }

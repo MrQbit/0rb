@@ -61,6 +61,76 @@ export async function exchangeCode(store: Store, code: string, state: string): P
   return true
 }
 
+
+// ── TV-style linking via the orb2.app relay ──────────────────────────────
+// The 0rb project registers ONE Spotify app; its secret lives only on the
+// relay (orb2.app). An orb sends the browser to the relay's /start, the
+// relay handles consent + code exchange, bounces back an AES-sealed blob,
+// and the orb claims the real tokens server-to-server. No per-install app
+// registration, no local secret — like linking Spotify on a TV.
+const RELAY_KEY = (nonce: string) => `spotify:relay:${nonce}`
+
+export function relayUrl(): string {
+  return (process.env.ORB2_RELAY_URL || process.env.ORB2_BROKER_URL || 'https://orb2.app').replace(/\/+$/, '')
+}
+
+let relayProbe: { ok: boolean; ts: number } | null = null
+/** Is Spotify configured on the relay? (probed, cached 10 min) */
+export async function relayAvailable(): Promise<boolean> {
+  if (relayProbe && Date.now() - relayProbe.ts < 600_000) return relayProbe.ok
+  let ok = false
+  try {
+    const r = await fetch(`${relayUrl()}/api/oauth/start?provider=spotify`, { redirect: 'manual', signal: AbortSignal.timeout(6000) })
+    // 400 "redirect must be…" = provider configured, our probe just lacked a
+    // redirect; 503 = not configured on the relay.
+    ok = r.status === 400
+  } catch { ok = false }
+  relayProbe = { ok, ts: Date.now() }
+  return ok
+}
+
+/** The instance return host the relay will accept (device cert hostname). */
+async function instanceReturn(store: Store): Promise<string | null> {
+  const host = await store.getKv('devicecert:hostname').catch(() => null)
+  if (!host) return null
+  const port = Number(process.env.ORB2_DEVICE_TLS_PORT || 9444)
+  return `https://${host}${port === 443 ? '' : `:${port}`}/v1/oauth/spotify/relay`
+}
+
+/** Begin a relay link for this member. Null when the device URL isn't enrolled yet. */
+export async function relayStartUrl(store: Store, member?: string): Promise<{ url: string } | { error: string }> {
+  const ret = await instanceReturn(store)
+  if (!ret) return { error: 'Linking needs the device URL first — Settings → General → System shows it; it enrolls automatically when remote access is on.' }
+  const nonce = Math.random().toString(36).slice(2) + Date.now().toString(36)
+  await store.putKv(RELAY_KEY(nonce), JSON.stringify({ member: member || '' }), 600)
+  return { url: `${relayUrl()}/api/oauth/start?provider=spotify&redirect=${encodeURIComponent(ret)}&istate=${nonce}` }
+}
+
+/** The relay bounced back: claim the sealed blob and store the member's tokens. */
+export async function claimRelayBlob(store: Store, blob: string, nonce: string): Promise<boolean> {
+  const raw = await store.getKv(RELAY_KEY(nonce)).catch(() => null)
+  if (!raw) return false
+  await store.delKv(RELAY_KEY(nonce)).catch(() => {})
+  let member = ''
+  try { member = JSON.parse(raw).member || '' } catch { /* household */ }
+  const r = await fetch(`${relayUrl()}/api/oauth/claim`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ blob }), signal: AbortSignal.timeout(10_000),
+  })
+  if (!r.ok) return false
+  const d = (await r.json()) as any
+  const tk = d?.tokens
+  if (!tk?.access_token) return false
+  const t: Tokens & { via?: string } = {
+    access_token: tk.access_token,
+    refresh_token: tk.refresh_token || '',
+    expires_at: Date.now() + ((tk.expires_in || 3600) - 60) * 1000,
+    via: 'relay',
+  }
+  await store.putKv(tokKey(member || undefined), JSON.stringify(t), 60 * 60 * 24 * 365)
+  return true
+}
+
 export async function isConnected(store: Store, member?: string): Promise<boolean> {
   if (member && await store.getKv(tokKey(member)).catch(() => null)) return true
   return !!(await store.getKv(TOK_KEY).catch(() => null))
@@ -81,7 +151,26 @@ export async function getUserToken(store: Store, member?: string): Promise<strin
   let t: Tokens
   try { t = JSON.parse(raw) } catch { return null }
   if (Date.now() < t.expires_at && t.access_token) return t.access_token
-  // refresh
+  // Relay-linked tokens refresh through the relay — only it holds the secret.
+  if ((t as any).via === 'relay') {
+    if (!t.refresh_token) return null
+    try {
+      const rr = await fetch(`${relayUrl()}/api/oauth/refresh`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ provider: 'spotify', refresh_token: t.refresh_token }),
+        signal: AbortSignal.timeout(10_000),
+      })
+      if (!rr.ok) return null
+      const rd = (await rr.json()) as any
+      const tk = rd?.tokens
+      if (!tk?.access_token) return null
+      const nt = { access_token: tk.access_token, refresh_token: tk.refresh_token || t.refresh_token,
+        expires_at: Date.now() + ((tk.expires_in || 3600) - 60) * 1000, via: 'relay' }
+      await store.putKv(key, JSON.stringify(nt), 60 * 60 * 24 * 365)
+      return nt.access_token
+    } catch { return null }
+  }
+  // Own-app tokens refresh directly with the local credential.
   const r = await fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded', authorization: 'Basic ' + Buffer.from(`${clientId()}:${clientSecret()}`).toString('base64') },

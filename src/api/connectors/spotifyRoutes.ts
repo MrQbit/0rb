@@ -8,7 +8,7 @@
  */
 import type { Store } from '../store/store.js'
 import { authEnabled, verifySession, parseCookies, SESSION_COOKIE } from '../auth/session.js'
-import { authorizeUrl, exchangeCode, isConnected, disconnect, getUserToken, spotifyOAuthConfigured, redirectUri } from './spotifyOAuth.js'
+import { authorizeUrl, exchangeCode, isConnected, disconnect, getUserToken, spotifyOAuthConfigured, redirectUri, relayAvailable, relayStartUrl, claimRelayBlob } from './spotifyOAuth.js'
 
 function json(status: number, body: unknown, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...headers } })
@@ -31,7 +31,17 @@ function sessionMember(req: Request): string | undefined {
 export async function trySpotifyOAuthRoute(req: Request, method: string, pathname: string, store: Store): Promise<Response | null> {
   if (!pathname.startsWith('/v1/oauth/spotify/')) return null
 
-  // Public: the Spotify redirect lands here.
+  // Public: the RELAY bounce lands here — the browser carries an AES-sealed
+  // blob; we claim the real tokens server-to-server (TV-style linking).
+  if (method === 'GET' && pathname === '/v1/oauth/spotify/relay') {
+    const u = new URL(req.url)
+    const blob = u.searchParams.get('orb2_relay') || ''
+    const nonce = u.searchParams.get('state') || ''
+    const ok = blob && nonce && await claimRelayBlob(store, blob, nonce)
+    return new Response(null, { status: 302, headers: { location: `/?spotify=${ok ? 'connected' : 'error'}` } })
+  }
+
+  // Public: the Spotify redirect lands here (own-app mode).
   if (method === 'GET' && pathname === '/v1/oauth/spotify/callback') {
     const u = new URL(req.url)
     const code = u.searchParams.get('code') || ''
@@ -46,11 +56,19 @@ export async function trySpotifyOAuthRoute(req: Request, method: string, pathnam
   const member = sessionMember(req)
 
   if (method === 'GET' && pathname === '/v1/oauth/spotify/start') {
-    if (!spotifyOAuthConfigured()) return json(400, { error: 'Set Spotify Client ID/Secret + ORB2_PUBLIC_URL first.', redirect_uri: redirectUri() })
-    return json(200, { url: await authorizeUrl(store, member), redirect_uri: redirectUri() })
+    // Own-app mode wins when this house registered its own Spotify app;
+    // otherwise the default is the relay — one shared 0rb app, zero setup.
+    if (spotifyOAuthConfigured()) return json(200, { url: await authorizeUrl(store, member), redirect_uri: redirectUri(), mode: 'own' })
+    if (await relayAvailable()) {
+      const r = await relayStartUrl(store, member)
+      return 'url' in r ? json(200, { ...r, mode: 'relay' }) : json(400, r)
+    }
+    return json(400, { error: 'Spotify linking is not available yet: neither the shared 0rb app (relay) nor a house app credential is configured.' })
   }
   if (method === 'GET' && pathname === '/v1/oauth/spotify/status') {
-    return json(200, { connected: await isConnected(store, member), configured: spotifyOAuthConfigured(), redirect_uri: redirectUri() })
+    const own = spotifyOAuthConfigured()
+    const relay = own ? false : await relayAvailable()
+    return json(200, { connected: await isConnected(store, member), configured: own || relay, mode: own ? 'own' : relay ? 'relay' : 'none', redirect_uri: redirectUri() })
   }
   if (method === 'GET' && pathname === '/v1/oauth/spotify/token') {
     const t = await getUserToken(store, member)
