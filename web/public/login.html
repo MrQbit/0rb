@@ -36,15 +36,32 @@
     .msg { font-size:13px; margin-top:14px; min-height:18px; }
     .err { color:#ff6b6b; } .ok { color:var(--nv); }
     .hide { display:none; }
+    .brand h1 sup { font-size:12px; color:var(--nv); }
+    .qr-wrap { display:grid; place-items:center; margin:6px 0 10px; }
+    .qr-wrap img { width:180px; height:180px; border-radius:12px; background:rgba(118,185,0,.06);
+      border:1px solid rgba(118,185,0,.18); padding:12px; }
+    .claim-code { text-align:center; font-family:ui-monospace,Menlo,monospace; font-size:20px;
+      letter-spacing:4px; color:var(--nv); margin-bottom:8px; }
+    .claim-note { color:var(--muted); font-size:13px; text-align:center; margin:0 0 14px; line-height:1.5; }
   </style>
 </head>
 <body>
   <div class="card">
     <div class="brand">
       <img src="/web/assets/orb2-logo.svg" alt="orb2" />
-      <h1><b>0</b>rb</h1>
+      <h1><b>0</b>rb<sup>2</sup></h1>
     </div>
-    <p class="sub">Sign in with your email</p>
+    <p class="sub" id="subLine">Sign in with your email</p>
+
+    <div id="step-claim" class="hide">
+      <div class="qr-wrap"><img id="claimQr" alt="Claim QR" /></div>
+      <div class="claim-code" id="claimCode"></div>
+      <p class="claim-note">This orb doesn't belong to anyone yet.<br />
+        Scan the code with your phone — or enter your email here to make it yours.</p>
+      <label for="claimEmail">Your email</label>
+      <input id="claimEmail" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" />
+      <button type="button" id="claimBtn">Claim this orb</button>
+    </div>
 
     <div id="step-email">
       <label for="email">Email</label>

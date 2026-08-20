@@ -61,6 +61,29 @@ export async function handleAuthRoutes(
     return json(200, { ok: true, sent: r.sent, via })
   }
 
+  // ── Claim ceremony (v0.2 S2): first-owner enrollment. These answer only
+  //    while NO owner exists; afterwards they say "claimed" and nothing else.
+  if (method === 'GET' && (pathname === '/v1/claim' || pathname === '/v1/claim/qr.svg')) {
+    const { currentClaim } = await import('./claim.js')
+    const host = (req.headers.get('host') || 'orb.local').split(':')[0]!
+    const c = await currentClaim(store, host)
+    if (pathname === '/v1/claim') return json(200, c ? { available: true, ...c } : { available: false })
+    if (!c) return json(404, { error: 'already claimed' })
+    const QR = await import('qrcode')
+    const svg: string = await (QR as any).toString(c.uri, {
+      type: 'svg', margin: 1, errorCorrectionLevel: 'M',
+      color: { dark: '#e9f1e2ff', light: '#00000000' },
+    })
+    return new Response(svg, { status: 200, headers: { 'content-type': 'image/svg+xml', 'cache-control': 'no-store' } })
+  }
+  if (method === 'POST' && pathname === '/v1/claim') {
+    const { redeemClaim } = await import('./claim.js')
+    const b = (await req.json().catch(() => ({}))) as any
+    const r = await redeemClaim(store, String(b.code || ''), String(b.email || ''))
+    if (!r.ok) return json(400, { error: r.error })
+    return json(200, { ok: true, token: r.token }, { 'set-cookie': sessionCookie(r.token!) })
+  }
+
   // ── User database (allowed users) — reads for any session; WRITES are
   //    owner-only (members must not add users, change roles, or evict). ──
   if (pathname === '/v1/auth/users') {

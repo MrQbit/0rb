@@ -66,4 +66,47 @@
     codeEl.value = codeEl.value.replace(/\D/g, '').slice(0, 6);
     if (codeEl.value.length === 6) document.getElementById('verifyBtn').click();
   });
+
+  // ── Claim ceremony (v0.2 S2): a brand-new orb shows a QR + code instead
+  //    of the sign-in form. The window exists only while no owner does.
+  var stepClaim = document.getElementById('step-claim');
+  var claimCode = '';
+  function pollClaim() {
+    fetch('/v1/claim', { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || !d.available) {
+          if (!stepClaim.classList.contains('hide')) location.reload();
+          return;
+        }
+        claimCode = d.code || '';
+        document.getElementById('claimCode').textContent = claimCode.replace(/(.{4})(.{4})/, '$1 · $2');
+        document.getElementById('claimQr').src = '/v1/claim/qr.svg?t=' + d.expires_at;
+        document.getElementById('subLine').textContent = 'Welcome';
+        stepEmail.classList.add('hide'); stepCode.classList.add('hide');
+        stepClaim.classList.remove('hide');
+        // refresh before the 10-minute code expires
+        setTimeout(pollClaim, 60000);
+      })
+      .catch(function () { setTimeout(pollClaim, 60000); });
+  }
+  pollClaim();
+
+  var claimBtn = document.getElementById('claimBtn');
+  function doClaim() {
+    var email = document.getElementById('claimEmail').value.trim();
+    if (!email) { setMsg('Enter your email', false); return; }
+    claimBtn.disabled = true; setMsg('Claiming…', true);
+    fetch('/v1/claim', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin',
+      body: JSON.stringify({ code: claimCode, email: email }),
+    }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (res.ok && res.d.ok) { setMsg('This orb is yours.', true); location.replace('/'); return; }
+        setMsg(res.d.error || 'Could not claim', false);
+      }).catch(function () { setMsg('Could not reach the server', false); })
+      .finally(function () { claimBtn.disabled = false; });
+  }
+  claimBtn.addEventListener('click', doClaim);
+  document.getElementById('claimEmail').addEventListener('keydown', function (e) { if (e.key === 'Enter') doClaim(); });
 })();
