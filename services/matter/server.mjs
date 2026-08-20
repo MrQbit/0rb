@@ -120,7 +120,16 @@ async function addLock(l) {
   const ep = new Endpoint(DoorLockDevice.with(BridgedDeviceBasicInformationServer), {
     id: safeId(l.entity_id),
     bridgedDeviceBasicInformation: { nodeLabel: label(l.name), reachable: true },
-    doorLock: { lockState: l.locked ? 1 : 2, lockType: 2, actuatorEnabled: true },
+    doorLock: {
+      lockState: l.locked ? 1 : 2, lockType: 2, actuatorEnabled: true,
+      // Mandatory in matter.js 0.17 — without these the endpoint init rolls
+      // back ("Behaviors have errors"). SupportedOperatingModes is the
+      // spec's inverted bitmap: bit CLEAR = supported, so only `normal`
+      // stays false.
+      operatingMode: 0,
+      supportedOperatingModes: { normal: false, vacation: true, privacy: true, noRemoteLockUnlock: true, passage: true, alwaysSet: 2047 },
+      wrongCodeEntryLimit: 3, userCodeTemporaryDisableTime: 10,
+    },
   });
   await aggregator.add(ep);
   const entry = { ep, lastLocked: l.locked };
@@ -254,7 +263,7 @@ async function sync() {
 // ── status HTTP (pairing code for the Settings card) ─────────────────────
 http.createServer((req, res) => {
   res.setHeader("content-type", "application/json");
-  if (req.url === "/health") { res.end(JSON.stringify({ ok: true, devices: bridged.size })); return; }
+  if (req.url === "/health") { res.end(JSON.stringify({ ok: true, devices: bridged.size + lockEps.size })); return; }
   if (req.url === "/pairing") {
     let out = { commissioned: false };
     try {
@@ -267,7 +276,8 @@ http.createServer((req, res) => {
       }
       out.fabrics = Object.keys(c.fabrics ?? {}).length;
     } catch (e) { out.error = String(e.message).slice(0, 120); }
-    out.devices = bridged.size;
+    out.devices = bridged.size + lockEps.size;
+    out.locks = lockEps.size;
     res.end(JSON.stringify(out));
     return;
   }

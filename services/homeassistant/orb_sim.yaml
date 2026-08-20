@@ -1,0 +1,112 @@
+# 0rb simulated devices — a test fleet that exercises every device path
+# (agent control, widgets, voice, Matter bridge-out to Apple Home, house
+# modes, the morning deck) until real hardware arrives. Installed as an HA
+# package by scripts/sim-devices.sh; remove with `sim-devices.sh off`.
+#
+# Everything is backed by input_* helpers, so state is real, persistent,
+# and controllable from both sides — exactly like hardware.
+
+input_boolean:
+  sim_light_living:
+    name: "[sim] living light backer"
+  sim_light_kitchen:
+    name: "[sim] kitchen light backer"
+  sim_lock_front:
+    name: "[sim] front lock backer"
+    initial: on          # on = locked
+  sim_door_front:
+    name: "[sim] front door backer"
+  sim_window_kitchen:
+    name: "[sim] kitchen window backer"
+  sim_motion_hall:
+    name: "[sim] hallway motion backer"
+
+input_number:
+  sim_light_living_level:
+    name: "[sim] living light level"
+    min: 0
+    max: 255
+    initial: 180
+  sim_temp_living:
+    name: "[sim] living temperature"
+    min: -20
+    max: 60
+    initial: 22.5
+  sim_humidity_living:
+    name: "[sim] living humidity"
+    min: 0
+    max: 100
+    initial: 41
+  sim_battery_front_door:
+    name: "[sim] front door sensor battery"
+    min: 0
+    max: 100
+    initial: 84
+
+template:
+  - light:
+      - name: "Living Room Light"
+        unique_id: orb_sim_light_living
+        state: "{{ is_state('input_boolean.sim_light_living', 'on') }}"
+        level: "{{ states('input_number.sim_light_living_level') | int }}"
+        turn_on:
+          service: input_boolean.turn_on
+          target: { entity_id: input_boolean.sim_light_living }
+        turn_off:
+          service: input_boolean.turn_off
+          target: { entity_id: input_boolean.sim_light_living }
+        set_level:
+          - service: input_number.set_value
+            target: { entity_id: input_number.sim_light_living_level }
+            data:
+              value: "{{ brightness }}"
+          - service: input_boolean.turn_on
+            target: { entity_id: input_boolean.sim_light_living }
+      - name: "Kitchen Light"
+        unique_id: orb_sim_light_kitchen
+        state: "{{ is_state('input_boolean.sim_light_kitchen', 'on') }}"
+        turn_on:
+          service: input_boolean.turn_on
+          target: { entity_id: input_boolean.sim_light_kitchen }
+        turn_off:
+          service: input_boolean.turn_off
+          target: { entity_id: input_boolean.sim_light_kitchen }
+  - lock:
+      - name: "Front Door Lock"
+        unique_id: orb_sim_lock_front
+        state: "{{ is_state('input_boolean.sim_lock_front', 'on') }}"
+        lock:
+          service: input_boolean.turn_on
+          target: { entity_id: input_boolean.sim_lock_front }
+        unlock:
+          service: input_boolean.turn_off
+          target: { entity_id: input_boolean.sim_lock_front }
+  - binary_sensor:
+      - name: "Front Door"
+        unique_id: orb_sim_door_front
+        device_class: door
+        state: "{{ is_state('input_boolean.sim_door_front', 'on') }}"
+      - name: "Kitchen Window"
+        unique_id: orb_sim_window_kitchen
+        device_class: window
+        state: "{{ is_state('input_boolean.sim_window_kitchen', 'on') }}"
+      - name: "Hallway Motion"
+        unique_id: orb_sim_motion_hall
+        device_class: motion
+        state: "{{ is_state('input_boolean.sim_motion_hall', 'on') }}"
+  - sensor:
+      - name: "Living Room Temperature"
+        unique_id: orb_sim_temp_living
+        device_class: temperature
+        unit_of_measurement: "°C"
+        state: "{{ states('input_number.sim_temp_living') | float | round(1) }}"
+      - name: "Living Room Humidity"
+        unique_id: orb_sim_humidity_living
+        device_class: humidity
+        unit_of_measurement: "%"
+        state: "{{ states('input_number.sim_humidity_living') | int }}"
+      - name: "Front Door Sensor Battery"
+        unique_id: orb_sim_batt_front
+        device_class: battery
+        unit_of_measurement: "%"
+        state: "{{ states('input_number.sim_battery_front_door') | int }}"

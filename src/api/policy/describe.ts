@@ -11,7 +11,7 @@ export function summarizeAction(tool: string, args: any): string {
   const q = String(args?.query || args?.device || args?.printer || '')
   switch (tool) {
     case 'Home':
-      if (op === 'mode') return `Set the house to ${args?.mode}${args?.secure ? ' and secure it' : ''}`
+      if (op === 'mode') return `Set the house to ${args?.mode || 'a new mode'}${args?.secure ? ' and secure it' : ''}`
       if (op === 'control' || args?.action) return `${cap(String(args?.action || 'change'))} ${q || 'a device'}${args?.value != null ? ` to ${args.value}` : ''}`
       return `Home ${op}`
     case 'AirPlay':
@@ -44,13 +44,22 @@ export async function captureInverse(store: Store, tool: string, args: any): Pro
       return prior && prior !== args.mode ? { kind: 'mode', mode: prior } : undefined
     }
     const action = String(args?.action || '')
-    if (!['on', 'off', 'toggle', 'set'].includes(action)) return undefined
+    if (!['on', 'off', 'toggle', 'set', 'lock', 'unlock'].includes(action)) return undefined
     const q = String(args?.query || '').trim()
     if (!q) return undefined
     const { haStates, haResolve, haJoinAreas, HOME_DOMAINS } = await import('../connectors/homeAssistant.js')
+    // Only consider domains the ACTION can apply to — "front door" matching
+    // both the lock and its contact sensor must not read as ambiguous.
+    const domainsFor = action === 'lock' || action === 'unlock'
+      ? ['lock'] : ['light', 'switch', 'fan', 'media_player']
     const matches = haResolve(await haJoinAreas(await haStates(HOME_DOMAINS)), q)
+      .filter(e => domainsFor.includes(e.domain))
     if (matches.length !== 1) return undefined     // ambiguous → no inverse
     const e = matches[0]!
+    if (e.domain === 'lock') {
+      // inverse of a lock change = restore the prior state
+      return { kind: 'home-control', entity_id: e.entity_id, action: e.state === 'locked' ? 'lock' : 'unlock' }
+    }
     if (!['light', 'switch', 'fan', 'media_player'].includes(e.domain)) return undefined
     if (e.state === 'on' || e.state === 'playing') {
       const b = e.attributes.brightness
