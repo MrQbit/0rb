@@ -7,7 +7,7 @@ doctrine throughout: the Apple way — deterministic basics that never break,
 physical ceremonies instead of typed credentials, one design system as the
 constraint surface, accent spent only where the user can act, calm by default.*
 
-**Version:** 0.2.0 · **Codename:** Trust
+**Version:** 0.2.0 · **Codename:** Trust · **Status: implemented 2026-08-20 — all Part I/III features at Done criteria; §11–13 scaffolded as scoped; S6 deferred as scoped**
 **Definition of done:** every feature below at its stated Done criteria;
 hardware-gated features (§11–13) at "scaffolded" — activation documented,
 software path complete, blocked only on hardware arriving.
@@ -17,6 +17,8 @@ software path complete, blocked only on hardware arriving.
 ## Part I — The agent you can trust
 
 ### 1. Voice fast-path (deterministic intents before the LLM)
+
+**Status: ✅ SHIPPED**
 
 **Why:** Alexa+/Gemini-for-Home broke timers and lights by routing everything
 through an LLM; HA's intent-first architecture is the only pattern with a good
@@ -43,6 +45,8 @@ cases); live: "turn off the living room speaker" answers without a model call
 (verified via logs); zero regression in normal turns.
 
 ### 2. Consent gradient, receipts, undo, earned autonomy
+
+**Status: ✅ SHIPPED**
 
 **Why:** the converged 2026 agent-trust anatomy (gradient of consent, evidence
 cards, receipts with undo, progressive delegation) — nobody ships it for the
@@ -82,6 +86,8 @@ ledger, inverse derivation, approval timeout.
 
 ### 3. The morning deck (proactive digest done the calm way)
 
+**Status: ✅ SHIPPED**
+
 **Why:** ChatGPT Pulse proved the overnight card-deck; orb has the pieces
 (briefing, scheduler, memory, widgets) and the trust layer (§2) to do it
 without being creepy.
@@ -106,6 +112,8 @@ per-user; no LLM required for assembly (template + data), LLM optional for
 the one narrative line.
 
 ### 4. Per-person memory bound to voice
+
+**Status: ✅ SHIPPED**
 
 **Why:** two-layer memory (auto profile + pinned facts) per member, selected
 by on-device speaker-ID — the fully-local version of what Alexa/Google do in
@@ -134,6 +142,8 @@ do you know about me"; deletion works; voice binding selects the right scope
 
 ### 5. Streaming, skeleton-first widgets + versioned catalog
 
+**Status: ✅ SHIPPED**
+
 **Why:** perceived latency is the whole game (Google GenUI's >1min full-page
 gen is the cautionary tale). The catalog-as-constraint IS the A2UI/MCP-Apps
 security model — formalize ours.
@@ -158,6 +168,8 @@ regression in the gallery (43/43).
 
 ### 6. Malleable, persistent widgets + composed home screen
 
+**Status: ✅ SHIPPED**
+
 **Why:** Ink & Switch malleability: adaptation at the point of use, as spec
 diffs over shared data — not regeneration. And the kiosk should compose itself.
 
@@ -181,6 +193,8 @@ pinned spec; two members see different pin sets; composition switches
 morning/evening layouts (clock-driven test).
 
 ### 7. Matter controller (commission devices directly)
+
+**Status: ✅ SHIPPED (IP commissioning; BLE best-effort as scoped)**
 
 **Why:** today orb bridges OUT to Apple Home; the controller role lets orb
 ADOPT Matter devices itself — scan code, device joins orb, no HA required for
@@ -207,6 +221,8 @@ message otherwise.
 
 ### 8. Three-tier routing + provenance badges
 
+**Status: ✅ SHIPPED**
+
 **Why:** Apple's on-device / private-cloud / frontier split is the canonical
 pattern; orb can mirror it exactly and make it VISIBLE.
 
@@ -223,6 +239,8 @@ pattern; orb can mirror it exactly and make it VISIBLE.
 scripted mixed session; fast-path replies logged as rules-tier.
 
 ### 9. Routines (user-visible scheduled agents)
+
+**Status: ✅ SHIPPED**
 
 **Why:** scheduled/background agents are table stakes (Tasks/Pulse/Routines);
 orb's engine is half-built (care routines) but invisible.
@@ -244,6 +262,8 @@ orb's engine is half-built (care routines) but invisible.
 per-member scoping correct.
 
 ### 10. Attention tiers + ambient surfaces
+
+**Status: ✅ SHIPPED**
 
 **Why:** calm technology — every widget declares how much attention it may
 claim; the renderer maps tiers to surfaces. Interruption must be earned.
@@ -271,21 +291,29 @@ grayscale board.
 ## Part II — Hardware-gated scaffolds
 
 ### 11. Energy intelligence (scaffold)
+
+**Status: ✅ SCAFFOLDED (op + widget + docs; awaits metering hardware)**
 Snapshot schema + Home op `energy` + widget already-designed against Matter
 1.3/1.5 power/tariff clusters and HA energy entities; activates when metering
 hardware exists. Done = schema + empty-state widget + docs.
 
 ### 12. Camera intelligence (scaffold)
+
+**Status: ✅ SCAFFOLDED (ask op wired to HA cameras + vision brain; awaits a camera)**
 `AI-Task` pattern: `Home op:'camera'` gains `ask:"is the package there?"` →
 frame → multimodal brain (vision path exists). Done = op wired against HA
 camera entities (testable the day a camera exists) + docs. Matter 1.5 camera
 adoption noted for §7 future.
 
 ### 13. mmWave presence (doc only)
+
+**Status: ✅ DONE (docs §7d in SETUP-AND-INTEGRATIONS)**
 Recommended hardware (FP2-class / LD2410-ESPHome), integration path via HA →
 existing presence merge. Done = docs section.
 
 ### 14. CreateWidget v2 sandbox (MCP-Apps contract)
+
+**Status: ✅ SHIPPED**
 Runtime-minted widgets and `html` widgets render in an iframe with
 `sandbox="allow-scripts"`, locked CSP (no external network), postMessage-only
 bridge for the widget bus. Aligns with MCP Apps 2026-01-26. Done = sandboxed
@@ -296,6 +324,8 @@ render path + one minted widget passing the gallery.
 ## Part III — Setup & onboarding
 
 ### S1. orb.local + one-liner
+
+**Status: ✅ SHIPPED (orb.local claimed via bridge mDNS)**
 Bridge sidecar additionally registers hostname `orb.local` (zeroconf address
 record) → console reachable at http://orb.local:9080. Install docs lead with
 `curl -fsSL https://orb2.app/install | bash` (relay serves the script,
@@ -303,6 +333,8 @@ redirecting to the repo installer). Done = orb.local resolves on LAN; script
 served.
 
 ### S2. Claim ceremony (scan instead of type)
+
+**Status: ✅ SHIPPED**
 First-run (no users yet) console shows a **QR** encoding
 `orb2-claim://<host>/<code>` (code = short-lived, single-use, from the api).
 The phone app's enrollment adds "Scan the code on your orb's screen" —
@@ -313,6 +345,8 @@ app-scan flow mints owner (simulated via curl for the code exchange + app
 code paths written).
 
 ### S3. Narrated first-run
+
+**Status: ✅ SHIPPED**
 After owner claim, the orb SPEAKS (if voice available) and posts a first-run
 card sequence: name the orb → who lives here (add members) → "I found these
 on your network" (bridge devices + HA discoveries) — each optional,
@@ -320,6 +354,8 @@ dismissible, resumable from Settings. No wizard walls. Done = first-run
 sequence renders on fresh install; every step skippable; state persisted.
 
 ### S4. Backup & migration
+
+**Status: ✅ SHIPPED**
 Settings → General → Backup: one-tap **encrypted export** (kv namespaces:
 users, memory, pins, policy, routines, matter fabric + devicecert identity;
 AES-256-GCM, passphrase) downloaded as `.orbbackup`; Restore accepts it on a
@@ -328,6 +364,8 @@ Apple Home pairing. Done = round-trip test: export → wipe test namespace →
 import → state identical (scripted).
 
 ### S5. Unified Add Device flow
+
+**Status: ✅ SHIPPED (console; app camera-scan path next app release)**
 Apps + console: one "Add device" entry → camera scan → payload sniffing:
 `MT:` → §7 controller (or HA fallback while controller is IP-only);
 HomeKit `X-HM://` → guidance; otherwise → HA discovery/setup flows (existing,

@@ -426,11 +426,12 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
       name: 'Home',
       description: "Control and check the home's devices through Home Assistant — lights, switches/plugs, thermostats (climate), locks, window shades/blinds (cover), TVs & speakers (media_player), robot vacuums, fans, and door/window & motion sensors. This is how Orb acts as the house. Use op:'list' to see what's available (optionally a `type`), op:'status' to check a device by name, and op:'control' to change one: action on/off/toggle for lights/plugs/switches; lock/unlock for locks; open/close (or set with `value` 0-100) for shades; set with `value` for a thermostat's target temperature; play/pause/on/off (or set volume with `value` 0-100) for media; start/stop/dock for a vacuum. Always refer to devices by their friendly name (e.g. \"kitchen lights\", \"front door\").",
       input_schema: { type: 'object', properties: {
-        op: { type: 'string', enum: ['list', 'status', 'control', 'media', 'lights', 'climate', 'vacuum', 'covers', 'security', 'plugs', 'scenes', 'sensors', 'camera', 'presence', 'automations', 'printer', 'mode'], description: "list = overview dashboard; status/control = one device; each FUNCTION op shows a focused widget: media (TV/speaker remote), lights (room-grouped), climate (thermostats), vacuum, covers (shades/blinds), security (locks + door/window/motion sensors), plugs (switches/outlets), scenes, sensors (readings: temperature/humidity/battery), camera (snapshots), presence (who's home/away), automations (list HA automations with on/off + run), printer (3D printer: live camera, progress, temps, pause/stop); mode {mode:'home'|'away'|'vacation'|'guest', secure?:true} sets the HOUSE MODE — away/vacation = instant alerts incl. motion; guest = mute door nagging; secure:true when leaving also locks every lock and turns lights off (say what was done). Use for 'we're leaving', 'back home', 'guests are over'. ALWAYS prefer the function widget matching what the user is focused on — the overview dashboard (list) is for 'show me everything'." },
+        op: { type: 'string', enum: ['list', 'status', 'control', 'media', 'lights', 'climate', 'vacuum', 'covers', 'security', 'plugs', 'scenes', 'sensors', 'camera', 'presence', 'automations', 'printer', 'energy', 'mode'], description: "list = overview dashboard; status/control = one device; each FUNCTION op shows a focused widget: media (TV/speaker remote), lights (room-grouped), climate (thermostats), vacuum, covers (shades/blinds), security (locks + door/window/motion sensors), plugs (switches/outlets), scenes, sensors (readings: temperature/humidity/battery), camera (snapshots), presence (who's home/away), automations (list HA automations with on/off + run), printer (3D printer: live camera, progress, temps, pause/stop); energy (power draw now + today, per metered device); mode {mode:'home'|'away'|'vacation'|'guest', secure?:true} sets the HOUSE MODE — away/vacation = instant alerts incl. motion; guest = mute door nagging; secure:true when leaving also locks every lock and turns lights off (say what was done). Use for 'we're leaving', 'back home', 'guests are over'. ALWAYS prefer the function widget matching what the user is focused on — the overview dashboard (list) is for 'show me everything'." },
         query: { type: 'string', description: "Device name for status/control (e.g. 'living room lights', 'front door', 'bedroom thermostat')." },
         type: { type: 'string', enum: ['light', 'switch', 'climate', 'lock', 'cover', 'media_player', 'vacuum', 'fan', 'sensor', 'camera'], description: 'Optional device type filter for list.' },
         action: { type: 'string', enum: ['on', 'off', 'toggle', 'lock', 'unlock', 'open', 'close', 'play', 'pause', 'start', 'stop', 'dock', 'set'], description: 'What to do for op:control.' },
         value: { type: 'number', description: 'Numeric arg for set: brightness/position/volume 0-100, or thermostat temperature.' },
+        ask: { type: 'string', description: "op:camera only — a question about what the camera sees ('is the package still on the porch?'); the orb grabs a fresh frame and answers." },
       }, required: ['op'] },
       available: haEnabled(),
     },
@@ -1167,12 +1168,53 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
       if (op === 'camera') {
         const cams = await haJoinAreas(await haStates(['camera']))
         if (!cams.length) return 'No cameras in Home Assistant.'
+        // Camera intelligence (v0.2 §12): ask:"is the package still there?"
+        // grabs a fresh frame and puts it to the vision brain.
+        const ask = String((args as any)?.ask || '').trim()
+        if (ask) {
+          const q = String((args as any)?.query || '').toLowerCase()
+          const cam = (q && cams.find(c => c.name.toLowerCase().includes(q))) || cams[0]!
+          try {
+            const base = (process.env.ORB2_HA_URL || '').replace(/\/+$/, '')
+            const r = await fetch(`${base}/api/camera_proxy/${cam.entity_id}`, {
+              headers: { Authorization: `Bearer ${process.env.ORB2_HA_TOKEN || ''}` },
+              signal: AbortSignal.timeout(10_000),
+            })
+            if (!r.ok) return `[ERROR] ${cam.name} did not return a frame (HA ${r.status}).`
+            const { askAboutImage } = await import('../vision/vision.js')
+            const answer = await askAboutImage(new Uint8Array(await r.arrayBuffer()), ask)
+            emitWidget(ctx.sessionId, {
+              id: `camera-${cam.entity_id}`, type: 'camera', title: cam.name,
+              name: cam.name, pill: 'checked just now',
+              snapshot: `/v1/home/ha-image?path=${encodeURIComponent(`/api/camera_proxy/${cam.entity_id}`)}`,
+            } as any)
+            return `${cam.name}: ${answer}`
+          } catch (e) { return `[ERROR] could not check ${cam.name}: ${(e as Error).message}` }
+        }
         for (const c of cams.slice(0, 4)) emitWidget(ctx.sessionId, {
           id: `camera-${c.entity_id}`, type: 'camera', title: c.name,
           entity_id: c.entity_id, name: c.name, area: c.area,
           snapshot: `/v1/home/ha-image?path=${encodeURIComponent(`/api/camera_proxy/${c.entity_id}`)}`,
         } as any)
         return `Showed camera widget${cams.length > 1 ? 's' : ''}: ${cams.slice(0, 4).map(c => c.name).join(', ')}.`
+      }
+      if (op === 'energy') {
+        // Energy intelligence scaffold (v0.2 §11): reads HA power/energy
+        // sensors today; fills in the day metering hardware exists.
+        const sensors = await haJoinAreas(await haStates(['sensor'])).catch(() => [] as any[])
+        const power = sensors.filter((e: any) => String(e.attributes.device_class) === 'power' && Number.isFinite(Number(e.state)))
+        const energy = sensors.filter((e: any) => String(e.attributes.device_class) === 'energy' && Number.isFinite(Number(e.state)))
+        const totalW = power.reduce((s: number, e: any) => s + Number(e.state), 0)
+        emitWidget(ctx.sessionId, {
+          id: 'energy', type: 'energy', title: 'Energy',
+          pill: power.length ? `${Math.round(totalW)} W` : undefined,
+          total_w: Math.round(totalW),
+          today_kwh: energy.length ? Number(energy.reduce((s: number, e: any) => s + Number(e.state), 0).toFixed(2)) : null,
+          devices: power.slice(0, 12).map((e: any) => ({ name: e.name, area: e.area || '', watts: Math.round(Number(e.state)) })),
+        } as any)
+        return power.length
+          ? `Energy: ${Math.round(totalW)} W now across ${power.length} metered devices.`
+          : 'No energy metering hardware yet — the widget explains what to plug in.'
       }
       if (op === 'printer') {
         // 3D printers (Bambu Lab via the bambu_lab integration; the shape

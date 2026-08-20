@@ -422,6 +422,7 @@
     else if(spec.type==='camera'){ wg.style.width='480px'; wg.style.height='340px'; }
     else if(spec.type==='timers'){ wg.style.width='340px'; wg.style.maxHeight='340px'; }
     else if(spec.type==='presence'){ wg.style.width='340px'; wg.style.maxHeight='260px'; }
+    else if(spec.type==='energy'){ wg.style.width='360px'; wg.style.maxHeight='340px'; }
     else if(spec.type==='automations'){ wg.style.width='420px'; wg.style.maxHeight='400px'; }
     else if(spec.type==='printer3d'){ wg.style.width='480px'; wg.style.height='560px'; }
     else if(spec.type==='familyboard'){ wg.style.width='420px'; wg.style.maxHeight='440px'; }
@@ -719,6 +720,7 @@
     else if(spec.type==='camera') renderCamera(body, spec, wg);
     else if(spec.type==='timers') renderTimers(body, spec, wg);
     else if(spec.type==='presence') renderPresence(body, spec);
+    else if(spec.type==='energy') renderEnergy(body, spec);
     else if(spec.type==='automations') renderAutomations(body, spec);
     else if(spec.type==='printer3d') renderPrinter3d(body, spec, wg);
     else if(spec.type==='familyboard') renderFamilyBoard(body, spec);
@@ -1350,6 +1352,28 @@
       const chip=document.createElement('div'); chip.className='wg-person'+(p.home?' home':'');
       chip.innerHTML=`<span class="dot"></span><span class="nm">${esc2(p.name)}</span><span class="st">${esc2(p.home?'home':(p.state||'away'))}</span>`;
       wrap.appendChild(chip);
+    });
+  }
+
+  // ── energy (v0.2 §11 scaffold): honest empty state until metering exists ──
+  function renderEnergy(body, spec){
+    const wrap=document.createElement('div'); wrap.className='wg-energy'; body.appendChild(wrap);
+    const devs=spec.devices||[];
+    if(!devs.length){
+      wrap.innerHTML='<div class="wg-empty">No energy metering yet.<br>Add a Matter smart plug with power metering, or an HA energy integration, and the house\u2019s live power draw appears here.</div>';
+      return;
+    }
+    const head=document.createElement('div'); head.className='wg-energy-now';
+    head.innerHTML=`<span class="big">${esc2(String(spec.total_w??0))}</span><span class="unit">W now</span>`+
+      (spec.today_kwh!=null?`<span class="today">${esc2(String(spec.today_kwh))} kWh today</span>`:'');
+    wrap.appendChild(head);
+    const max=Math.max.apply(null, devs.map(d=>d.watts||0).concat([1]));
+    devs.forEach(d=>{
+      const row=document.createElement('div'); row.className='wg-energy-row';
+      row.innerHTML=`<span class="nm" title="${esc2(d.name)}">${esc2(d.name)}</span>`+
+        `<span class="bar"><i style="width:${Math.max(3,Math.round((d.watts||0)/max*100))}%"></i></span>`+
+        `<span class="w">${esc2(String(d.watts||0))} W</span>`;
+      wrap.appendChild(row);
     });
   }
 

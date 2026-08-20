@@ -131,6 +131,21 @@ export async function recentSightings(store: Store, sessionId: string, limit = 2
   return []
 }
 
+/** Camera intelligence (v0.2 §12): ask the vision brain about an arbitrary
+ *  JPEG — e.g. a Home Assistant camera frame — not just the console feed. */
+export async function askAboutImage(jpeg: Uint8Array, question: string): Promise<string> {
+  const q = question.trim() || 'Describe what you see in this image in 1-3 concise, factual sentences.'
+  if (llmVisionEnabled()) return captionViaLLM({ jpeg, ts: Date.now() } as Frame, q)
+  if (!visionEnabled()) return 'Vision is not configured (set ORB2_VISION_BACKEND=llm or ORB2_VISION_URL).'
+  const res = await fetch(`${visionUrl()}/query`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ image_b64: Buffer.from(jpeg).toString('base64'), question: q }),
+  })
+  if (!res.ok) return `Vision error (${res.status}).`
+  const data = (await res.json()) as { answer?: string }
+  return data.answer || '(no result)'
+}
+
 // ── the agent tool: look at the current frame ──
 export async function executeVision(
   args: { question?: string },

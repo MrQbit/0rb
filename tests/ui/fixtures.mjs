@@ -68,6 +68,8 @@ export const FIXTURES = [
   { type: 'camera', title: 'Front door', name: 'Front door', snapshot: IMG },
   { type: 'timers', title: 'Timers', timers: [ { id: 't-1', label: 'Pasta', at: now + 6 * 60000, set: now - 3 * 60000 }, { id: 't-2', label: 'Laundry', at: now + 42 * 60000, set: now - 3 * 60000 } ] },
   { type: 'presence', title: "Who's home", people: [ { name: 'Martin', home: true }, { name: 'Ana', home: false } ], pill: '1/2 home' },
+  { type: 'energy', title: 'Energy', pill: '412 W', total_w: 412, today_kwh: 6.8,
+    devices: [ { name: 'Heat pump', area: 'Basement', watts: 220 }, { name: 'Fridge', area: 'Kitchen', watts: 95 }, { name: 'Office desk', area: 'Office', watts: 97 } ] },
   { type: 'automations', title: 'Automations', automations: [ { entity_id: 'automation.night', name: 'Lights off at midnight', on: true, last: '2026-08-19T00:00:00Z' }, { entity_id: 'automation.away', name: 'Away arming', on: false } ] },
   { type: 'printer3d', title: 'Bambu X2D', name: 'Bambu X2D', state: 'printing', progress: 62, layer: 143, total_layers: 231, nozzle: 219, nozzle_target: 220, bed: 55, bed_target: 55, remaining_min: 74, snapshot: IMG, controls: true },
   { type: 'familyboard', title: 'Family board', notes: [ { from: 'Martin', to: 'Ana', text: 'Package on the porch', time: '10:40', delivered: false, trigger: 'home' } ],
