@@ -1,0 +1,23 @@
+# Every PR must move the version (Apple-style calendar versioning — see
+# VERSIONING.md). Fails when package.json's version is not strictly
+# greater than the base branch's.
+name: version-bump
+on:
+  pull_request:
+    branches: [main]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: version must increase
+        run: |
+          BASE=$(git show origin/${{ github.base_ref }}:package.json | node -pe 'JSON.parse(require("fs").readFileSync(0,"utf8")).version')
+          HEAD=$(node -pe 'JSON.parse(require("fs").readFileSync("package.json","utf8")).version')
+          echo "base=$BASE head=$HEAD"
+          node -e '
+            const [b, h] = process.argv.slice(1).map(v => v.split(".").map(Number));
+            const gt = h[0] !== b[0] ? h[0] > b[0] : h[1] !== b[1] ? h[1] > b[1] : (h[2]||0) > (b[2]||0);
+            if (!gt) { console.error("::error::package.json version must increase (see VERSIONING.md) — bump v" + b[0] + "." + (b[1]+1)); process.exit(1); }
+          ' "$BASE" "$HEAD"

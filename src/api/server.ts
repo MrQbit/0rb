@@ -494,7 +494,7 @@ export async function startApiServer(config: ApiServerConfig) {
   })
 
   const openApiSpec = buildOpenApiSpec({
-    version: process.env.ORB2_API_VERSION || 'dev',
+    version: process.env.ORB2_API_VERSION || MACRO.DISPLAY_VERSION || 'dev',
     agentId: config.agentId,
   })
 
@@ -659,7 +659,7 @@ export async function startApiServer(config: ApiServerConfig) {
         const info: InstanceInfo = {
           instanceId: '',
           agentId: config.agentId,
-          version: process.env.ORB2_API_VERSION || 'dev',
+          version: process.env.ORB2_API_VERSION || MACRO.DISPLAY_VERSION || 'dev',
           startedAt: new Date().toISOString(),
           models: [],
           workerMode: process.env.ORB2_WORKER_MODE ?? 'in-process',
@@ -2056,7 +2056,7 @@ async function handleInfo(ctx: RuntimeContext): Promise<Response> {
   return jsonResponse(200, {
     agent_id: ctx.agentId,
     instance_id: getRelayReporter()?.getInstanceId() || null,
-    version: process.env.ORB2_API_VERSION || 'dev',
+    version: process.env.ORB2_API_VERSION || MACRO.DISPLAY_VERSION || 'dev',
     public_url: process.env.ORB2_PUBLIC_URL || null,
     device_url: deviceHost ? `https://${deviceHost}:${process.env.ORB2_DEVICE_TLS_PORT || '9444'}` : null,
     turn_tiers: await ctx.store.getKv('provenance:counts').then(v => v ? JSON.parse(v) : {}).catch(() => ({})),
@@ -2107,7 +2107,7 @@ function buildAgentCard(ctx: RuntimeContext): Record<string, unknown> {
     url: agentUrl,
     description:
       'ORB2 — general-purpose agentic coding assistant with read/write/edit/grep/run tools.',
-    version: process.env.ORB2_API_VERSION || 'dev',
+    version: process.env.ORB2_API_VERSION || MACRO.DISPLAY_VERSION || 'dev',
     capabilities: {
       contentTypes: ['application/json', 'text/plain'],
       messaging: ['http', 'json', 'jsonrpc'],
