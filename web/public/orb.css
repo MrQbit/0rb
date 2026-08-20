@@ -1114,3 +1114,8 @@ sup.sq { font-size:.58em; color:var(--nv); font-weight:700; margin-left:1px; tra
 .wg-deck-topic input{ accent-color:var(--nv,#76b900); }
 .wg-deck-topic i{ color:var(--ink-dim); font-style:normal; font-size:11.5px; }
 .wg-deck-topic.off{ opacity:.55; }
+
+/* ── official brand marks in settings ── */
+.brand{ width:16px; height:16px; display:inline-flex; flex:none; align-items:center; }
+.brand svg{ width:100%; height:100%; }
+.app-ic svg{ width:20px; height:20px; }

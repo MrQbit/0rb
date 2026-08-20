@@ -157,7 +157,7 @@
             <p class="set-muted small">Connect an account <strong>once</strong> and everything it offers lights up together — mail, calendar, files, music — in your widgets, the agent, and the morning deck. Each person connects their own accounts. The simplest way is a one-time code, like signing in on a TV.</p>
             <!-- Google -->
             <div class="set-sub">
-              <div class="set-row"><span class="pill-dot" id="gdDot"></span><div class="info-label small" style="color:var(--ink);">Google</div><span id="gdAcct" class="set-muted small"></span></div>
+              <div class="set-row"><span class="pill-dot" id="gdDot"></span><span class="brand" data-brand="google"></span><div class="info-label small" style="color:var(--ink);">Google</div><span id="gdAcct" class="set-muted small"></span></div>
               <p class="set-muted small">Drive · Calendar · Gmail. Connect with a code:</p>
               <div class="set-row" style="margin-top:6px;">
                 <button id="gdDevice" class="set-btn">Connect with code</button>
@@ -176,7 +176,7 @@
             </div>
             <!-- Microsoft -->
             <div class="set-sub" style="margin-top:12px;">
-              <div class="set-row"><span class="pill-dot" id="odDot"></span><div class="info-label small" style="color:var(--ink);">Microsoft</div><span id="odAcct" class="set-muted small"></span></div>
+              <div class="set-row"><span class="pill-dot" id="odDot"></span><span class="brand" data-brand="microsoft"></span><div class="info-label small" style="color:var(--ink);">Microsoft</div><span id="odAcct" class="set-muted small"></span></div>
               <p class="set-muted small">OneDrive · Outlook mail · Calendar. Connect with a code:</p>
               <div class="set-row" style="margin-top:6px;">
                 <button id="odDevice" class="set-btn">Connect with code</button>
@@ -195,7 +195,7 @@
             </div>
             <!-- Apple -->
             <div class="set-sub" style="margin-top:12px;">
-              <div class="set-row"><span class="pill-dot" id="apDot"></span><div class="info-label small" style="color:var(--ink);">Apple</div><span id="apAcct" class="set-muted small"></span></div>
+              <div class="set-row"><span class="pill-dot" id="apDot"></span><span class="brand" data-brand="apple"></span><div class="info-label small" style="color:var(--ink);">Apple</div><span id="apAcct" class="set-muted small"></span></div>
               <p class="set-muted small">iCloud Calendar. Apple has no sign-in-with-Apple for your data, so this uses an <strong>app-specific password</strong>: appleid.apple.com → Sign-In and Security → App-Specific Passwords → generate one for “orb”.</p>
               <div class="set-form" style="margin-top:6px;">
                 <input id="apId" type="email" placeholder="Apple ID email" autocomplete="off" />
@@ -209,7 +209,7 @@
             </div>
             <!-- Spotify (account link — the house app credential lives under Connections & keys) -->
             <div class="set-sub" style="margin-top:12px;">
-              <div class="set-row"><span class="pill-dot" id="spAcctDot"></span><div class="info-label small" style="color:var(--ink);">Spotify</div><span id="spAcctState" class="set-muted small"></span></div>
+              <div class="set-row"><span class="pill-dot" id="spAcctDot"></span><span class="brand" data-brand="spotify"></span><div class="info-label small" style="color:var(--ink);">Spotify</div><span id="spAcctState" class="set-muted small"></span></div>
               <p class="set-muted small">Music on your speakers. Tap Connect and sign in — like linking Spotify on a TV. Each person links <em>their own</em> account; nothing to register.</p>
               <div class="set-row" style="margin-top:6px;">
                 <button id="spConnect2" class="set-btn">Connect account →</button>
@@ -220,7 +220,7 @@
           <details class="apps-conn">
             <summary>Connections &amp; keys</summary>
           <div class="set-card">
-            <div class="set-row"><span class="pill-dot" id="ytDot"></span><div class="info-label" style="color:var(--ink);">YouTube</div><span id="ytState" class="set-muted small"></span></div>
+            <div class="set-row"><span class="pill-dot" id="ytDot"></span><span class="brand" data-brand="youtube"></span><div class="info-label" style="color:var(--ink);">YouTube</div><span id="ytState" class="set-muted small"></span></div>
             <p class="set-muted small">Search + play videos. Get a YouTube Data API v3 key (Google Cloud console → enable the API → create a key).</p>
             <div class="set-form">
               <input id="ytKey" type="password" placeholder="YouTube API key" style="flex:2;" autocomplete="off" />
@@ -228,7 +228,7 @@
             </div>
           </div>
           <div class="set-card">
-            <div class="set-row"><span class="pill-dot" id="spDot"></span><div class="info-label" style="color:var(--ink);">Spotify</div><span id="spState" class="set-muted small"></span></div>
+            <div class="set-row"><span class="pill-dot" id="spDot"></span><span class="brand" data-brand="spotify"></span><div class="info-label" style="color:var(--ink);">Spotify</div><span id="spState" class="set-muted small"></span></div>
             <p class="set-muted small">Optional — only for houses that want their OWN Spotify app instead of the shared 0rb one (developer.spotify.com → Client ID + Secret). Most people never need this; linking accounts happens under Your accounts above.</p>
             <div class="set-form">
               <input id="spId" type="text" placeholder="Client ID" autocomplete="off" />
@@ -251,7 +251,7 @@
             </div>
           </div>
           <div class="set-card">
-            <div class="set-row"><span class="pill-dot" id="vcDot"></span><div class="info-label" style="color:var(--ink);">Vercel</div><span id="vcState" class="set-muted small"></span></div>
+            <div class="set-row"><span class="pill-dot" id="vcDot"></span><span class="brand" data-brand="vercel"></span><div class="info-label" style="color:var(--ink);">Vercel</div><span id="vcState" class="set-muted small"></span></div>
             <p class="set-muted small">Publish shareable pages to a real public vercel.app URL (off-box). Token from vercel.com/account/tokens. Team ID optional.</p>
             <div class="set-form">
               <input id="vcToken" type="password" placeholder="Vercel token" autocomplete="off" style="flex:2;" />
