@@ -100,6 +100,11 @@ export async function tryCloudOAuthRoute(req: Request, method: string, pathname:
     }
     return json(400, { error: `${p} linking is not available yet — the shared 0rb app isn't on the relay and no house credential is set.`, redirect_uri: redirectUri(p) })
   }
+  if (method === 'POST' && pathname === '/v1/oauth/cloud/claim-blob') {
+    const b = (await req.json().catch(() => ({}))) as any
+    const p2 = b?.blob && b?.istate ? await claimRelayBlob(store, String(b.blob), String(b.istate)) : null
+    return p2 ? json(200, { ok: true, provider: p2 }) : json(400, { error: 'claim failed — reconnect' })
+  }
   const disc = /^\/v1\/oauth\/cloud\/(google|microsoft)\/disconnect$/.exec(pathname)
   if (method === 'POST' && disc && isProvider(disc[1]!)) {
     await disconnect(store, disc[1] as CloudProvider, member)

@@ -74,6 +74,13 @@ export async function trySpotifyOAuthRoute(req: Request, method: string, pathnam
     const t = await getUserToken(store, member)
     return t ? json(200, { token: t }) : json(404, { error: 'not connected' })
   }
+  if (method === 'POST' && pathname === '/v1/oauth/spotify/claim-blob') {
+    // Popup completion: the console hands over the sealed blob it received
+    // by postMessage; session-authed, nonce-gated, single-use.
+    const b = (await req.json().catch(() => ({}))) as any
+    const ok = b?.blob && b?.istate && await claimRelayBlob(store, String(b.blob), String(b.istate))
+    return ok ? json(200, { ok: true }) : json(400, { error: 'claim failed — reconnect' })
+  }
   if (method === 'POST' && pathname === '/v1/oauth/spotify/disconnect') {
     await disconnect(store, member)
     return json(200, { ok: true })

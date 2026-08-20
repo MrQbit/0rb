@@ -148,13 +148,16 @@ export async function relayAvailable(p: CloudProvider): Promise<boolean> {
 }
 
 export async function relayStartUrl(store: Store, p: CloudProvider, member?: string, req?: Request): Promise<{ url: string } | { error: string }> {
-  const { bounceBase } = await import('./relayBounce.js')
-  const base = await bounceBase(store, req)
-  if (!base) return { error: 'Linking needs a reachable HTTPS address — connect Tailscale or enroll the device URL (Settings → General).' }
-  const ret = `${base}/v1/oauth/cloud/relay`
   const nonce = Math.random().toString(36).slice(2) + Date.now().toString(36)
   await store.putKv(RELAY_KEY(nonce), JSON.stringify({ p, member: member || '' }), 600)
-  return { url: `${relayUrl()}/api/oauth/start?provider=${p}&redirect=${encodeURIComponent(ret)}&istate=${nonce}` }
+  const origin = req?.headers.get('origin') || ''
+  const popupUrl = `${relayUrl()}/api/oauth/start?provider=${p}&popup=1&istate=${nonce}${origin ? `&origin=${encodeURIComponent(origin)}` : ''}`
+  const { bounceBase } = await import('./relayBounce.js')
+  const base = await bounceBase(store, req)
+  const redirectUrl = base
+    ? `${relayUrl()}/api/oauth/start?provider=${p}&redirect=${encodeURIComponent(`${base}/v1/oauth/cloud/relay`)}&istate=${nonce}`
+    : null
+  return { url: popupUrl, ...(redirectUrl ? { redirect_url: redirectUrl } : {}) } as any
 }
 
 export async function claimRelayBlob(store: Store, blob: string, nonce: string): Promise<CloudProvider | null> {

@@ -2689,6 +2689,28 @@
   }
   try { paintBrands(document); } catch { /* pre-DOM */ }
 
+  // ── OAuth popup completion: the consent window posts the sealed blob
+  //    back here; we claim it with our session. Works on any network —
+  //    no inbound URL, DNS name, or tailscale required. ──
+  function oauthPopupFlow(startUrl, redirectUrl, claimPath, label, done){
+    const w = window.open(startUrl, 'orb2-oauth', 'width=520,height=680');
+    if(!w){ if(redirectUrl){ location.href=redirectUrl; } else toast('Popup blocked — allow popups for this site'); return; }
+    const onMsg = async (e)=>{
+      const d=e.data;
+      if(!d || d.type!=='orb2-oauth' || !d.blob) return;
+      window.removeEventListener('message', onMsg);
+      try{
+        const r=await fetch(claimPath,{method:'POST',credentials:'same-origin',
+          headers:{'content-type':'application/json'},body:JSON.stringify({blob:d.blob,istate:d.istate})});
+        const j=await r.json();
+        if(r.ok&&j.ok){ toast(label+' linked'); done&&done(true); }
+        else{ toast(j.error||'Linking failed'); done&&done(false); }
+      }catch{ toast('Linking failed'); done&&done(false); }
+      try{ w.close(); }catch{}
+    };
+    window.addEventListener('message', onMsg);
+  }
+
   async function loadAppsRegistry(){
     const grid=$('#appsGrid'); if(!grid) return;
     let widgets=[];
@@ -2810,7 +2832,7 @@
       if(conn) conn.style.display = st.connected ? 'none' : (st.configured ? '' : 'none');
       if(disc) disc.style.display = st.connected ? '' : 'none';
       if(redir && st.redirect_uri) redir.textContent = 'Add this Redirect URI to your Spotify app: ' + st.redirect_uri;
-      if(conn && !conn.dataset.w){ conn.dataset.w='1'; conn.onclick=async()=>{ try{ const d=await (await fetch('/v1/oauth/spotify/start',{credentials:'same-origin'})).json(); if(d.url) location.href=d.url; else toast(d.error||'Configure Spotify first'); }catch{ toast('Failed'); } }; }
+      if(conn && !conn.dataset.w){ conn.dataset.w='1'; conn.onclick=async()=>{ try{ const d=await (await fetch('/v1/oauth/spotify/start',{credentials:'same-origin'})).json(); if(d.mode==='relay'&&d.url) oauthPopupFlow(d.url, d.redirect_url, '/v1/oauth/spotify/claim-blob', 'Spotify', ok=>{ if(ok) loadApps(); }); else if(d.url) location.href=d.url; else toast(d.error||'Configure Spotify first'); }catch{ toast('Failed'); } }; }
       if(disc && !disc.dataset.w){ disc.dataset.w='1'; disc.onclick=async()=>{ await fetch('/v1/oauth/spotify/disconnect',{method:'POST',credentials:'same-origin'}); toast('Disconnected'); loadApps(); }; }
     }catch{}
     // Cloud Storage (Google Drive + OneDrive): save client creds + OAuth.
@@ -2836,7 +2858,8 @@
         if(dev && !dev.dataset.w){ dev.dataset.w='1'; dev.onclick=async()=>{
           if(dev.dataset.mode==='relay'){
             try{ const d=await (await fetch('/v1/oauth/cloud/'+p+'/start',{credentials:'same-origin'})).json();
-              if(d.url) location.href=d.url; else toast(d.error||'Not available yet'); }catch{ toast('Failed'); }
+              if(d.url) oauthPopupFlow(d.url, d.redirect_url, '/v1/oauth/cloud/claim-blob', (p==='google'?'Google':'Microsoft'), ok=>{ if(ok) loadApps(); });
+              else toast(d.error||'Not available yet'); }catch{ toast('Failed'); }
             return;
           }
           try{

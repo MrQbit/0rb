@@ -93,13 +93,20 @@ export async function relayAvailable(): Promise<boolean> {
  *  browser is already on (see relayBounce.ts — DNS-rebind-filtering routers
  *  make the device hostname unresolvable on some LANs). */
 export async function relayStartUrl(store: Store, member?: string, req?: Request): Promise<{ url: string } | { error: string }> {
-  const { bounceBase } = await import('./relayBounce.js')
-  const base = await bounceBase(store, req)
-  if (!base) return { error: 'Linking needs a reachable HTTPS address — connect Tailscale or enroll the device URL (Settings → General).' }
-  const ret = `${base}/v1/oauth/spotify/relay`
   const nonce = Math.random().toString(36).slice(2) + Date.now().toString(36)
   await store.putKv(RELAY_KEY(nonce), JSON.stringify({ member: member || '' }), 600)
-  return { url: `${relayUrl()}/api/oauth/start?provider=spotify&redirect=${encodeURIComponent(ret)}&istate=${nonce}` }
+  // Popup mode: the consent window posts the sealed blob back to the console
+  // tab, which claims it through its own session — no inbound reachability,
+  // DNS, or tailscale needed. The console falls back to redirect mode (below)
+  // only when the popup is blocked.
+  const origin = req?.headers.get('origin') || ''
+  const popupUrl = `${relayUrl()}/api/oauth/start?provider=spotify&popup=1&istate=${nonce}${origin ? `&origin=${encodeURIComponent(origin)}` : ''}`
+  const { bounceBase } = await import('./relayBounce.js')
+  const base = await bounceBase(store, req)
+  const redirectUrl = base
+    ? `${relayUrl()}/api/oauth/start?provider=spotify&redirect=${encodeURIComponent(`${base}/v1/oauth/spotify/relay`)}&istate=${nonce}`
+    : null
+  return { url: popupUrl, ...(redirectUrl ? { redirect_url: redirectUrl } : {}) } as any
 }
 
 /** The relay bounced back: claim the sealed blob and store the member's tokens. */
