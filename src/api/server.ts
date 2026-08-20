@@ -1707,6 +1707,24 @@ async function dispatch(
     }
     if (pathname === '/v1/board' && method === 'GET') return jsonResponse(200, { widgets: await composeBoard(ctx.store, user) })
   }
+  // ─── The morning deck (v0.2 §3) ───
+  if (pathname.startsWith('/v1/deck')) {
+    const { todaysDeck, recordFeedback, dismissDeck } = await import('./deck/deck.js')
+    const user = (attributionFor(identity).oid || 'owner').replace(/^user:/, '')
+    if (pathname === '/v1/deck' && method === 'GET') {
+      return jsonResponse(200, { deck: await todaysDeck(ctx.store, user) })
+    }
+    if (pathname === '/v1/deck/feedback' && method === 'POST') {
+      const b = await req.json().catch(() => ({})) as any
+      if (!b?.topic) return jsonResponse(400, { error: 'topic required' })
+      await recordFeedback(ctx.store, user, String(b.topic), Number(b.delta) || 1)
+      return jsonResponse(200, { ok: true })
+    }
+    if (pathname === '/v1/deck/dismiss' && method === 'POST') {
+      await dismissDeck(ctx.store, user)
+      return jsonResponse(200, { ok: true })
+    }
+  }
   // ─── Widget catalog (the design system as data; v0.2 §5) ───
   if (method === 'GET' && pathname === '/v1/widgets/catalog') {
     const { catalogJson } = await import('./widgets/catalog.js')

@@ -74,6 +74,7 @@ export const CATALOG: Record<string, CatalogEntry> = {
   housemode: { fields: { mode: S }, attention: 'ambient', refresh: 'live', hint: 'home|away|vacation|guest' },
   setup: { fields: { integration: S, flow: O }, attention: 'notify', refresh: 'snapshot', hint: 'device pairing form' },
   approval: { fields: { approval_id: S, summary: S, reason: S, tool: S, action_key: S, offer_always: B, expires_at: N, resolved: B, approved: B }, attention: 'notify', refresh: 'snapshot', hint: 'action awaiting approval' },
+  deck: { fields: { cards: A }, attention: 'ambient', refresh: 'snapshot', hint: 'morning digest card stack' },
   receipts: { fields: { receipts: A }, attention: 'glance', refresh: 'live', hint: 'action ledger + undo' },
 }
 

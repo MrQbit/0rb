@@ -1057,3 +1057,10 @@ sup.sq { font-size:.58em; color:var(--nv); font-weight:700; margin-left:1px; tra
 .wg-pin:hover { color:var(--ink); opacity:1; }
 .wg-pin.on { color:var(--nv); opacity:1; }
 .wg-pin svg { pointer-events:none; }
+/* the morning deck */
+.wg-deck { display:flex; flex-direction:column; gap:12px; }
+.wg-deck-card { background:rgba(255,255,255,.045); border-radius:12px; padding:12px 12px 6px; position:relative; }
+.wg-deck-fb { display:flex; gap:2px; justify-content:flex-end; }
+.wg-deck-vote { background:none; border:0; color:var(--ink-dim); cursor:pointer; padding:5px; border-radius:6px; opacity:.6; }
+.wg-deck-vote:hover { color:var(--nv); opacity:1; }
+.wg-deck-vote svg { pointer-events:none; }

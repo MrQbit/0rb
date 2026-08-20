@@ -84,6 +84,10 @@ export const FIXTURES = [
     { id: 'r-1', ts: Date.now() - 240000, user: 'Martin', summary: 'Set the house to away and secure it', inverse: { kind: 'mode', mode: 'home' } },
     { id: 'r-2', ts: Date.now() - 3600000, user: 'Ana', summary: 'Turn off the kitchen lights', inverse: { kind: 'home-control', entity_id: 'light.k', action: 'on', value: 80 } },
     { id: 'r-3', ts: Date.now() - 7200000, user: 'Martin', summary: 'Announce on Living Room: “Dinner is ready”', undone: false } ] },
+  { type: 'deck', title: 'Good morning', cards: [
+    { topic: 'calendar', spec: { id: 'dc1', type: 'familyboard', title: 'Today', notes: [], events: [ { date: '2026-08-20', time: '10:00', title: 'Bambu X2D delivery' } ] } },
+    { topic: 'house', spec: { id: 'dc2', type: 'note', title: 'Worth a look', text: 'Garage door is open · Motion sensor battery at 12%' } },
+    { topic: 'presence', spec: { id: 'dc3', type: 'presence', title: "Who's home", people: [ { name: 'Martin', home: true } ] } } ] },
   { type: 'calculator', title: 'Calculator' },
   { type: 'video', title: 'Launch video', provider: 'file', url: '/assets/icon-192.png' },
   { type: 'music', title: 'Now playing', url: 'about:blank' },

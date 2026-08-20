@@ -402,6 +402,7 @@
     else if(spec.type==='setup'){ wg.style.width='360px'; }
     else if(spec.type==='approval'){ wg.style.width='360px'; }
     else if(spec.type==='receipts'){ wg.style.width='440px'; wg.style.maxHeight='480px'; }
+    else if(spec.type==='deck'){ wg.style.width='420px'; wg.style.maxHeight='560px'; }
     else if(spec.type==='lights'){ wg.style.width='400px'; wg.style.maxHeight='460px'; }
     else if(spec.type==='media'){ wg.style.width='380px'; wg.style.maxHeight='320px'; }
     else if(spec.type==='climate'){ wg.style.width='300px'; wg.style.height='300px'; }
@@ -660,6 +661,7 @@
     else if(spec.type==='setup') renderSetup(body, spec, wg);
     else if(spec.type==='approval') renderApproval(body, spec, wg);
     else if(spec.type==='receipts') renderReceipts(body, spec, wg);
+    else if(spec.type==='deck') renderDeck(body, spec, wg);
     else if(_plugins[spec.type]) renderPlugin(body, spec, _plugins[spec.type]);
     else {
       // Freshly-minted custom widget? (CreateWidget installs plugins at
@@ -1064,6 +1066,39 @@
     const wrap=document.createElement('div'); wrap.className='wg-setup'; body.appendChild(wrap);
     haFlowForm(wrap, spec.flow, spec.integration, f=>{ if(wg&&wg._spec) wg._spec.flow=f; });
   }
+
+  // ── deck: the morning digest — cards with thumbs that teach it ──
+  function renderDeck(body, spec, wg){
+    const wrap=document.createElement('div'); wrap.className='wg-deck'; body.appendChild(wrap);
+    (spec.cards||[]).forEach(card=>{
+      const cell=document.createElement('div'); cell.className='wg-deck-card';
+      const inner=document.createElement('div'); inner.className='wg-deck-body'; cell.appendChild(inner);
+      try{ renderWidget(inner, card.spec||{}, wg); }catch{ inner.textContent='—'; }
+      const fb=document.createElement('div'); fb.className='wg-deck-fb';
+      const send=async(delta)=>{ try{ await fetch('/v1/deck/feedback',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({topic:card.topic,delta})});
+        fb.innerHTML='<span class="set-muted small">Noted.</span>'; }catch{} };
+      const up=document.createElement('button'); up.className='wg-deck-vote'; up.title='More like this';
+      up.innerHTML='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11v9M7 11l4-8a2.4 2.4 0 0 1 2.3 3l-.8 3h6a2 2 0 0 1 2 2.4l-1.2 5A2 2 0 0 1 17.3 20H7"/></svg>';
+      up.onclick=()=>send(1);
+      const down=document.createElement('button'); down.className='wg-deck-vote'; down.title='Less of this';
+      down.innerHTML='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 13V4M17 13l-4 8a2.4 2.4 0 0 1-2.3-3l.8-3H5.5a2 2 0 0 1-2-2.4l1.2-5A2 2 0 0 1 6.7 4H17"/></svg>';
+      down.onclick=()=>send(-1);
+      fb.append(up,down); cell.appendChild(fb);
+      wrap.appendChild(cell);
+    });
+    const done=document.createElement('button'); done.className='set-btn ghost'; done.textContent='Done for today';
+    done.onclick=async()=>{ try{ await fetch('/v1/deck/dismiss',{method:'POST',credentials:'same-origin'}); }catch{}
+      const host=body.closest('.wg'); if(host){ widgets.delete(host.id?host.id.replace(/^wg-/,''):''); host.remove(); growWidgetCanvas(); } };
+    wrap.appendChild(done);
+  }
+
+  // ── deck delivery: on load, today's deck appears once (v0.2 §3) ──
+  setTimeout(async()=>{
+    try{
+      const d=await (await fetch('/v1/deck',{credentials:'same-origin'})).json();
+      if(d.deck) spawnWidget(d.deck);
+    }catch{}
+  }, 2200);
 
   // ── approval: an action waiting on you (trust layer) ──
   function renderApproval(body, spec, wg){
