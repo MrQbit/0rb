@@ -178,15 +178,10 @@
             else if(evt==='canvas_close') hideCanvas();
             else if(evt==='widget') spawnWidget(d);
             else if(evt==='text_chunk'){ full+=d.text; out.textContent=full; messages.scrollTop=messages.scrollHeight; }
-            else if(evt==='done'&&d.provenance&&full.trim()){
-              // Provenance (v0.2 §8): QUIET metadata — a faint inline mark at
-              // the end of the answer, never its own bubble/line. Skipped
-              // entirely on widget-only turns (no text = nothing to annotate).
-              const b=document.createElement('span'); b.className='prov-badge '+(d.provenance.tier||'local');
-              b.title='Answered by the '+(d.provenance.tier==='cloud'?'cloud model':'local model')+(d.provenance.model?' · '+d.provenance.model:'');
-              b.textContent=d.provenance.tier==='cloud'?'cloud':'local';
-              out.appendChild(b);
-            }
+            // Provenance (v0.2 §8) is deliberately NOT shown per message —
+            // it lives as the aggregate "Answers by tier" row in Settings.
+            // (Server still counts tiers; d.provenance is available here
+            // if a debug surface ever wants it.)
             evt='';
           } else if(line==='') evt='';
         }

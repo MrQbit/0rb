@@ -1,0 +1,18 @@
+import { chromium } from 'playwright';
+const b = await chromium.launch();
+const page = await (await b.newContext()).newPage();
+await page.context().addCookies([{ name: 'orb2_session', value: process.env.ORB_SESSION, domain: 'localhost', path: '/' }]);
+await page.goto('http://localhost:9080/', { waitUntil: 'networkidle' });
+await page.waitForTimeout(2000);
+await page.locator('#chatInput, textarea').first().fill('Hello orb');
+await page.keyboard.press('Enter');
+await page.waitForTimeout(15000);
+const badges = await page.locator('.prov-badge').count();
+const texts = await page.locator('.msg').allTextContents();
+const hasLocal = texts.some(t => /\blocal\b/i.test(t) && t.length < 120);
+console.log('prov badges:', badges, '| reply mentions LOCAL:', hasLocal);
+console.log('last reply:', (texts[texts.length-1]||'').slice(0,90));
+const chat = page.locator('#messages, .chat, .msg').last();
+await page.screenshot({ path: (process.env.SHOTS_DIR||'.') + '/badge-gone.png', clip: (await chat.boundingBox()) || undefined });
+await b.close();
+process.exit(badges === 0 && !hasLocal ? 0 : 1);
