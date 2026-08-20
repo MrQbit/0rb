@@ -147,16 +147,11 @@ export async function relayAvailable(p: CloudProvider): Promise<boolean> {
   return ok
 }
 
-async function instanceReturn(store: Store): Promise<string | null> {
-  const host = await store.getKv('devicecert:hostname').catch(() => null)
-  if (!host) return null
-  const port = Number(process.env.ORB2_DEVICE_TLS_PORT || 9444)
-  return `https://${host}${port === 443 ? '' : `:${port}`}/v1/oauth/cloud/relay`
-}
-
-export async function relayStartUrl(store: Store, p: CloudProvider, member?: string): Promise<{ url: string } | { error: string }> {
-  const ret = await instanceReturn(store)
-  if (!ret) return { error: 'Linking needs the device URL first — it enrolls automatically when remote access is on (Settings → General).' }
+export async function relayStartUrl(store: Store, p: CloudProvider, member?: string, req?: Request): Promise<{ url: string } | { error: string }> {
+  const { bounceBase } = await import('./relayBounce.js')
+  const base = await bounceBase(store, req)
+  if (!base) return { error: 'Linking needs a reachable HTTPS address — connect Tailscale or enroll the device URL (Settings → General).' }
+  const ret = `${base}/v1/oauth/cloud/relay`
   const nonce = Math.random().toString(36).slice(2) + Date.now().toString(36)
   await store.putKv(RELAY_KEY(nonce), JSON.stringify({ p, member: member || '' }), 600)
   return { url: `${relayUrl()}/api/oauth/start?provider=${p}&redirect=${encodeURIComponent(ret)}&istate=${nonce}` }

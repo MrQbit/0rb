@@ -60,7 +60,7 @@ export async function trySpotifyOAuthRoute(req: Request, method: string, pathnam
     // otherwise the default is the relay — one shared 0rb app, zero setup.
     if (spotifyOAuthConfigured()) return json(200, { url: await authorizeUrl(store, member), redirect_uri: redirectUri(), mode: 'own' })
     if (await relayAvailable()) {
-      const r = await relayStartUrl(store, member)
+      const r = await relayStartUrl(store, member, req)
       return 'url' in r ? json(200, { ...r, mode: 'relay' }) : json(400, r)
     }
     return json(400, { error: 'Spotify linking is not available yet: neither the shared 0rb app (relay) nor a house app credential is configured.' })

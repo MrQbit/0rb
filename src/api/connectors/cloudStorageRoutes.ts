@@ -95,7 +95,7 @@ export async function tryCloudOAuthRoute(req: Request, method: string, pathname:
     // Own app wins when this house registered one; otherwise the relay.
     if (providerConfigured(p)) return json(200, { url: await authorizeUrl(store, p, member), redirect_uri: redirectUri(p), mode: 'own' })
     if (await relayAvailable(p)) {
-      const r = await relayStartUrl(store, p, member)
+      const r = await relayStartUrl(store, p, member, req)
       return 'url' in r ? json(200, { ...r, mode: 'relay' }) : json(400, r)
     }
     return json(400, { error: `${p} linking is not available yet — the shared 0rb app isn't on the relay and no house credential is set.`, redirect_uri: redirectUri(p) })

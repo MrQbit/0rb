@@ -89,18 +89,14 @@ export async function relayAvailable(): Promise<boolean> {
   return ok
 }
 
-/** The instance return host the relay will accept (device cert hostname). */
-async function instanceReturn(store: Store): Promise<string | null> {
-  const host = await store.getKv('devicecert:hostname').catch(() => null)
-  if (!host) return null
-  const port = Number(process.env.ORB2_DEVICE_TLS_PORT || 9444)
-  return `https://${host}${port === 443 ? '' : `:${port}`}/v1/oauth/spotify/relay`
-}
-
-/** Begin a relay link for this member. Null when the device URL isn't enrolled yet. */
-export async function relayStartUrl(store: Store, member?: string): Promise<{ url: string } | { error: string }> {
-  const ret = await instanceReturn(store)
-  if (!ret) return { error: 'Linking needs the device URL first — Settings → General → System shows it; it enrolls automatically when remote access is on.' }
+/** Begin a relay link for this member. The bounce host prefers whatever the
+ *  browser is already on (see relayBounce.ts — DNS-rebind-filtering routers
+ *  make the device hostname unresolvable on some LANs). */
+export async function relayStartUrl(store: Store, member?: string, req?: Request): Promise<{ url: string } | { error: string }> {
+  const { bounceBase } = await import('./relayBounce.js')
+  const base = await bounceBase(store, req)
+  if (!base) return { error: 'Linking needs a reachable HTTPS address — connect Tailscale or enroll the device URL (Settings → General).' }
+  const ret = `${base}/v1/oauth/spotify/relay`
   const nonce = Math.random().toString(36).slice(2) + Date.now().toString(36)
   await store.putKv(RELAY_KEY(nonce), JSON.stringify({ member: member || '' }), 600)
   return { url: `${relayUrl()}/api/oauth/start?provider=spotify&redirect=${encodeURIComponent(ret)}&istate=${nonce}` }
