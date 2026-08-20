@@ -159,6 +159,21 @@ async function setSensor(entry, value) {
   await entry.ep.set(patch).catch(() => {});
 }
 
+// Setup-code parsing (§7): MT: QR payloads or 11/21-digit manual codes.
+async function parseSetupCode(raw) {
+  const code = String(raw || "").trim();
+  if (!code) throw new Error("no setup code provided");
+  if (/^MT:/i.test(code)) {
+    const { QrPairingCodeCodec } = await import("@matter/types/schema");
+    const decoded = QrPairingCodeCodec.decode(code);
+    const p = Array.isArray(decoded) ? decoded[0] : decoded;
+    return { passcode: p.passcode, discriminator: p.discriminator };
+  }
+  const digits = code.replace(/[^0-9]/g, "");
+  if (digits.length === 11 || digits.length === 21) return { pairingCode: digits };
+  throw new Error("unrecognized setup code — expected an MT: QR payload or an 11-digit pairing code");
+}
+
 const peopleEps = new Map();
 async function addPerson(name, home) {
   // OccupancySensorDevice ships with only `identify` — the sensing cluster
@@ -254,6 +269,76 @@ http.createServer((req, res) => {
     } catch (e) { out.error = String(e.message).slice(0, 120); }
     out.devices = bridged.size;
     res.end(JSON.stringify(out));
+    return;
+  }
+  // ── Controller (v0.2 §7): orb ADOPTS Matter devices itself. IP-first;
+  //    BLE is best-effort and this host's adapter is flaky, so codes for
+  //    devices not yet on the network fail with a named reason. ──
+  if (req.url === "/commission" && req.method === "POST") {
+    let body = "";
+    req.on("data", (c) => { body += c; });
+    req.on("end", async () => {
+      try {
+        const { code } = JSON.parse(body || "{}");
+        const opts = await parseSetupCode(code);
+        const started = Date.now();
+        const client = await Promise.race([
+          node.peers.commission(opts),
+          new Promise((_, rej) => setTimeout(() => rej(new Error("not found on the network after 90s")), 90_000)),
+        ]);
+        console.log(`commissioned node ${client.id} in ${Date.now() - started}ms`);
+        res.end(JSON.stringify({ ok: true, node: String(client.id) }));
+      } catch (e) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: String(e.message).slice(0, 300) }));
+      }
+    });
+    return;
+  }
+  if (req.url === "/nodes") {
+    const out = [];
+    try {
+      for (const client of node.peers) {
+        const eps = [];
+        try {
+          for (const part of client.parts) {
+            const onOff = part.stateOfIfSupported?.("onOff");
+            eps.push({ id: String(part.id), onOff: onOff ? !!onOff.onOff : null });
+          }
+        } catch { /* offline node — structure unavailable */ }
+        out.push({ id: String(client.id), endpoints: eps });
+      }
+    } catch (e) { console.warn("nodes list failed:", e.message); }
+    res.end(JSON.stringify({ nodes: out }));
+    return;
+  }
+  if (req.url === "/node" && req.method === "POST") {
+    let body = "";
+    req.on("data", (c) => { body += c; });
+    req.on("end", async () => {
+      try {
+        const { id, action } = JSON.parse(body || "{}");
+        const client = node.peers.get(String(id));
+        if (!client) { res.statusCode = 404; res.end('{"error":"unknown node"}'); return; }
+        if (action === "remove") {
+          await client.decommission();
+          res.end(JSON.stringify({ ok: true, removed: true }));
+          return;
+        }
+        let done = false;
+        for (const part of client.parts) {
+          const cmds = part.commandsOfIfSupported?.("onOff") ??
+            (() => { try { return part.commandsOf("onOff"); } catch { return null; } })();
+          if (!cmds) continue;
+          if (action === "on") await cmds.on();
+          else if (action === "off") await cmds.off();
+          else await cmds.toggle();
+          done = true;
+          break;
+        }
+        res.end(JSON.stringify(done ? { ok: true } : { error: "node has no on/off endpoint" }));
+      } catch (e) { res.statusCode = 400; res.end(JSON.stringify({ error: String(e.message).slice(0, 300) })); }
+    });
     return;
   }
   // Backup & migration (v0.2 S4): the fabric IS the Apple Home pairing —

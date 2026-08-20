@@ -2229,6 +2229,44 @@
     loadBridgeDevices();
     loadMatterCard();
   }
+  // ── Unified Add Device (v0.2 S5): one box, the orb routes the code.
+  //    MT:/digits → Matter controller (§7); X-HM:// → HomeKit guidance;
+  //    anything else → the Home Assistant integration search below. ──
+  (function wireAddDevice(){
+    const inp=document.getElementById('addDevCode'), go=document.getElementById('addDevGo'), st=document.getElementById('addDevStatus');
+    if(!inp||!go) return;
+    const say=(t,ok)=>{ st.textContent=t; st.style.color=ok?'':'#ff9a7a'; };
+    async function add(){
+      const code=inp.value.trim();
+      if(!code) return;
+      if(/^X-HM:\/\//i.test(code)){
+        say('That’s an Apple HomeKit code. Most recent HomeKit devices also print a Matter “MT:” QR or an 11-digit number — use that here. Older HomeKit-only devices pair in the Apple Home app instead.',false);
+        return;
+      }
+      const digits=code.replace(/[^0-9]/g,'');
+      if(/^MT:/i.test(code)||digits.length===11||digits.length===21){
+        go.disabled=true;
+        say('Looking for the device on your network… this can take up to a minute.',true);
+        try{
+          const r=await fetch('/v1/matter/commission',{method:'POST',credentials:'same-origin',
+            headers:{'content-type':'application/json'},body:JSON.stringify({code})});
+          const d=await r.json();
+          if(r.ok&&d.ok){ say('Done — the device joined the orb. It will appear under Devices in a moment.',true); inp.value=''; }
+          else if(/not found on the network/i.test(d.error||'')){
+            say('Could not find it on the network. If it’s brand new: give it power, wait for its light to blink, and make sure it’s joined your Wi-Fi first (many devices only speak 2.4 GHz — if your phone is on the 5 GHz network, the device may be on a network the orb can’t see).',false);
+          } else say('Pairing failed at commissioning: '+(d.error||'unknown')+'. The code may already be used — a Matter device needs a fresh code after a factory reset.',false);
+        }catch{ say('The Matter service didn’t answer — is the orb fully started?',false); }
+        finally{ go.disabled=false; }
+        return;
+      }
+      // Not a pairing payload — treat as a product name for HA.
+      const ha=document.getElementById('haAddName');
+      if(ha){ ha.value=code; document.getElementById('haAddStart')?.click(); say('That doesn’t look like a setup code — searching Home Assistant integrations for “'+code+'” below.',true); }
+      else say('That doesn’t look like a setup code.',false);
+    }
+    go.addEventListener('click', add);
+    inp.addEventListener('keydown', e=>{ if(e.key==='Enter') add(); });
+  })();
   // ── Apple Home & Siri: the Matter bridge pairing card ──
   async function loadMatterCard(){
     const card=$('#matterCard'); if(!card) return;

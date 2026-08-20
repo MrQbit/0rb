@@ -90,6 +90,15 @@
         <div class="set-sec" data-sec="smarthome">
           <h3>Home</h3>
           <p class="set-muted">Speakers, TVs and printers work <strong>directly</strong> — nothing to set up. Home Assistant adds deep control for lights, locks, climate and everything else.</p>
+          <h4 class="set-h4">Add a device</h4>
+          <div class="set-card">
+            <p class="set-muted small">Paste the setup code from the device, its box, or its app — a QR payload starting with <code>MT:</code> or the 11-digit pairing number. The orb works out where it belongs.</p>
+            <div class="set-form">
+              <input id="addDevCode" type="text" placeholder="MT:… or 1234-567-8901" autocomplete="off" />
+              <button id="addDevGo" class="set-btn">Add</button>
+            </div>
+            <div id="addDevStatus" class="set-muted small"></div>
+          </div>
           <h4 class="set-h4">On your network — ready now</h4>
           <div id="bridgeWrap" style="display:none;">
             <div id="bridgeDevices" class="set-list"></div>

@@ -42,6 +42,35 @@ export async function tryHandleMatterRoute(method: string, pathname: string, req
     }
   }
 
+  // Console-facing controller proxies (v0.2 §7 + S5): commission a device
+  // by setup code, list adopted nodes, flip one. Session-authed like the
+  // pairing card — never token-reachable from the LAN.
+  if (pathname === '/v1/matter/commission' || pathname === '/v1/matter/nodes' || pathname === '/v1/matter/node') {
+    const { authEnabled, verifySession, parseCookies, SESSION_COOKIE } = await import('../auth/session.js')
+    if (authEnabled()) {
+      const a = req.headers.get('authorization') ?? ''
+      let token = /^Bearer\s+/i.test(a) ? a.replace(/^Bearer\s+/i, '').trim() : ''
+      if (!token) token = parseCookies(req.headers.get('cookie'))[SESSION_COOKIE] ?? ''
+      if (!token || !verifySession(token)) return json(401, { error: 'authentication required' })
+    }
+    try {
+      if (method === 'GET' && pathname === '/v1/matter/nodes') {
+        const r = await fetch(`${matterUrl()}/nodes`, { signal: AbortSignal.timeout(8000) })
+        return json(r.status, await r.json() as any)
+      }
+      if (method === 'POST') {
+        const body = await req.text()
+        const path = pathname === '/v1/matter/commission' ? '/commission' : '/node'
+        // commissioning legitimately takes a while — discovery + PASE + CASE
+        const r = await fetch(`${matterUrl()}${path}`, {
+          method: 'POST', headers: { 'content-type': 'application/json' }, body,
+          signal: AbortSignal.timeout(path === '/commission' ? 100_000 : 15_000),
+        })
+        return json(r.status, await r.json() as any)
+      }
+    } catch { return json(502, { error: 'matter sidecar unreachable' }) }
+  }
+
   // Sidecar-facing routes below.
   if (!sidecarAuthed(req)) return json(401, { error: 'bad matter token' })
 
