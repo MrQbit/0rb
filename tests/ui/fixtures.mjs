@@ -79,6 +79,11 @@ export const FIXTURES = [
   { type: 'setup', title: 'Set up brother', integration: 'brother', flow: { type: 'form', flow_id: 'fx1', handler: 'brother', step_id: 'user',
     step_title: 'Discovered Brother Printer', step_description: 'Do you want to add HL-L2460DW to Home Assistant?',
     fields: [ { name: 'type', type: 'string', required: true, options: ['laser', 'ink'], label: 'Printer type', help: 'The type of the Brother printer.' } ] } },
+  { type: 'approval', title: 'Approval needed', approval_id: 'ap-fx', summary: 'Unlock the front door', reason: 'This action is gated — approve it on screen.', offer_always: true, expires_at: Date.now() + 120000 },
+  { type: 'receipts', title: 'What Orb did', receipts: [
+    { id: 'r-1', ts: Date.now() - 240000, user: 'Martin', summary: 'Set the house to away and secure it', inverse: { kind: 'mode', mode: 'home' } },
+    { id: 'r-2', ts: Date.now() - 3600000, user: 'Ana', summary: 'Turn off the kitchen lights', inverse: { kind: 'home-control', entity_id: 'light.k', action: 'on', value: 80 } },
+    { id: 'r-3', ts: Date.now() - 7200000, user: 'Martin', summary: 'Announce on Living Room: “Dinner is ready”', undone: false } ] },
   { type: 'calculator', title: 'Calculator' },
   { type: 'video', title: 'Launch video', provider: 'file', url: '/assets/icon-192.png' },
   { type: 'music', title: 'Now playing', url: 'about:blank' },

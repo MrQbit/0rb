@@ -397,6 +397,8 @@
     else if(spec.type==='document'){ wg.style.width='560px'; wg.style.maxHeight='520px'; }
     else if(spec.type==='wallet'){ wg.style.width='380px'; wg.style.maxHeight='420px'; }
     else if(spec.type==='setup'){ wg.style.width='360px'; }
+    else if(spec.type==='approval'){ wg.style.width='360px'; }
+    else if(spec.type==='receipts'){ wg.style.width='440px'; wg.style.maxHeight='480px'; }
     else if(spec.type==='lights'){ wg.style.width='400px'; wg.style.maxHeight='460px'; }
     else if(spec.type==='media'){ wg.style.width='380px'; wg.style.maxHeight='320px'; }
     else if(spec.type==='climate'){ wg.style.width='300px'; wg.style.height='300px'; }
@@ -621,6 +623,8 @@
     else if(spec.type==='briefing') renderBriefing(body, spec);
     else if(spec.type==='housemode') renderHouseMode(body, spec);
     else if(spec.type==='setup') renderSetup(body, spec, wg);
+    else if(spec.type==='approval') renderApproval(body, spec, wg);
+    else if(spec.type==='receipts') renderReceipts(body, spec, wg);
     else if(_plugins[spec.type]) renderPlugin(body, spec, _plugins[spec.type]);
     else {
       // Freshly-minted custom widget? (CreateWidget installs plugins at
@@ -1024,6 +1028,60 @@
   function renderSetup(body, spec, wg){
     const wrap=document.createElement('div'); wrap.className='wg-setup'; body.appendChild(wrap);
     haFlowForm(wrap, spec.flow, spec.integration, f=>{ if(wg&&wg._spec) wg._spec.flow=f; });
+  }
+
+  // ── approval: an action waiting on you (trust layer) ──
+  function renderApproval(body, spec, wg){
+    const wrap=document.createElement('div'); wrap.className='wg-approval'; body.appendChild(wrap);
+    if(spec.resolved){
+      wrap.innerHTML=`<div class="${spec.approved?'ha-flow-done':'ha-flow-abort'}">${spec.approved?'✓ Approved — done.':'Not approved.'}</div>
+        <div class="set-muted small" style="margin-top:6px;">${esc2(spec.summary||'')}</div>`;
+      return;
+    }
+    const sum=document.createElement('div'); sum.className='ap-sum'; sum.textContent=spec.summary||'An action needs your approval.'; wrap.appendChild(sum);
+    if(spec.reason){ const r=document.createElement('div'); r.className='set-muted small'; r.textContent=spec.reason; wrap.appendChild(r); }
+    const send=async(approve,always)=>{
+      try{ const r=await fetch('/v1/approvals/'+encodeURIComponent(spec.approval_id),{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({approve,always})});
+        if(!r.ok) toast('That request already expired');
+      }catch{ toast('Failed'); }
+    };
+    const row=document.createElement('div'); row.className='ap-row';
+    const ok=document.createElement('button'); ok.className='set-btn'; ok.textContent='Approve'; ok.onclick=()=>send(true,false);
+    const no=document.createElement('button'); no.className='set-btn ghost'; no.textContent='Cancel'; no.onclick=()=>send(false,false);
+    row.append(ok,no); wrap.appendChild(row);
+    if(spec.offer_always){
+      const al=document.createElement('button'); al.className='set-btn ghost ap-always';
+      al.textContent='Always allow this — just show a receipt';
+      al.onclick=()=>send(true,true); wrap.appendChild(al);
+    }
+    if(spec.expires_at){
+      const cd=document.createElement('div'); cd.className='set-muted small ap-cd'; wrap.appendChild(cd);
+      const tick=()=>{ const s=Math.max(0,Math.round((spec.expires_at-Date.now())/1000));
+        cd.textContent=s?`Expires in ${s}s`:'Expired.'; if(s&&document.contains(cd)) setTimeout(tick,1000); };
+      tick();
+    }
+  }
+
+  // ── receipts: what orb did, with undo ──
+  function renderReceipts(body, spec, wg){
+    const wrap=document.createElement('div'); wrap.className='wg-receipts'; body.appendChild(wrap);
+    const rows=spec.receipts||[];
+    if(!rows.length){ wrap.innerHTML='<div class="wg-empty">Nothing yet — Orb hasn’t changed anything.</div>'; return; }
+    rows.forEach(r=>{
+      const row=document.createElement('div'); row.className='wg-rcpt'+(r.undone?' undone':'');
+      const t=new Date(r.ts); const hh=String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
+      row.innerHTML=`<span class="tm mono">${esc2(hh)}</span><div class="grow"><div class="s1">${esc2(r.summary)}</div><div class="s2">${esc2(r.user||'')}${r.undone?' · undone':''}</div></div>`;
+      if(r.inverse&&!r.undone){
+        const u=document.createElement('button'); u.className='set-btn ghost'; u.textContent='Undo';
+        u.onclick=async()=>{ u.disabled=true;
+          try{ const res=await fetch('/v1/receipts/'+encodeURIComponent(r.id)+'/undo',{method:'POST',credentials:'same-origin'});
+            const j=await res.json().catch(()=>({}));
+            if(res.ok){ toast(j.summary||'Undone'); row.classList.add('undone'); u.remove(); } else { toast(j.error||'Failed'); u.disabled=false; }
+          }catch{ toast('Failed'); u.disabled=false; } };
+        row.appendChild(u);
+      }
+      wrap.appendChild(row);
+    });
   }
 
   // ── briefing: the day at a glance ──

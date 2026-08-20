@@ -476,6 +476,15 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
       available: bridgeEnabled(),
     },
     {
+      name: 'Receipts',
+      description: "The household action ledger — everything Orb has DONE (who asked, what changed, when), with undo. op:'list' shows recent actions as a widget; op:'undo' reverses the most recent undoable action (or a specific one by id) — use when the user says 'undo that', 'turn it back', 'what did you just do?'.",
+      input_schema: { type: 'object', properties: {
+        op: { type: 'string', enum: ['list', 'undo'] },
+        id: { type: 'string', description: 'Specific receipt id to undo (default: most recent undoable).' },
+      }, required: ['op'] },
+      available: true,
+    },
+    {
       name: 'Settings',
       description: "Read and change Orb's own settings, and open the Settings panel for the user. op:'open' {section?} opens the panel (sections: access, users, channels, voice, apps, files, integrations, system). op:'get' {key?} reads current settings (secret values are shown only as set/unset). op:'connect' {value:<pasted credential>} auto-detects WHICH service a pasted API key/token belongs to by its shape and wires it into the right setting (use whenever the user pastes a key without saying where it goes — if ambiguous it returns the candidates to ask about). op:'set' {key, value} changes a setting live (e.g. OPENAI_MODEL, ORB2_TTS_VOICE, ORB2_HOME_LOCATION, OPENAI_BASE_URL for a cloud brain). Use when the user asks to change how Orb works — do it for them instead of describing where to click. Endpoint/key changes may need a restart to fully apply.",
       input_schema: { type: 'object', properties: {
@@ -559,13 +568,36 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
   const add = (name: string, opts: { readOnly?: boolean; destructive?: boolean }, run: (args: any) => Promise<string>) => {
     const def = byName.get(name)!
     if (!def.available) return
+    // The trust layer (v0.2 §2): classify → (approve) → run → receipt.
+    const wrapped = async (args: any): Promise<string> => {
+      const { effectiveImpact, requestApproval, recordReceipt, actionKey } = await import('../policy/policy.js')
+      const { summarizeAction, captureInverse } = await import('../policy/describe.js')
+      const user = ctx.ownerId || 'owner'
+      let impact: Awaited<ReturnType<typeof effectiveImpact>>
+      try { impact = await effectiveImpact(ctx.store, user, name, args) } catch { impact = 'read' }
+      if (impact === 'read') return run(args)
+      if (impact === 'never-auto') return "I can't do that autonomously — it needs to be done by hand."
+      const summary = summarizeAction(name, args)
+      const inverse = await captureInverse(ctx.store, name, args)
+      if (impact === 'confirm') {
+        const { approved } = await requestApproval(ctx.store, ctx.sessionId, user, name, args,
+          summary, 'This action is gated — approve it on screen.')
+        if (!approved) return `Not approved — I didn't do it (${summary}).`
+      }
+      const result = await run(args)
+      if (!/^\[ERROR|^\[Home Assistant\]|failed/i.test(result.slice(0, 40))) {
+        recordReceipt(ctx.store, { user, tool: name, key: actionKey(name, args), summary, inverse })
+          .catch(() => { /* the action already happened; never fail it on ledger IO */ })
+      }
+      return result
+    }
     tools.push(buildTool({
       name: def.name,
       description: def.description,
       inputJSONSchema: def.input_schema,
       readOnly: opts.readOnly,
       destructive: opts.destructive,
-      run,
+      run: wrapped,
     }))
   }
 
@@ -1528,6 +1560,23 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
     } catch (e) {
       return `[Print bridge] ${(e as Error).message}`
     }
+  })
+  add('Receipts', { readOnly: true }, async args => {
+    const { listReceipts, undoReceipt } = await import('../policy/policy.js')
+    const op = String(args?.op || 'list')
+    if (op === 'undo') {
+      const receipts = await listReceipts(ctx.store, 50)
+      const target = args?.id
+        ? receipts.find(r => r.id === args.id)
+        : receipts.find(r => r.inverse && !r.undone)
+      if (!target) return 'Nothing recent can be undone automatically.'
+      const done = await undoReceipt(ctx.store, target.id)
+      return done ?? 'That one has no automatic inverse.'
+    }
+    const receipts = await listReceipts(ctx.store, 20)
+    if (!receipts.length) return 'No actions recorded yet.'
+    emitWidget(ctx.sessionId, { id: 'receipts', type: 'receipts', title: 'What Orb did', receipts } as any)
+    return 'Recent actions: ' + receipts.slice(0, 6).map(r => `${r.summary}${r.undone ? ' (undone)' : ''}`).join(' · ')
   })
   add('Settings', {}, async args => {
     const op = String(args?.op || 'open')

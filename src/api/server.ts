@@ -1638,6 +1638,27 @@ async function dispatch(
     const { setRemoteMode } = await import('./devicecert/remote.js')
     return jsonResponse(200, await setRemoteMode(ctx.store, mode))
   }
+  // ─── Trust layer: approvals + receipts (v0.2 §2) ───
+  {
+    const ap = pathname.match(/^\/v1\/approvals\/(ap-[A-Za-z0-9-]+)$/)
+    if (ap && method === 'POST') {
+      const b = await req.json().catch(() => ({})) as any
+      const { resolveApproval } = await import('./policy/policy.js')
+      const ok = resolveApproval(ap[1]!, b?.approve === true, b?.always === true)
+      return jsonResponse(ok ? 200 : 404, ok ? { ok: true } : { error: 'no such pending approval' })
+    }
+    if (pathname === '/v1/receipts' && method === 'GET') {
+      const { listReceipts } = await import('./policy/policy.js')
+      const limit = Number(new URL(req.url).searchParams.get('limit')) || 50
+      return jsonResponse(200, { receipts: await listReceipts(ctx.store, Math.min(limit, 200)) })
+    }
+    const un = pathname.match(/^\/v1\/receipts\/(r-[A-Za-z0-9-]+)\/undo$/)
+    if (un && method === 'POST') {
+      const { undoReceipt } = await import('./policy/policy.js')
+      const done = await undoReceipt(ctx.store, un[1]!)
+      return done ? jsonResponse(200, { ok: true, summary: done }) : jsonResponse(400, { error: 'nothing to undo for that entry' })
+    }
+  }
   // ─── Presence: the phones report home/away directly (geofence) ───
   if (pathname === '/v1/presence/config' && method === 'GET') {
     const { haConfig } = await import('./connectors/homeAssistant.js')

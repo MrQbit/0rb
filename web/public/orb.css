@@ -1029,3 +1029,18 @@ sup.sq { font-size:.58em; color:var(--nv); font-weight:700; margin-left:1px; tra
 .wg-med-btn.sm { padding:6px 8px; border-radius:8px; }
 .wg-model-bar .off { opacity:.45; }
 .wg-model-dims { margin-left:auto; font-family:var(--mono); font-size:11px; color:var(--ink-dim); }
+
+/* trust layer: approval cards + the receipts ledger */
+.wg-approval { display:flex; flex-direction:column; gap:10px; }
+.wg-approval .ap-sum { font-size:14px; color:var(--ink); }
+.wg-approval .ap-row { display:flex; gap:8px; }
+.wg-approval .ap-always { text-align:left; font-size:12px; }
+.wg-approval .ap-cd { font-size:11px; }
+.wg-receipts { display:flex; flex-direction:column; }
+.wg-rcpt { display:flex; align-items:center; gap:10px; padding:9px 4px; }
+.wg-rcpt + .wg-rcpt { border-top:1px solid rgba(255,255,255,.06); }
+.wg-rcpt .tm { font-size:11px; color:var(--ink-dim); flex:none; }
+.wg-rcpt .grow { flex:1; min-width:0; }
+.wg-rcpt .s1 { font-size:13px; color:var(--ink); }
+.wg-rcpt .s2 { font-size:11px; color:var(--ink-dim); }
+.wg-rcpt.undone .s1 { text-decoration:line-through; opacity:.55; }
