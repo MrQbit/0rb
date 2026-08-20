@@ -123,6 +123,71 @@ export async function exchangeCode(store: Store, code: string, state: string): P
   return p
 }
 
+
+// ── TV-style linking via the orb2.app relay (same pattern as Spotify) ────
+// ONE Google / ONE Microsoft app registered by the 0rb project; secrets
+// live only on the relay. /start sends the browser there, the sealed blob
+// bounces back to /v1/oauth/cloud/relay, and we claim tokens server-side.
+const RELAY_KEY = (nonce: string) => `cloud:relay:${nonce}`
+
+export function relayUrl(): string {
+  return (process.env.ORB2_RELAY_URL || process.env.ORB2_BROKER_URL || 'https://orb2.app').replace(/\/+$/, '')
+}
+
+const relayProbes = new Map<CloudProvider, { ok: boolean; ts: number }>()
+export async function relayAvailable(p: CloudProvider): Promise<boolean> {
+  const c = relayProbes.get(p)
+  if (c && Date.now() - c.ts < 600_000) return c.ok
+  let ok = false
+  try {
+    const r = await fetch(`${relayUrl()}/api/oauth/start?provider=${p}`, { redirect: 'manual', signal: AbortSignal.timeout(6000) })
+    ok = r.status === 400   // "redirect must be…" = configured; 503 = not
+  } catch { ok = false }
+  relayProbes.set(p, { ok, ts: Date.now() })
+  return ok
+}
+
+async function instanceReturn(store: Store): Promise<string | null> {
+  const host = await store.getKv('devicecert:hostname').catch(() => null)
+  if (!host) return null
+  const port = Number(process.env.ORB2_DEVICE_TLS_PORT || 9444)
+  return `https://${host}${port === 443 ? '' : `:${port}`}/v1/oauth/cloud/relay`
+}
+
+export async function relayStartUrl(store: Store, p: CloudProvider, member?: string): Promise<{ url: string } | { error: string }> {
+  const ret = await instanceReturn(store)
+  if (!ret) return { error: 'Linking needs the device URL first — it enrolls automatically when remote access is on (Settings → General).' }
+  const nonce = Math.random().toString(36).slice(2) + Date.now().toString(36)
+  await store.putKv(RELAY_KEY(nonce), JSON.stringify({ p, member: member || '' }), 600)
+  return { url: `${relayUrl()}/api/oauth/start?provider=${p}&redirect=${encodeURIComponent(ret)}&istate=${nonce}` }
+}
+
+export async function claimRelayBlob(store: Store, blob: string, nonce: string): Promise<CloudProvider | null> {
+  const raw = await store.getKv(RELAY_KEY(nonce)).catch(() => null)
+  if (!raw) return null
+  await store.delKv(RELAY_KEY(nonce)).catch(() => {})
+  let p: CloudProvider | null = null
+  let member = ''
+  try { const j = JSON.parse(raw); p = j.p; member = j.member || '' } catch { return null }
+  if (!p || !CLOUD_PROVIDERS.includes(p)) return null
+  const r = await fetch(`${relayUrl()}/api/oauth/claim`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ blob }), signal: AbortSignal.timeout(10_000),
+  })
+  if (!r.ok) return null
+  const d = (await r.json()) as any
+  const tk = d?.tokens
+  if (!tk?.access_token) return null
+  const t: Tokens & { via?: string } = {
+    access_token: tk.access_token,
+    refresh_token: tk.refresh_token || '',
+    expires_at: Date.now() + ((tk.expires_in || 3600) - 60) * 1000,
+    via: 'relay',
+  }
+  await store.putKv(tokKey(p, member || undefined), JSON.stringify(t), 60 * 60 * 24 * 365)
+  return p
+}
+
 export async function isConnected(store: Store, p: CloudProvider, member?: string): Promise<boolean> {
   if (member && await store.getKv(tokKey(p, member)).catch(() => null)) return true
   return !!(await store.getKv(TOK_KEY(p)).catch(() => null))
@@ -144,6 +209,23 @@ export async function getToken(store: Store, p: CloudProvider, member?: string):
   try { t = JSON.parse(raw) } catch { return null }
   if (Date.now() < t.expires_at && t.access_token) return t.access_token
   if (!t.refresh_token) return null
+  if ((t as any).via === 'relay') {
+    try {
+      const rr = await fetch(`${relayUrl()}/api/oauth/refresh`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ provider: p, refresh_token: t.refresh_token }),
+        signal: AbortSignal.timeout(10_000),
+      })
+      if (!rr.ok) return null
+      const rd = (await rr.json()) as any
+      const tk = rd?.tokens
+      if (!tk?.access_token) return null
+      const nt = { access_token: tk.access_token, refresh_token: tk.refresh_token || t.refresh_token,
+        expires_at: Date.now() + ((tk.expires_in || 3600) - 60) * 1000, via: 'relay' }
+      await store.putKv(key, JSON.stringify(nt), 60 * 60 * 24 * 365)
+      return nt.access_token
+    } catch { return null }
+  }
   const c = providerCfg(p)
   const r = await fetch(c.tokenUrl, {
     method: 'POST',

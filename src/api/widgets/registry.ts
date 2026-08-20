@@ -80,7 +80,7 @@ export const WIDGET_CATALOG: WidgetDef[] = [
 
   // ── Media (one shared owner key — safe to share, public data only) ──
   { id: 'youtube', name: 'YouTube', desc: 'Search and play videos.', category: 'Media', setup: 'owner-key', icon: '▶️', envKeys: ['ORB2_YOUTUBE_API_KEY'], ownerAction: true },
-  { id: 'spotify', name: 'Spotify', desc: 'Search music and play embeds.', category: 'Media', setup: 'owner-key', icon: '🎵', envKeys: ['ORB2_SPOTIFY_CLIENT_ID', 'ORB2_SPOTIFY_CLIENT_SECRET'], provider: 'spotify', ownerAction: true },
+  { id: 'spotify', name: 'Spotify', desc: 'Search and play music on your speakers — link your account, nothing to register.', category: 'Media', setup: 'oauth', icon: '🎵', provider: 'spotify' },
 
   // ── Account (per-user OAuth / token) ──
   { id: 'gmail', name: 'Gmail / mail', desc: 'Inbox preview from your connected account.', category: 'Account', setup: 'oauth', icon: '✉️', provider: 'google' },
@@ -120,6 +120,10 @@ export async function getWidgetRegistry(store: Store): Promise<WidgetStatus[]> {
   const off = disabledSet()
   let connected: string[] = []
   try { connected = await connectedProviders(store) } catch { /* none */ }
+  try {
+    const { isConnected } = await import('../connectors/spotifyOAuth.js')
+    if (await isConnected(store)) connected.push('spotify')
+  } catch { /* off */ }
   const builtins = WIDGET_CATALOG.map(w => {
     let configured: boolean
     if (w.setup === 'oauth' && w.provider) configured = connected.includes(w.provider as any)

@@ -28,8 +28,23 @@ async function spotifyToken(): Promise<string> {
 
 export type SpTrack = { title: string; artist: string; url: string; embed: string; thumbnail?: string }
 
-export async function spotifySearch(query: string, max = 8): Promise<SpTrack[]> {
-  const tok = await spotifyToken()
+/** Search works with EITHER the house app credential (client-credentials)
+ *  or, in relay mode, a linked member's own token. */
+export async function spotifySearch(query: string, max = 8, store?: any, member?: string): Promise<SpTrack[]> {
+  if (!spotifyEnabled() && store) {
+    const { getUserToken } = await import('./spotifyOAuth.js')
+    const tok = await getUserToken(store, member)
+    if (!tok) throw new Error('no Spotify link yet')
+    return searchWith(tok, query, max)
+  }
+  return spotifySearchApp(query, max)
+}
+
+async function spotifySearchApp(query: string, max = 8): Promise<SpTrack[]> {
+  return searchWith(await spotifyToken(), query, max)
+}
+
+async function searchWith(tok: string, query: string, max = 8): Promise<SpTrack[]> {
   const r = await fetch(`https://api.spotify.com/v1/search?type=track&limit=${Math.min(max, 15)}&q=${encodeURIComponent(query)}`, {
     headers: { authorization: 'Bearer ' + tok },
   })

@@ -2533,7 +2533,7 @@
     const search=(w.name+' '+w.desc+' '+w.category+' '+w.id).toLowerCase();
     const needsSetup = !w.configured && w.setup!=='none';
     const action = needsSetup
-      ? `<button class="app-setup" data-id="${esc(w.id)}">Set up</button>`
+      ? `<button class="app-setup" data-id="${esc(w.id)}" data-setup="${esc(w.setup||'')}">${w.setup==='oauth'?'Connect':'Set up'}</button>`
       : `<button class="app-toggle${w.enabled?' on':''}" data-id="${esc(w.id)}" aria-label="Toggle ${esc(w.name)}"><span class="knob"></span></button>`;
     return `<div class="app-card${needsSetup?' dim':''}" data-search="${esc(search)}">
       <div class="app-ic">${BRAND_SVG[w.id]||BRAND_SVG[w.provider]||esc(w.icon||'▢')}</div>
@@ -2573,6 +2573,12 @@
       try{ await fetch('/v1/widgets/toggle',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({id,enabled:on})}); }
       catch{ btn.classList.toggle('on',!on); toast('Failed'); } }; });
     grid.querySelectorAll('.app-setup').forEach(btn=>{ btn.onclick=()=>{
+      // Account-linked widgets connect in Your accounts; key-based ones
+      // live in the Connections & keys drawer.
+      if(btn.dataset.setup==='oauth'){
+        const a=document.querySelector('[data-brand="google"]')?.closest('.set-card');
+        if(a){ a.scrollIntoView({behavior:'smooth',block:'start'}); return; }
+      }
       const c=$('.apps-conn'); if(c){ c.open=true; c.scrollIntoView({behavior:'smooth',block:'start'}); } }; });
     const sb=$('#appsSearch'); if(sb && !sb.dataset.wired){ sb.dataset.wired='1'; sb.oninput=()=>{
       const q=sb.value.toLowerCase().trim();
@@ -2690,15 +2696,22 @@
       const wire=(p,dotSel,acctSel,connSel,discSel,redirSel,devSel,codeSel)=>{
         const st=cs[p]||{}; const acct=$(acctSel),conn=$(connSel),disc=$(discSel),redir=$(redirSel),dot=$(dotSel),dev=$(devSel),code=$(codeSel);
         if(dot) dot.className='pill-dot '+(st.connected?'ok':'');
-        if(acct) acct.textContent = st.connected?'✓ connected':(st.device?'not connected':'add a client ID first');
-        if(conn) conn.style.display = st.connected?'none':(st.configured?'':'none');
-        if(dev) dev.style.display = st.connected?'none':(st.device?'':'none');
+        const relayMode = !st.connected && st.mode==='relay';
+        if(acct) acct.textContent = st.connected?'✓ connected':(relayMode?'ready — tap Connect':(st.device?'not connected':'waiting for the shared 0rb app'));
+        if(conn) conn.style.display = st.connected?'none':(st.mode==='own'&&st.configured?'':'none');
+        if(dev){ dev.style.display = st.connected?'none':((relayMode||st.device)?'':'none');
+          dev.textContent = relayMode?'Connect →':'Connect with code'; dev.dataset.mode = st.mode||''; }
         if(disc) disc.style.display = st.connected?'':'none';
         if(redir && st.redirect_uri) redir.textContent='Redirect URI: '+st.redirect_uri;
         if(conn && !conn.dataset.w){ conn.dataset.w='1'; conn.onclick=async()=>{ try{ const d=await (await fetch('/v1/oauth/cloud/'+p+'/start',{credentials:'same-origin'})).json(); if(d.url) location.href=d.url; else toast(d.error||'Configure first'); }catch{ toast('Failed'); } }; }
         if(disc && !disc.dataset.w){ disc.dataset.w='1'; disc.onclick=async()=>{ await fetch('/v1/oauth/cloud/'+p+'/disconnect',{method:'POST',credentials:'same-origin'}); toast('Disconnected'); loadApps(); }; }
         // device-code flow: start → show code/url → poll until connected
         if(dev && !dev.dataset.w){ dev.dataset.w='1'; dev.onclick=async()=>{
+          if(dev.dataset.mode==='relay'){
+            try{ const d=await (await fetch('/v1/oauth/cloud/'+p+'/start',{credentials:'same-origin'})).json();
+              if(d.url) location.href=d.url; else toast(d.error||'Not available yet'); }catch{ toast('Failed'); }
+            return;
+          }
           try{
             const d=await (await fetch('/v1/oauth/cloud/'+p+'/device/start',{method:'POST',credentials:'same-origin'})).json();
             if(d.error||!d.user_code){ toast(d.error||'Could not start'); return; }
@@ -2957,8 +2970,10 @@
     vrow.appendChild(sel); list.appendChild(vrow);
 
     try{ const v=await (await fetch('/v1/voice/status')).json();
-      list.insertAdjacentHTML('beforeend', chRow('Speech-to-text', v.stt||'faster-whisper', !!v.ready));
-      list.insertAdjacentHTML('beforeend', chRow('Text-to-speech', v.tts||'Orpheus (expressive)', !!v.ready));
+      // raw engine URLs are plumbing — say where it runs, not the socket
+      const pretty=(x,fall)=>{ const t=String(x||fall); return /http/.test(t)?('on this orb'+(/gpu/i.test(t)?' · GPU':'')):t; };
+      list.insertAdjacentHTML('beforeend', chRow('Speech-to-text', pretty(v.stt,'Whisper'), !!v.ready));
+      list.insertAdjacentHTML('beforeend', chRow('Text-to-speech', pretty(v.tts,'Kokoro'), !!v.ready));
     }catch{}
     // Vision is handled by the multimodal model itself now (not moondream2).
     list.insertAdjacentHTML('beforeend', chRow('Vision','the model · camera frames', true));

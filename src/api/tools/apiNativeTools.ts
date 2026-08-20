@@ -685,31 +685,41 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
       return `Showed ${res.length} YouTube results for "${q}" (each plays on click). Top: ${res.slice(0, 3).map(r => r.title).join('; ')}.`
     } catch (e) { return `[ERROR] YouTube search failed: ${(e as Error).message}` }
   })
-  const SPOTIFY_SETUP = "Spotify isn't set up on this orb yet. It needs a free app credential: developer.spotify.com \u2192 Create app \u2192 copy the Client ID and Client Secret into Settings \u2192 Apps \u2192 Spotify. After that, each listener taps Connect Spotify there to link their account. Tell the user exactly this \u2014 do not try Home Assistant for music."
+  // Mode-aware guidance: with the shared 0rb app on the relay, linking is
+  // one tap — never send users to developer.spotify.com in that case.
+  const spotifyGuidance = async (): Promise<string> => {
+    try {
+      const { relayAvailable } = await import('../connectors/spotifyOAuth.js')
+      if (await relayAvailable()) return "Spotify just needs linking: Settings \u2192 Apps \u2192 Your accounts \u2192 Spotify \u2192 Connect \u2014 sign in once, done. Tell the user exactly this; do not try Home Assistant for music."
+    } catch { /* fall through */ }
+    return "Spotify isn't available yet on this orb \u2014 the linking service is unreachable and no house app credential is set (Settings \u2192 Apps \u2192 Connections & keys for the self-host option). Tell the user this; do not try Home Assistant for music."
+  }
   add('MusicSearch', { readOnly: true }, async args => {
-    if (!spotifyEnabled()) return SPOTIFY_SETUP
+    const member = ctx.ownerId?.replace(/^user:/, '')
     const q = String(args?.query || '').trim()
     if (!q) return 'Provide a query.'
     try {
-      const res = await spotifySearch(q, 8)
+      const res = await spotifySearch(q, 8, ctx.store, member)
       if (!res.length) return `No Spotify tracks for "${q}".`
       emitWidget(ctx.sessionId, {
         id: `sp-${Date.now().toString(36)}`, type: 'results', title: `Spotify · ${q}`,
         items: res.map(r => ({ title: r.title, subtitle: r.artist, thumbnail: r.thumbnail, action: { kind: 'music', url: r.embed } })),
       } as any)
       return `Showed ${res.length} Spotify tracks for "${q}" (click one to play). Top: ${res.slice(0, 3).map(r => `${r.title} — ${r.artist}`).join('; ')}.`
-    } catch (e) { return `[ERROR] Spotify search failed: ${(e as Error).message}` }
+    } catch (e) {
+      if (/no Spotify link/.test((e as Error).message)) return await spotifyGuidance()
+      return `[ERROR] Spotify search failed: ${(e as Error).message}`
+    }
   })
   add('MusicPlay', { destructive: false }, async args => {
-    if (!spotifyEnabled()) return SPOTIFY_SETUP
-    if (!(await getUserToken(ctx.store, ctx.ownerId?.replace(/^user:/, '')))) return "Spotify is set up but this account isn't linked yet — the user just needs to tap Connect Spotify in Settings → Apps."
+    if (!(await getUserToken(ctx.store, ctx.ownerId?.replace(/^user:/, '')))) return await spotifyGuidance()
     try {
       let uri = String(args?.uri || '').trim()
       let label = ''
       if (!uri) {
         const q = String(args?.query || '').trim()
         if (!q) return 'Provide a song/artist to play.'
-        const hits = await spotifySearch(q, 1)
+        const hits = await spotifySearch(q, 1, ctx.store, ctx.ownerId?.replace(/^user:/, ''))
         if (!hits.length) return `No Spotify track found for "${q}".`
         // emit the track widget for visual
         emitWidget(ctx.sessionId, { id: `sp-now`, type: 'music', title: `${hits[0].title} — ${hits[0].artist}`, url: hits[0].embed } as any)
@@ -741,8 +751,7 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
     } catch (e) { return `[ERROR] ${(e as Error).message}` }
   })
   add('MusicControl', { destructive: false }, async args => {
-    if (!spotifyEnabled()) return SPOTIFY_SETUP
-    if (!(await getUserToken(ctx.store, ctx.ownerId?.replace(/^user:/, '')))) return "Spotify is set up but this account isn't linked yet — the user just needs to tap Connect Spotify in Settings → Apps."
+    if (!(await getUserToken(ctx.store, ctx.ownerId?.replace(/^user:/, '')))) return await spotifyGuidance()
     const action = String(args?.action || '')
     try {
       let r: Response

@@ -10,6 +10,7 @@ import type { Store } from '../store/store.js'
 import { authEnabled, verifySession, parseCookies, SESSION_COOKIE } from '../auth/session.js'
 import {
   type CloudProvider, CLOUD_PROVIDERS, authorizeUrl, exchangeCode, isConnected,
+  relayAvailable, relayStartUrl, claimRelayBlob,
   disconnect, providerConfigured, redirectUri, deviceConfigured, startDeviceFlow, pollDeviceFlow,
 } from './cloudStorageOAuth.js'
 
@@ -35,7 +36,17 @@ function sessionMember(req: Request): string | undefined {
 export async function tryCloudOAuthRoute(req: Request, method: string, pathname: string, store: Store): Promise<Response | null> {
   if (!pathname.startsWith('/v1/oauth/cloud/')) return null
 
-  // Public: the provider redirect lands here.
+  // Public: the RELAY bounce lands here (TV-style linking — the shared 0rb
+  // app lives on orb2.app; we claim the sealed blob server-to-server).
+  if (method === 'GET' && pathname === '/v1/oauth/cloud/relay') {
+    const u = new URL(req.url)
+    const blob = u.searchParams.get('orb2_relay') || ''
+    const nonce = u.searchParams.get('state') || ''
+    const p = blob && nonce ? await claimRelayBlob(store, blob, nonce) : null
+    return new Response(null, { status: 302, headers: { location: `/?cloud=${p || 'error'}` } })
+  }
+
+  // Public: the provider redirect lands here (own-app mode).
   const cb = /^\/v1\/oauth\/cloud\/(google|microsoft)\/callback$/.exec(pathname)
   if (method === 'GET' && cb) {
     const u = new URL(req.url)
@@ -51,9 +62,16 @@ export async function tryCloudOAuthRoute(req: Request, method: string, pathname:
 
   // Combined status for the Settings panel.
   if (method === 'GET' && pathname === '/v1/oauth/cloud/status') {
-    const status: Record<string, { configured: boolean; device: boolean; connected: boolean; redirect_uri: string }> = {}
+    const status: Record<string, { configured: boolean; device: boolean; connected: boolean; mode: string; redirect_uri: string }> = {}
     for (const p of CLOUD_PROVIDERS) {
-      status[p] = { configured: providerConfigured(p), device: deviceConfigured(p), connected: await isConnected(store, p, member), redirect_uri: redirectUri(p) }
+      const own = providerConfigured(p) || deviceConfigured(p)
+      const relay = own ? false : await relayAvailable(p)
+      status[p] = {
+        configured: own || relay, device: deviceConfigured(p),
+        connected: await isConnected(store, p, member),
+        mode: providerConfigured(p) || deviceConfigured(p) ? 'own' : relay ? 'relay' : 'none',
+        redirect_uri: redirectUri(p),
+      }
     }
     return json(200, status)
   }
@@ -74,8 +92,13 @@ export async function tryCloudOAuthRoute(req: Request, method: string, pathname:
   const start = /^\/v1\/oauth\/cloud\/(google|microsoft)\/start$/.exec(pathname)
   if (method === 'GET' && start && isProvider(start[1]!)) {
     const p = start[1] as CloudProvider
-    if (!providerConfigured(p)) return json(400, { error: `Set ${p} Client ID/Secret + ORB2_PUBLIC_URL first.`, redirect_uri: redirectUri(p) })
-    return json(200, { url: await authorizeUrl(store, p, member), redirect_uri: redirectUri(p) })
+    // Own app wins when this house registered one; otherwise the relay.
+    if (providerConfigured(p)) return json(200, { url: await authorizeUrl(store, p, member), redirect_uri: redirectUri(p), mode: 'own' })
+    if (await relayAvailable(p)) {
+      const r = await relayStartUrl(store, p, member)
+      return 'url' in r ? json(200, { ...r, mode: 'relay' }) : json(400, r)
+    }
+    return json(400, { error: `${p} linking is not available yet — the shared 0rb app isn't on the relay and no house credential is set.`, redirect_uri: redirectUri(p) })
   }
   const disc = /^\/v1\/oauth\/cloud\/(google|microsoft)\/disconnect$/.exec(pathname)
   if (method === 'POST' && disc && isProvider(disc[1]!)) {
