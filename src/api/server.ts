@@ -1867,12 +1867,40 @@ async function dispatch(
       return jsonResponse(200, { ok: true, ...result, created_at: payload.created_at })
     } catch (e) { return jsonResponse(400, { error: (e as Error).message }) }
   }
+  // ─── Apple account (CalDAV via app-specific password) ───
+  if (pathname.startsWith('/v1/apple/')) {
+    const member = (attributionFor(identity).oid || 'owner').replace(/^user:/, '')
+    const apple = await import('./connectors/apple.js')
+    if (pathname === '/v1/apple/status' && method === 'GET') {
+      return jsonResponse(200, { connected: await apple.appleConnected(ctx.store, member) })
+    }
+    if (pathname === '/v1/apple/connect' && method === 'POST') {
+      const b = await req.json().catch(() => ({})) as any
+      try {
+        await apple.connectApple(ctx.store, member, String(b.apple_id || ''), String(b.app_password || ''))
+        return jsonResponse(200, { ok: true })
+      } catch (e) { return jsonResponse(400, { error: (e as Error).message }) }
+    }
+    if (pathname === '/v1/apple/disconnect' && method === 'POST') {
+      await apple.disconnectApple(ctx.store, member)
+      return jsonResponse(200, { ok: true })
+    }
+  }
   // ─── The morning deck (v0.2 §3) ───
   if (pathname.startsWith('/v1/deck')) {
-    const { todaysDeck, recordFeedback, dismissDeck } = await import('./deck/deck.js')
+    const { todaysDeck, recordFeedback, dismissDeck, topicsView, setEnabledTopics } = await import('./deck/deck.js')
     const user = (attributionFor(identity).oid || 'owner').replace(/^user:/, '')
     if (pathname === '/v1/deck' && method === 'GET') {
-      return jsonResponse(200, { deck: await todaysDeck(ctx.store, user) })
+      const force = new URL(req.url).searchParams.get('force') === '1'
+      return jsonResponse(200, { deck: await todaysDeck(ctx.store, user, new Date(), force) })
+    }
+    if (pathname === '/v1/deck/topics' && method === 'GET') {
+      return jsonResponse(200, { topics: await topicsView(ctx.store, user) })
+    }
+    if (pathname === '/v1/deck/topics' && method === 'POST') {
+      const b = await req.json().catch(() => ({})) as any
+      if (!Array.isArray(b?.enabled)) return jsonResponse(400, { error: 'enabled[] required' })
+      return jsonResponse(200, { enabled: await setEnabledTopics(ctx.store, user, b.enabled.map(String)) })
     }
     if (pathname === '/v1/deck/feedback' && method === 'POST') {
       const b = await req.json().catch(() => ({})) as any

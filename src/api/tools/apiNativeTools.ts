@@ -702,7 +702,7 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
   })
   add('MusicPlay', { destructive: false }, async args => {
     if (!spotifyEnabled()) return SPOTIFY_SETUP
-    if (!(await getUserToken(ctx.store))) return "Spotify is set up but this account isn't linked yet — the user just needs to tap Connect Spotify in Settings → Apps."
+    if (!(await getUserToken(ctx.store, ctx.ownerId?.replace(/^user:/, '')))) return "Spotify is set up but this account isn't linked yet — the user just needs to tap Connect Spotify in Settings → Apps."
     try {
       let uri = String(args?.uri || '').trim()
       let label = ''
@@ -723,7 +723,7 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
       let deviceName = ''
       const wantDev = String((args as any)?.device || '').trim().toLowerCase()
       if (wantDev) {
-        const dr = await spotifyApi(ctx.store, '/me/player/devices')
+        const dr = await spotifyApi(ctx.store, '/me/player/devices', undefined, ctx.ownerId?.replace(/^user:/, ''))
         const devices: any[] = dr.ok ? ((await dr.json()) as any).devices || [] : []
         const hit = devices.find(d => String(d.name).toLowerCase().includes(wantDev))
           || devices.find(d => wantDev.split(/\s+/).some(w => String(d.name).toLowerCase().includes(w)))
@@ -734,7 +734,7 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
         deviceId = hit.id; deviceName = hit.name
       }
       const path = '/me/player/play' + (deviceId ? `?device_id=${encodeURIComponent(deviceId)}` : '')
-      const r = await spotifyApi(ctx.store, path, { method: 'PUT', body: JSON.stringify(uri ? { uris: [uri] } : {}) })
+      const r = await spotifyApi(ctx.store, path, { method: 'PUT', body: JSON.stringify(uri ? { uris: [uri] } : {}) }, ctx.ownerId?.replace(/^user:/, ''))
       if (r.status === 404) return `Showing "${label}". Spotify has no active device — open Spotify anywhere (or name a speaker) and I can start it.`
       if (!r.ok && r.status !== 204) return `Spotify play returned ${r.status}. ${label ? `Showing "${label}".` : ''}`
       return `Playing${label ? ` "${label}"` : ''}${deviceName ? ` on ${deviceName}` : ' on your Spotify'}.`
@@ -742,15 +742,15 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
   })
   add('MusicControl', { destructive: false }, async args => {
     if (!spotifyEnabled()) return SPOTIFY_SETUP
-    if (!(await getUserToken(ctx.store))) return "Spotify is set up but this account isn't linked yet — the user just needs to tap Connect Spotify in Settings → Apps."
+    if (!(await getUserToken(ctx.store, ctx.ownerId?.replace(/^user:/, '')))) return "Spotify is set up but this account isn't linked yet — the user just needs to tap Connect Spotify in Settings → Apps."
     const action = String(args?.action || '')
     try {
       let r: Response
-      if (action === 'pause') r = await spotifyApi(ctx.store, '/me/player/pause', { method: 'PUT' })
-      else if (action === 'play') r = await spotifyApi(ctx.store, '/me/player/play', { method: 'PUT' })
-      else if (action === 'next') r = await spotifyApi(ctx.store, '/me/player/next', { method: 'POST' })
-      else if (action === 'previous') r = await spotifyApi(ctx.store, '/me/player/previous', { method: 'POST' })
-      else if (action === 'volume') r = await spotifyApi(ctx.store, `/me/player/volume?volume_percent=${Math.max(0, Math.min(100, Number(args?.volume) || 50))}`, { method: 'PUT' })
+      if (action === 'pause') r = await spotifyApi(ctx.store, '/me/player/pause', { method: 'PUT' }, ctx.ownerId?.replace(/^user:/, ''))
+      else if (action === 'play') r = await spotifyApi(ctx.store, '/me/player/play', { method: 'PUT' }, ctx.ownerId?.replace(/^user:/, ''))
+      else if (action === 'next') r = await spotifyApi(ctx.store, '/me/player/next', { method: 'POST' }, ctx.ownerId?.replace(/^user:/, ''))
+      else if (action === 'previous') r = await spotifyApi(ctx.store, '/me/player/previous', { method: 'POST' }, ctx.ownerId?.replace(/^user:/, ''))
+      else if (action === 'volume') r = await spotifyApi(ctx.store, `/me/player/volume?volume_percent=${Math.max(0, Math.min(100, Number(args?.volume) || 50))}`, { method: 'PUT' }, ctx.ownerId?.replace(/^user:/, ''))
       else return `Unknown action "${action}".`
       if (r.status === 404) return 'No active Spotify device — open Spotify or the orb2 player first.'
       return `Done (${action}).`

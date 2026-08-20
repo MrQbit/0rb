@@ -13,7 +13,10 @@ import type { Store } from '../store/store.js'
 export type CloudProvider = 'google' | 'microsoft'
 export const CLOUD_PROVIDERS: CloudProvider[] = ['google', 'microsoft']
 
+// One APP credential per provider; each MEMBER's account link is keyed to
+// them, with the pre-multiuser household token as fallback.
 const TOK_KEY = (p: CloudProvider) => `cloud:oauth:${p}`
+const tokKey = (p: CloudProvider, member?: string) => (member ? `cloud:oauth:${p}:${member}` : TOK_KEY(p))
 const STATE_KEY = (s: string) => `cloud:oauthstate:${s}`
 
 interface ProviderCfg {
@@ -70,10 +73,10 @@ export function redirectUri(p: CloudProvider): string {
   return `${base}/v1/oauth/cloud/${p}/callback`
 }
 
-export async function authorizeUrl(store: Store, p: CloudProvider): Promise<string> {
+export async function authorizeUrl(store: Store, p: CloudProvider, member?: string): Promise<string> {
   const c = providerCfg(p)
   const state = `${p}.${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`
-  await store.putKv(STATE_KEY(state), p, 600).catch(() => {})
+  await store.putKv(STATE_KEY(state), JSON.stringify({ p, member: member || '' }), 600).catch(() => {})
   const params = new URLSearchParams({
     client_id: c.clientId,
     response_type: 'code',
@@ -88,7 +91,11 @@ export async function authorizeUrl(store: Store, p: CloudProvider): Promise<stri
 type Tokens = { access_token: string; refresh_token: string; expires_at: number }
 
 export async function exchangeCode(store: Store, code: string, state: string): Promise<CloudProvider | null> {
-  const p = (await store.getKv(STATE_KEY(state)).catch(() => null)) as CloudProvider | null
+  const rawState = await store.getKv(STATE_KEY(state)).catch(() => null)
+  let p: CloudProvider | null = null
+  let member = ''
+  try { const j = JSON.parse(rawState || ''); p = j.p; member = j.member || '' }
+  catch { p = rawState as CloudProvider | null }   // legacy plain-provider state
   if (!p || !CLOUD_PROVIDERS.includes(p)) return null
   await store.delKv(STATE_KEY(state)).catch(() => {})
   const c = providerCfg(p)
@@ -112,21 +119,26 @@ export async function exchangeCode(store: Store, code: string, state: string): P
     refresh_token: d.refresh_token || '',
     expires_at: Date.now() + ((d.expires_in || 3600) - 60) * 1000,
   }
-  await store.putKv(TOK_KEY(p), JSON.stringify(t), 60 * 60 * 24 * 365)
+  await store.putKv(tokKey(p, member || undefined), JSON.stringify(t), 60 * 60 * 24 * 365)
   return p
 }
 
-export async function isConnected(store: Store, p: CloudProvider): Promise<boolean> {
+export async function isConnected(store: Store, p: CloudProvider, member?: string): Promise<boolean> {
+  if (member && await store.getKv(tokKey(p, member)).catch(() => null)) return true
   return !!(await store.getKv(TOK_KEY(p)).catch(() => null))
 }
 
-export async function disconnect(store: Store, p: CloudProvider): Promise<void> {
+export async function disconnect(store: Store, p: CloudProvider, member?: string): Promise<void> {
+  if (member) await store.delKv(tokKey(p, member)).catch(() => {})
   await store.delKv(TOK_KEY(p)).catch(() => {})
 }
 
-/** Valid user access token (refreshes if expired). null if not connected. */
-export async function getToken(store: Store, p: CloudProvider): Promise<string | null> {
-  const raw = await store.getKv(TOK_KEY(p)).catch(() => null)
+/** Valid user access token (refreshes if expired). null if not connected.
+ *  Reads the member's own link first, then the household fallback. */
+export async function getToken(store: Store, p: CloudProvider, member?: string): Promise<string | null> {
+  let key = tokKey(p, member)
+  let raw = member ? await store.getKv(key).catch(() => null) : null
+  if (!raw) { key = TOK_KEY(p); raw = await store.getKv(TOK_KEY(p)).catch(() => null) }
   if (!raw) return null
   let t: Tokens
   try { t = JSON.parse(raw) } catch { return null }
@@ -152,7 +164,7 @@ export async function getToken(store: Store, p: CloudProvider): Promise<string |
     refresh_token: d.refresh_token || t.refresh_token,
     expires_at: Date.now() + ((d.expires_in || 3600) - 60) * 1000,
   }
-  await store.putKv(TOK_KEY(p), JSON.stringify(nt), 60 * 60 * 24 * 365)
+  await store.putKv(key, JSON.stringify(nt), 60 * 60 * 24 * 365)
   return nt.access_token
 }
 

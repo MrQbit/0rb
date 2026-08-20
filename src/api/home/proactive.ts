@@ -263,11 +263,8 @@ async function tick(): Promise<void> {
     const { tickRoutines } = await import('../routines/routines.js')
     await tickRoutines(pushStore).catch(() => { /* best effort */ })
   }
-  // Morning decks assemble once per day from 05:30 (v0.2 §3).
-  if (pushStore && new Date().getHours() >= 5) {
-    const { assembleDaily } = await import('../deck/deck.js')
-    await assembleDaily(pushStore).catch(() => { /* best effort */ })
-  }
+  // Morning decks assemble ON DEMAND at first use after local sunrise
+  // (v0.2 §3) — weather and news fetched fresh, nothing pre-built here.
   await checkArrivals().catch(() => { /* best effort */ })
   await checkDeviceHealth().catch(() => { /* best effort */ })
   if (pushStore) { import('./briefing.js').then(m => m.maybeSendBriefing(pushStore!, notifyOwner)).catch(() => { /* optional */ }) }

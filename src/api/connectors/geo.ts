@@ -71,8 +71,13 @@ export interface WeatherResult {
 export async function weather(query: string): Promise<WeatherResult | null> {
   const g = await geocode(query)
   if (!g) return null
+  return weatherAt(g.lat, g.lng, g.name?.split(',').slice(0, 2).join(',').trim() || query)
+}
+
+/** Same forecast, straight from coordinates (e.g. Home Assistant's home). */
+export async function weatherAt(lat: number, lng: number, name: string): Promise<WeatherResult | null> {
   const url =
-    `https://api.open-meteo.com/v1/forecast?latitude=${g.lat}&longitude=${g.lng}` +
+    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
     `&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code` +
     `&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=5` +
     `&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto`
@@ -89,7 +94,7 @@ export async function weather(query: string): Promise<WeatherResult | null> {
     condition: WMO[d.daily.weather_code[i]] ?? '—',
   }))
   return {
-    location: g.name?.split(',').slice(0, 2).join(',').trim() || query,
+    location: name,
     current: {
       temp: Math.round(c.temperature_2m),
       condition: WMO[c.weather_code] ?? '—',

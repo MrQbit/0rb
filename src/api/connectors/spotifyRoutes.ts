@@ -21,6 +21,13 @@ function authed(req: Request): boolean {
   return !!(token && verifySession(token))
 }
 
+function sessionMember(req: Request): string | undefined {
+  const a = req.headers.get('authorization') ?? ''
+  let token = /^Bearer\s+/i.test(a) ? a.replace(/^Bearer\s+/i, '').trim() : ''
+  if (!token) token = parseCookies(req.headers.get('cookie'))[SESSION_COOKIE] ?? ''
+  return (token && verifySession(token)?.u) || undefined
+}
+
 export async function trySpotifyOAuthRoute(req: Request, method: string, pathname: string, store: Store): Promise<Response | null> {
   if (!pathname.startsWith('/v1/oauth/spotify/')) return null
 
@@ -36,20 +43,21 @@ export async function trySpotifyOAuthRoute(req: Request, method: string, pathnam
   }
 
   if (!authed(req)) return json(401, { error: 'authentication required' })
+  const member = sessionMember(req)
 
   if (method === 'GET' && pathname === '/v1/oauth/spotify/start') {
     if (!spotifyOAuthConfigured()) return json(400, { error: 'Set Spotify Client ID/Secret + ORB2_PUBLIC_URL first.', redirect_uri: redirectUri() })
-    return json(200, { url: await authorizeUrl(store), redirect_uri: redirectUri() })
+    return json(200, { url: await authorizeUrl(store, member), redirect_uri: redirectUri() })
   }
   if (method === 'GET' && pathname === '/v1/oauth/spotify/status') {
-    return json(200, { connected: await isConnected(store), configured: spotifyOAuthConfigured(), redirect_uri: redirectUri() })
+    return json(200, { connected: await isConnected(store, member), configured: spotifyOAuthConfigured(), redirect_uri: redirectUri() })
   }
   if (method === 'GET' && pathname === '/v1/oauth/spotify/token') {
-    const t = await getUserToken(store)
+    const t = await getUserToken(store, member)
     return t ? json(200, { token: t }) : json(404, { error: 'not connected' })
   }
   if (method === 'POST' && pathname === '/v1/oauth/spotify/disconnect') {
-    await disconnect(store)
+    await disconnect(store, member)
     return json(200, { ok: true })
   }
   return null

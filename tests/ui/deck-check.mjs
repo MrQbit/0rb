@@ -1,0 +1,33 @@
+import { chromium } from 'playwright';
+const b = await chromium.launch();
+const page = await (await b.newContext()).newPage();
+await page.context().addCookies([{ name: 'orb2_session', value: process.env.ORB_SESSION, domain: 'localhost', path: '/' }]);
+await page.goto('http://localhost:9080/', { waitUntil: 'networkidle' });
+await page.waitForTimeout(2500);
+const S = process.env.SHOTS_DIR || '.';
+await page.evaluate(async () => {
+  const d = await (await fetch('/v1/deck?force=1', { credentials: 'same-origin' })).json();
+  if (d.deck) window.__orbSpawnWidget(d.deck);
+});
+await page.waitForTimeout(3000);
+const deck = page.locator('.wg', { hasText: 'Good morning' }).first();
+const cardCount = await deck.locator('.wg-deck-card').count();
+console.log('deck cards rendered:', cardCount);
+await deck.screenshot({ path: S + '/deck-content.png' });
+await deck.locator('button:has-text("Customize")').click();
+await page.waitForTimeout(1200);
+const topicRows = await deck.locator('.wg-deck-topic').count();
+console.log('customize topics:', topicRows);
+await deck.screenshot({ path: S + '/deck-customize.png' });
+// Apps accounts card
+await page.locator('#gearBtn').click();
+await page.locator('.tm-item[data-act="settings"]').click();
+await page.waitForTimeout(600);
+await page.locator('.set-navi[data-sec="apps"]').click();
+await page.waitForTimeout(1500);
+const acctCard = await page.locator('text=Your accounts').count();
+const appleCard = await page.locator('#apConnect').count();
+console.log('accounts card:', acctCard, '| apple connect:', appleCard);
+await page.locator('#settingsPanel').screenshot({ path: S + '/apps-accounts.png' });
+await b.close();
+process.exit(cardCount >= 2 && topicRows === 8 && acctCard >= 1 && appleCard === 1 ? 0 : 1);

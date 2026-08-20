@@ -1111,3 +1111,12 @@ sup.sq { font-size:.58em; color:var(--nv); font-weight:700; margin-left:1px; tra
 .wg-energy-row .bar{ flex:1; height:6px; background:rgba(255,255,255,.06); border-radius:3px; overflow:hidden; }
 .wg-energy-row .bar i{ display:block; height:100%; background:var(--nv,#76b900); border-radius:3px; }
 .wg-energy-row .w{ flex:0 0 52px; text-align:right; color:var(--ink-dim); font-variant-numeric:tabular-nums; }
+
+/* ── morning deck: customize view ── */
+.wg-deck-foot{ display:flex; gap:8px; align-items:center; }
+.wg-deck-cust{ display:flex; flex-direction:column; gap:7px; padding:10px; border-radius:12px;
+  background:rgba(255,255,255,.03); border:1px solid var(--line); margin-bottom:4px; }
+.wg-deck-topic{ display:flex; gap:9px; align-items:center; font-size:12.5px; color:var(--ink); cursor:pointer; }
+.wg-deck-topic input{ accent-color:var(--nv,#76b900); }
+.wg-deck-topic i{ color:var(--ink-dim); font-style:normal; font-size:11.5px; }
+.wg-deck-topic.off{ opacity:.55; }

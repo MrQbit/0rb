@@ -10,7 +10,11 @@
  */
 import type { Store } from '../store/store.js'
 
+// One APP credential for the whole house (Client ID/Secret, set once in
+// Settings); each MEMBER links their own Spotify account — tokens are keyed
+// per member, with the pre-multiuser household token as a fallback.
 const TOK_KEY = 'spotify:oauth'
+const tokKey = (member?: string) => (member ? `spotify:oauth:${member}` : TOK_KEY)
 const STATE_KEY = (s: string) => `spotify:oauthstate:${s}`
 const SCOPES = [
   'streaming', 'user-read-email', 'user-read-private',
@@ -27,9 +31,9 @@ export function redirectUri(): string {
   return `${base}/v1/oauth/spotify/callback`
 }
 
-export async function authorizeUrl(store: Store): Promise<string> {
+export async function authorizeUrl(store: Store, member?: string): Promise<string> {
   const state = Math.random().toString(36).slice(2) + Date.now().toString(36)
-  await store.putKv(STATE_KEY(state), '1', 600).catch(() => {})
+  await store.putKv(STATE_KEY(state), JSON.stringify({ member: member || '' }), 600).catch(() => {})
   const p = new URLSearchParams({
     client_id: clientId(), response_type: 'code', redirect_uri: redirectUri(),
     scope: SCOPES, state, show_dialog: 'false',
@@ -42,6 +46,8 @@ type Tokens = { access_token: string; refresh_token: string; expires_at: number 
 export async function exchangeCode(store: Store, code: string, state: string): Promise<boolean> {
   const ok = await store.getKv(STATE_KEY(state)).catch(() => null)
   if (!ok) return false
+  let member = ''
+  try { member = JSON.parse(ok).member || '' } catch { /* legacy '1' state */ }
   await store.delKv(STATE_KEY(state)).catch(() => {})
   const r = await fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
@@ -51,21 +57,26 @@ export async function exchangeCode(store: Store, code: string, state: string): P
   if (!r.ok) return false
   const d = (await r.json()) as any
   const t: Tokens = { access_token: d.access_token, refresh_token: d.refresh_token, expires_at: Date.now() + (d.expires_in - 60) * 1000 }
-  await store.putKv(TOK_KEY, JSON.stringify(t), 60 * 60 * 24 * 365)
+  await store.putKv(tokKey(member || undefined), JSON.stringify(t), 60 * 60 * 24 * 365)
   return true
 }
 
-export async function isConnected(store: Store): Promise<boolean> {
+export async function isConnected(store: Store, member?: string): Promise<boolean> {
+  if (member && await store.getKv(tokKey(member)).catch(() => null)) return true
   return !!(await store.getKv(TOK_KEY).catch(() => null))
 }
 
-export async function disconnect(store: Store): Promise<void> {
+export async function disconnect(store: Store, member?: string): Promise<void> {
+  if (member) await store.delKv(tokKey(member)).catch(() => {})
   await store.delKv(TOK_KEY).catch(() => {})
 }
 
-/** Valid user access token (refreshes if expired). null if not connected. */
-export async function getUserToken(store: Store): Promise<string | null> {
-  const raw = await store.getKv(TOK_KEY).catch(() => null)
+/** Valid user access token (refreshes if expired). null if not connected.
+ *  Reads the member's own link first, then the household fallback. */
+export async function getUserToken(store: Store, member?: string): Promise<string | null> {
+  let key = tokKey(member)
+  let raw = member ? await store.getKv(key).catch(() => null) : null
+  if (!raw) { key = TOK_KEY; raw = await store.getKv(TOK_KEY).catch(() => null) }
   if (!raw) return null
   let t: Tokens
   try { t = JSON.parse(raw) } catch { return null }
@@ -79,13 +90,13 @@ export async function getUserToken(store: Store): Promise<string | null> {
   if (!r.ok) return null
   const d = (await r.json()) as any
   const nt: Tokens = { access_token: d.access_token, refresh_token: d.refresh_token || t.refresh_token, expires_at: Date.now() + (d.expires_in - 60) * 1000 }
-  await store.putKv(TOK_KEY, JSON.stringify(nt), 60 * 60 * 24 * 365)
+  await store.putKv(key, JSON.stringify(nt), 60 * 60 * 24 * 365)
   return nt.access_token
 }
 
 /** Thin wrapper for Spotify Web API calls with the user token. */
-export async function spotifyApi(store: Store, path: string, init?: RequestInit): Promise<Response> {
-  const tok = await getUserToken(store)
+export async function spotifyApi(store: Store, path: string, init?: RequestInit, member?: string): Promise<Response> {
+  const tok = await getUserToken(store, member)
   if (!tok) throw new Error('Spotify account not connected')
   return fetch(`https://api.spotify.com/v1${path}`, {
     ...init,

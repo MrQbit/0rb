@@ -25,6 +25,13 @@ function authed(req: Request): boolean {
 }
 function isProvider(p: string): p is CloudProvider { return (CLOUD_PROVIDERS as string[]).includes(p) }
 
+function sessionMember(req: Request): string | undefined {
+  const a = req.headers.get('authorization') ?? ''
+  let token = /^Bearer\s+/i.test(a) ? a.replace(/^Bearer\s+/i, '').trim() : ''
+  if (!token) token = parseCookies(req.headers.get('cookie'))[SESSION_COOKIE] ?? ''
+  return (token && verifySession(token)?.u) || undefined
+}
+
 export async function tryCloudOAuthRoute(req: Request, method: string, pathname: string, store: Store): Promise<Response | null> {
   if (!pathname.startsWith('/v1/oauth/cloud/')) return null
 
@@ -40,12 +47,13 @@ export async function tryCloudOAuthRoute(req: Request, method: string, pathname:
   }
 
   if (!authed(req)) return json(401, { error: 'authentication required' })
+  const member = sessionMember(req)
 
   // Combined status for the Settings panel.
   if (method === 'GET' && pathname === '/v1/oauth/cloud/status') {
     const status: Record<string, { configured: boolean; device: boolean; connected: boolean; redirect_uri: string }> = {}
     for (const p of CLOUD_PROVIDERS) {
-      status[p] = { configured: providerConfigured(p), device: deviceConfigured(p), connected: await isConnected(store, p), redirect_uri: redirectUri(p) }
+      status[p] = { configured: providerConfigured(p), device: deviceConfigured(p), connected: await isConnected(store, p, member), redirect_uri: redirectUri(p) }
     }
     return json(200, status)
   }
@@ -67,11 +75,11 @@ export async function tryCloudOAuthRoute(req: Request, method: string, pathname:
   if (method === 'GET' && start && isProvider(start[1]!)) {
     const p = start[1] as CloudProvider
     if (!providerConfigured(p)) return json(400, { error: `Set ${p} Client ID/Secret + ORB2_PUBLIC_URL first.`, redirect_uri: redirectUri(p) })
-    return json(200, { url: await authorizeUrl(store, p), redirect_uri: redirectUri(p) })
+    return json(200, { url: await authorizeUrl(store, p, member), redirect_uri: redirectUri(p) })
   }
   const disc = /^\/v1\/oauth\/cloud\/(google|microsoft)\/disconnect$/.exec(pathname)
   if (method === 'POST' && disc && isProvider(disc[1]!)) {
-    await disconnect(store, disc[1] as CloudProvider)
+    await disconnect(store, disc[1] as CloudProvider, member)
     return json(200, { ok: true })
   }
   return null

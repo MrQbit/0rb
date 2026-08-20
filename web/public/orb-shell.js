@@ -1157,10 +1157,40 @@
       fb.append(up,down); cell.appendChild(fb);
       wrap.appendChild(cell);
     });
+    const foot=document.createElement('div'); foot.className='wg-deck-foot';
     const done=document.createElement('button'); done.className='set-btn ghost'; done.textContent='Done for today';
     done.onclick=async()=>{ try{ await fetch('/v1/deck/dismiss',{method:'POST',credentials:'same-origin'}); }catch{}
       const host=body.closest('.wg'); if(host){ widgets.delete(host.id?host.id.replace(/^wg-/,''):''); host.remove(); growWidgetCanvas(); } };
-    wrap.appendChild(done);
+    const cust=document.createElement('button'); cust.className='set-btn ghost'; cust.textContent='Customize';
+    cust.onclick=async()=>{
+      if(wrap.querySelector('.wg-deck-cust')){ wrap.querySelector('.wg-deck-cust').remove(); return; }
+      let topics=[];
+      try{ topics=(await (await fetch('/v1/deck/topics',{credentials:'same-origin'})).json()).topics||[]; }catch{ return; }
+      const panel=document.createElement('div'); panel.className='wg-deck-cust';
+      const note=document.createElement('div'); note.className='set-muted small'; note.textContent='Your morning, your mix — pick what shows up.'; panel.appendChild(note);
+      topics.forEach(t=>{
+        const row=document.createElement('label'); row.className='wg-deck-topic'+(t.available?'':' off');
+        const cb=document.createElement('input'); cb.type='checkbox'; cb.checked=!!t.enabled; cb.dataset.id=t.id;
+        const txt=document.createElement('span'); txt.innerHTML=`<b>${esc2(t.label)}</b> <i>${esc2(t.available?t.desc:('needs '+(t.needs||'setup')))}</i>`;
+        row.append(cb,txt); panel.appendChild(row);
+      });
+      const save=document.createElement('button'); save.className='set-btn'; save.textContent='Save';
+      save.onclick=async()=>{
+        const enabled=[...panel.querySelectorAll('input:checked')].map(x=>x.dataset.id);
+        save.disabled=true;
+        try{
+          await fetch('/v1/deck/topics',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({enabled})});
+          const d=await (await fetch('/v1/deck?force=1',{credentials:'same-origin'})).json();
+          const host=body.closest('.wg');
+          if(d.deck&&host){ widgets.delete(host.id?host.id.replace(/^wg-/,''):''); host.remove(); growWidgetCanvas(); spawnWidget(d.deck); }
+          else if(!d.deck){ panel.replaceChildren(Object.assign(document.createElement('div'),{className:'set-muted small',textContent:'Saved — nothing to show for those topics right now.'})); }
+        }catch{ toast('Could not save'); }
+        finally{ save.disabled=false; }
+      };
+      panel.appendChild(save);
+      wrap.insertBefore(panel, foot);
+    };
+    foot.append(cust,done); wrap.appendChild(foot);
   }
 
   // ── deck delivery: on load, today's deck appears once (v0.2 §3) ──
@@ -2591,6 +2621,36 @@
     set('#vcDot','#vcState', !!s.ORB2_VERCEL_TOKEN, 'publishes to vercel.app');
     const put = async (body, ok) => { try{ const r=await fetch('/v1/settings',{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify(body)}); toast(r.ok?ok:'Failed'); if(r.ok) setTimeout(loadApps,300); }catch{ toast('Failed'); } };
     const yt=$('#ytSave'); if(yt && !yt.dataset.w){ yt.dataset.w='1'; yt.onclick=()=>{ const k=$('#ytKey').value.trim(); if(k){ put({ORB2_YOUTUBE_API_KEY:k},'YouTube connected'); $('#ytKey').value=''; } }; }
+        // Apple account (CalDAV app-specific password) + the accounts-card Spotify shortcut.
+    (async()=>{
+      try{
+        const st=await (await fetch('/v1/apple/status',{credentials:'same-origin'})).json();
+        const dot=$('#apDot'), acct=$('#apAcct'), disc=$('#apDisconnect');
+        if(dot){ dot.className='pill-dot'+(st.connected?' ok':''); acct.textContent=st.connected?'iCloud Calendar connected':''; if(disc) disc.style.display=st.connected?'':'none'; }
+      }catch{}
+      const go=$('#apConnect');
+      if(go&&!go.dataset.w){ go.dataset.w='1'; go.onclick=async()=>{
+        const id=$('#apId').value.trim(), pw=$('#apPass').value.trim(), msg=$('#apMsg');
+        if(!id||!pw){ msg.textContent='Both fields are needed.'; return; }
+        go.disabled=true; msg.textContent='Checking with iCloud…';
+        try{
+          const r=await fetch('/v1/apple/connect',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({apple_id:id,app_password:pw})});
+          const d=await r.json();
+          if(r.ok&&d.ok){ msg.textContent='Connected — your iCloud calendar now feeds the morning deck.'; $('#apDot').className='pill-dot ok'; $('#apPass').value=''; $('#apDisconnect').style.display=''; }
+          else msg.textContent=d.error||'Could not connect.';
+        }catch{ msg.textContent='Could not reach the server.'; }
+        finally{ go.disabled=false; }
+      }; }
+      const ad=$('#apDisconnect');
+      if(ad&&!ad.dataset.w){ ad.dataset.w='1'; ad.onclick=async()=>{ try{ await fetch('/v1/apple/disconnect',{method:'POST',credentials:'same-origin'}); $('#apDot').className='pill-dot'; $('#apAcct').textContent=''; ad.style.display='none'; }catch{} }; }
+      const sc=$('#spConnect2');
+      if(sc&&!sc.dataset.w){ sc.dataset.w='1'; sc.onclick=()=>$('#spConnect')?.click(); }
+      try{
+        const st=await (await fetch('/v1/oauth/spotify/status',{credentials:'same-origin'})).json();
+        const dot=$('#spAcctDot'), lbl=$('#spAcctState');
+        if(dot){ dot.className='pill-dot'+(st.connected?' ok':''); lbl.textContent=st.connected?'your account is linked':(st.configured?'app credential set — link your account':'needs the house app credential first'); }
+      }catch{}
+    })();
     const sp=$('#spSave'); if(sp && !sp.dataset.w){ sp.dataset.w='1'; sp.onclick=()=>{ const id=$('#spId').value.trim(), sec=$('#spSecret').value.trim(); if(id&&sec){ put({ORB2_SPOTIFY_CLIENT_ID:id,ORB2_SPOTIFY_CLIENT_SECRET:sec},'Spotify connected'); $('#spId').value=''; $('#spSecret').value=''; } }; }
     const nw=$('#nwSave'); if(nw && !nw.dataset.w){ nw.dataset.w='1'; nw.onclick=()=>{ const k=$('#nwKey').value.trim(); if(k){ put({ORB2_NEWSAPI_KEY:k},'News connected'); $('#nwKey').value=''; } }; }
     const vc=$('#vcSave'); if(vc && !vc.dataset.w){ vc.dataset.w='1'; vc.onclick=()=>{ const t=$('#vcToken').value.trim(); if(t){ put(Object.assign({ORB2_VERCEL_TOKEN:t}, $('#vcTeam').value.trim()?{ORB2_VERCEL_TEAM_ID:$('#vcTeam').value.trim()}:{}),'Vercel connected'); $('#vcToken').value=''; } }; }
