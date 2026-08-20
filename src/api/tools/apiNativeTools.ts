@@ -706,11 +706,13 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
   add('WebSearch', { readOnly: true }, async args => {
     const q = String(args?.query || '').trim()
     if (!q) return 'Provide a search query.'
+    const wid = `search-${Date.now().toString(36)}`
+    emitWidget(ctx.sessionId, { id: wid, type: 'results', title: `Web · ${q}`, pending: true } as any)
     try {
       const hits = await webSearch(q, Math.min(Number(args?.count) || 8, 20))
       if (!hits.length) return `No results for "${q}".`
       emitWidget(ctx.sessionId, {
-        id: `search-${Date.now().toString(36)}`, type: 'results', title: `Web · ${q}`,
+        id: wid, type: 'results', title: `Web · ${q}`,
         items: hits.map(h => ({ title: h.title, subtitle: h.snippet.slice(0, 120), action: { kind: 'link', url: h.url } })),
       } as any)
       return `Top results for "${q}":\n` + hits.map((h, i) => `${i + 1}. ${h.title} — ${h.url}\n   ${h.snippet.slice(0, 200)}`).join('\n')
@@ -862,6 +864,7 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
       const script = String(args?.script || '').trim()
       if (!script) return "Provide a bpy script (op:'build'/'render'), or a file for convert/analyze."
       if (op === 'render') {
+        emitWidget(ctx.sessionId, { id: 'render', type: 'image', title: args?.title || 'Render', pending: true } as any)
         const out = join(wsRoot, ctx.sessionId, '.widget', 'render.png')
         const d = await call('/render', { script, out })
         if (!d.ok) return `[ERROR] render failed: ${String(d.error || d.stderr || '').slice(-400)}`
@@ -870,6 +873,7 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
       }
       // build (default)
       const id = (typeof args?.id === 'string' && args.id.trim()) ? args.id.trim() : 'model-main'
+      emitWidget(ctx.sessionId, { id, type: 'model', title: args?.title || '3D model', pending: true } as any)
       const out = `${wsRoot}/${ctx.sessionId}/.widget/${id}.glb`
       const d = await call('/run', { script, out })
       if (!d.ok) return `[ERROR] Blender failed: ${String(d.stderr || d.error || 'unknown').slice(-700)}`

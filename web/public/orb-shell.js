@@ -579,6 +579,12 @@
   }
 
   function renderWidget(body, spec, wg){
+    // Skeleton-first streaming (v0.2 §5): a pending spec renders shimmer
+    // immediately; the full spec re-emitted with the same id fills it in.
+    if(spec.pending){
+      body.innerHTML='<div class="wg-skel"><div class="sk w62"></div><div class="sk w88"></div><div class="sk w45"></div></div>';
+      return;
+    }
     if(spec.type==='chart') renderChart(body, spec, wg);
     else if(spec.type==='results') renderResults(body, spec);
     else if(spec.type==='video') renderVideo(body, spec);

@@ -26,6 +26,12 @@ export function agentContextPrompt(): string {
     `SHOWING THINGS: when you have structured output to show the user — a chart, a table, a list of results/recommendations, a video, stats/metrics, an image or gallery, a map, or an embeddable interactive page (e.g. a Sketchfab 3D model) — ALWAYS use the **Widget** tool. It renders fast native interactive cards. Do NOT describe a chart/table/list in prose, and do NOT use the Canvas tool for these. Use **Canvas** ONLY for a bespoke custom multi-file web app or generated visualization that no Widget type can express (e.g. a three.js/WebGL scene, a simulation, a custom interactive UI).`,
   ]
   parts.push(`PROGRESS: for any multi-step or long-running task (research, coding, anything taking several tool calls), use the TodoWrite tool to keep a task list and update it as you go — it surfaces as a live "Tasks" widget so the user can watch progress. Keep exactly one task in_progress; mark each done as you finish.`)
+  // The widget catalog is the design system AND the guardrail: the model
+  // composes only from these types; unknown fields are stripped on emit.
+  try {
+    const { catalogPromptBlock } = require('./widgets/catalog.js') as typeof import('./widgets/catalog.js')
+    parts.push(catalogPromptBlock())
+  } catch { /* catalog optional */ }
   // Custom widget plugins installed at runtime — let the model use them.
   try {
     const { listPlugins } = require('./widgets/plugins.js') as typeof import('./widgets/plugins.js')

@@ -1683,6 +1683,11 @@ async function dispatch(
     const r = await tryHandleMatterRoute(method, pathname, req, ctx.store)
     if (r) return r
   }
+  // ─── Widget catalog (the design system as data; v0.2 §5) ───
+  if (method === 'GET' && pathname === '/v1/widgets/catalog') {
+    const { catalogJson } = await import('./widgets/catalog.js')
+    return jsonResponse(200, catalogJson())
+  }
   // ─── LAN bridge (Settings → Smart home: devices seen directly, no HA) ───
   if (method === 'GET' && pathname === '/v1/bridge/devices') {
     const { bridgeEnabled, bridgeDevices } = await import('./connectors/bridge.js')
