@@ -35,14 +35,33 @@ export async function runDreamConsolidation(store: Store, trigger: 'manual' | 's
   // Self-contained consolidation prompt (was core's buildConsolidationPrompt +
   // session-transcript scan, which the API doesn't keep on disk).
   const memoryRoot = getAutoMemPath()
+  // Memory v2: the dream LEARNS from lived days, not just tidies files —
+  // recent episodes (real conversation turns) are the raw material.
+  let episodeBlock = ''
+  try {
+    const { recentEpisodes } = await import('./episodes.js')
+    const eps = await recentEpisodes(store, 2, 60)
+    if (eps.length) {
+      episodeBlock = `\nRECENT EPISODES (last 2 days of real conversations — extract durable facts from these):\n`
+        + eps.map(e => `- [${e.who}] "${e.text}" → ${e.reply}`).join('\n')
+    }
+  } catch { /* episodes optional */ }
   const prompt = [
     `Consolidate your long-term memory. Triggered: ${trigger}.`,
-    `Your memory files live under ${memoryRoot} (MEMORY.md is the index, plus topic files).`,
-    `Use your Read/Write/Edit tools to: merge duplicates, sharpen vague entries, prune anything`,
-    `stale or contradictory, fix broken [[links]], and make sure MEMORY.md is an accurate,`,
-    `tight index with one line per memory. Don't invent facts — only reorganize what's there.`,
-    `When done, reply with a one-paragraph summary of what you changed.`,
-  ].join('\n')
+    `Your memory files live under ${memoryRoot} (MEMORY.md is the index, plus topic files;`,
+    `members/<slug>.md hold PERSONAL facts about each household member).`,
+    ``,
+    `1. EXTRACT: from the episodes below, save durable NEW facts you don't already have —`,
+    `   preferences, routines, people, projects, corrections. Personal facts go to that`,
+    `   member's file; household facts to MEMORY.md/topic files. Ignore small talk and`,
+    `   one-off requests. A nickname is only recorded if the person asked for it themselves.`,
+    `2. DATE facts: stamp new entries with (as of ${new Date().toISOString().slice(0, 7)}). When a new fact`,
+    `   CONTRADICTS an old one, don't silently delete — supersede: "X (until ${new Date().toISOString().slice(0, 7)}); now Y".`,
+    `3. TIDY: merge duplicates, sharpen vague entries, prune truly dead facts, fix [[links]],`,
+    `   keep MEMORY.md a tight one-line-per-memory index. Don't invent facts.`,
+    `When done, reply with a one-paragraph summary of what you learned and changed.`,
+    episodeBlock,
+  ].filter(Boolean).join('\n')
 
   const summary = await runChannelTurn({
     text: prompt,

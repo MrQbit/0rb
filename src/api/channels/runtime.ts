@@ -70,9 +70,11 @@ export async function runChannelTurn(input: ChannelTurnInput): Promise<string> {
         workingDirectory: process.cwd(),
         todoStore: makeChannelTodoStore(input.store),
         extraTools,
-        appendSystemPromptExtra: [agentContextPrompt(), input.vocalContext]
-          .filter(Boolean)
-          .join('\n\n'),
+        appendSystemPromptExtra: [
+          agentContextPrompt(),
+          await (await import('./turnContext.js')).turnContextExtra(input.store, ownerId, input.text),
+          input.vocalContext,
+        ].filter(Boolean).join('\n\n'),
       },
       {
         // The hook is onTextChunk and only fires on streaming deltas; forward
@@ -91,6 +93,10 @@ export async function runChannelTurn(input: ChannelTurnInput): Promise<string> {
     if (Array.isArray(result.finalMessages)) {
       await input.store.setSession(input.sessionId, result.finalMessages, sessionTtl).catch(() => {})
     }
+    // Episodic memory: the nightly dream extracts durable facts from these.
+    void (await import('../memory/episodes.js')).logEpisode(input.store, {
+      who: ownerId, text: input.text, reply: result.fullText || full, session: input.sessionId,
+    })
     return result.fullText || full
   } catch (err) {
     const msg = `Sorry, I hit an error: ${(err as Error).message}`

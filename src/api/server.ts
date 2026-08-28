@@ -3856,7 +3856,7 @@ async function handleChat(
           fallbackModels,
           userMcpServers,
           extraTools: apiNativeTools,
-          appendSystemPromptExtra: agentContextPrompt() + (await (await import('./family/family.js')).familyPromptExtra(ctx.store, attributionFor(identity).oid || '')),
+          appendSystemPromptExtra: agentContextPrompt() + (await (await import('./channels/turnContext.js')).turnContextExtra(ctx.store, attributionFor(identity).oid || '', String(body.message || ''))),
         },
         {
           onToolStart: e => {
@@ -3954,6 +3954,10 @@ async function handleChat(
     })
 
     await ctx.store.setSession(sessionId, result.finalMessages, ctx.sessionTtlSeconds)
+    void (await import('./memory/episodes.js')).logEpisode(ctx.store, {
+      who: attributionFor(identity).oid || 'owner', text: String(chatMessage || ''),
+      reply: String(result.fullText || ''), session: sessionId,
+    }).catch(() => { /* best effort */ })
     await ctx.store.setSessionMeta(
       sessionId,
       {
@@ -4222,7 +4226,7 @@ async function handleChat(
               autoApprove: () => true,
               mcpToken,
               extraTools: apiNativeTools,
-              appendSystemPromptExtra: agentContextPrompt() + (await (await import('./family/family.js')).familyPromptExtra(ctx.store, attributionFor(identity).oid || '')),
+              appendSystemPromptExtra: agentContextPrompt() + (await (await import('./channels/turnContext.js')).turnContextExtra(ctx.store, attributionFor(identity).oid || '', String(body.message || ''))),
             },
             hooks,
           )
