@@ -1150,3 +1150,16 @@ sup.sq { font-size:.58em; color:var(--nv); font-weight:700; margin-left:1px; tra
   background:rgba(118,185,0,.16); display:inline-flex; align-items:center; justify-content:center; margin-right:10px; }
 .avatar img{ width:100%; height:100%; object-fit:cover; position:absolute; inset:0; }
 .avatar i{ font-style:normal; font-size:12px; font-weight:700; color:var(--nv,#76b900); letter-spacing:.5px; }
+
+/* ── order widget (SPEC §3) ── */
+.wg-order{ display:flex; flex-direction:column; gap:9px; }
+.wg-ord-tl{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:11px; }
+.wg-ord-step{ padding:3px 9px; border-radius:999px; border:1px solid var(--line); color:var(--ink-dim); }
+.wg-ord-step.on{ color:#0a0d0a; background:var(--nv,#76b900); border-color:var(--nv,#76b900); font-weight:600; }
+.wg-ord-step.wait{ background:rgba(255,184,0,.18); color:#ffcf66; border-color:rgba(255,184,0,.4); }
+.wg-ord-step.off{ opacity:.7; }
+.wg-ord-arrow{ color:var(--ink-dim); font-style:normal; font-size:10px; }
+.wg-ord-items{ display:flex; flex-direction:column; gap:4px; }
+.wg-ord-it{ display:flex; justify-content:space-between; font-size:12.5px; color:var(--ink); }
+.wg-ord-it .pr{ color:var(--ink-dim); font-variant-numeric:tabular-nums; }
+.wg-ord-tot{ display:flex; justify-content:space-between; font-size:13px; font-weight:700; color:var(--ink); border-top:1px solid var(--line); padding-top:6px; }

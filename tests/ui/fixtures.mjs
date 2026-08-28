@@ -74,6 +74,8 @@ export const FIXTURES = [
     now: { title: 'Weightless', artist: 'Marconi Union', art: '', playing: true, device: 'Living Room', volume: 45 },
     devices: [ { id: 'd1', name: 'Living Room', type: 'Speaker', active: true }, { id: 'd2', name: 'Kitchen', type: 'Speaker', active: false } ],
     playlists: [ { name: 'Morning Coffee', uri: 'spotify:playlist:x1', tracks: 42, image: '' }, { name: 'Deep Focus', uri: 'spotify:playlist:x2', tracks: 87, image: '' } ] },
+  { type: 'order', title: 'Sim Eats', state: 'in-progress', service: 'sim-eats', total_cents: 4730, eta: '12 min',
+    items: [ { name: 'Pad See Ew', qty: 1, cents: 1450 }, { name: 'Tom Kha (2x)', qty: 1, cents: 3100 } ] },
   { type: 'energy', title: 'Energy', pill: '412 W', total_w: 412, today_kwh: 6.8,
     devices: [ { name: 'Heat pump', area: 'Basement', watts: 220 }, { name: 'Fridge', area: 'Kitchen', watts: 95 }, { name: 'Office desk', area: 'Office', watts: 97 } ] },
   { type: 'automations', title: 'Automations', automations: [ { entity_id: 'automation.night', name: 'Lights off at midnight', on: true, last: '2026-08-19T00:00:00Z' }, { entity_id: 'automation.away', name: 'Away arming', on: false } ] },

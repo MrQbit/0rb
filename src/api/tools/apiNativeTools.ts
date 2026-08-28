@@ -197,6 +197,19 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
       available: true,
     },
     {
+      name: 'Order',
+      description: "Order things in the real world (SPEC Hands): food delivery, consumables, parts — through connected services. op:'options' {intent, service?} lists what's available (e.g. intent 'thai'). op:'order' {service, items:[{id,qty?}], gift_for?} builds the cart and runs it through the household BUDGET policy: it may auto-place (earned tier), raise an approval card, or refuse with the reason — relay refusals verbatim. Handoff services return a checkout the human must Pay in; NEVER claim those are placed until confirmed. op:'status' shows open orders; op:'cancel' {order_id}; op:'confirm_paid' {order_id} after the human paid a handoff checkout. Present options with time + cost; only order what the user chose.",
+      input_schema: { type: 'object', properties: {
+        op: { type: 'string', enum: ['options', 'order', 'status', 'cancel', 'confirm_paid'] },
+        intent: { type: 'string', description: "What they want ('thai food', 'petg filament')." },
+        service: { type: 'string', description: 'Connector id (from options).' },
+        items: { type: 'array', description: '[{id, qty?}] chosen from options.' },
+        gift_for: { type: 'string', description: "Member email if this is a gift for them (hides it from their surfaces)." },
+        order_id: { type: 'string' },
+      }, required: ['op'] },
+      available: true,
+    },
+    {
       name: 'WebSearch',
       description: "Search the live web (private SearXNG). Use for ANY question about current events, prices, versions, releases, weather-adjacent news, or facts that may have changed since training — instead of saying you can't browse. Returns the top results (title, URL, snippet) and shows them in a results widget.",
       input_schema: { type: 'object', properties: {
@@ -780,6 +793,93 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
       emitWidget(ctx.sessionId, { id: 'spotify', type: 'spotify', title: 'Spotify', connected: true } as any)
       return `Done (${action}).`
     } catch (e) { return `[ERROR] ${(e as Error).message}` }
+  })
+  add('Order', {}, async (args: any) => {
+    const member = (ctx.ownerId || '').replace(/^user:/, '')
+    const { getConnector, listConnectors, initConnectors } = await import('../commerce/connector.js')
+    await initConnectors()
+    const op = String(args?.op || '')
+    const norm = (x: string) => x.toLowerCase().replace(/[^a-z0-9]/g, '')
+    const resolveService = (q: string) => {
+      const n = norm(q)
+      return listConnectors().find(c => norm(c.id) === n || norm(c.label) === n)
+        || listConnectors().find(c => norm(c.id).includes(n) || norm(c.label).includes(n))
+    }
+    if (op === 'options') {
+      const intent = String(args?.intent || '').trim()
+      const all = listConnectors()
+      const conns = args?.service ? [resolveService(String(args.service))].filter(Boolean) as any[] : all
+      if (!all.length) return 'No ordering services are connected yet (Settings → Apps → Your accounts).'
+      if (!conns.length) return `No service matching "${args?.service}". Connected: ${all.map(c => `${c.label} [${c.id}]`).join(', ')}.`
+      const parts: string[] = []
+      for (const c of conns.slice(0, 4)) {
+        const opts = await c.options(ctx.store, member, intent).catch(() => [])
+        if (opts.length) parts.push(`${c.label} [${c.id}] (${c.mechanism}): ` + opts.slice(0, 6).map(o => `${o.name} $${(o.cents / 100).toFixed(2)} (id:${o.id})`).join(' · '))
+      }
+      return parts.length ? `Options:\n${parts.join('\n')}` : `Nothing matching "${intent}" on connected services.`
+    }
+    if (op === 'order') {
+      const c = getConnector(String(args?.service || '')) || resolveService(String(args?.service || ''))
+      if (!c) return `Unknown service "${args?.service}". Connected: ${listConnectors().map(x => `${x.label} [${x.id}]`).join(', ') || 'none'}. Use op:'options' first.`
+      const items = Array.isArray(args?.items) ? args.items : []
+      if (!items.length) return 'Pick items first (op:options → pass their ids).'
+      const cart = await c.buildCart(ctx.store, member, items)
+      if (!cart.items.length) return 'None of those item ids exist on that service.'
+      const giftFor = String(args?.gift_for || '') || undefined
+      const category = giftFor ? 'gifts' as const : cart.category
+      const { authorizeSpend, recordSpend, recordSpendDenied } = await import('../commerce/policy.js')
+      const label = cart.items.map(i => i.name).join(', ')
+      const fmt = `$${(cart.totalCents / 100).toFixed(2)}`
+      const decision = await authorizeSpend(ctx.store, { member, category, amountCents: cart.totalCents, service: c.id, summary: label })
+      if (decision.decision === 'refused') return `I can't place that: ${decision.reason}`
+      if (decision.decision === 'ask') {
+        const { requestApproval } = await import('../policy/policy.js')
+        const { approved } = await requestApproval(ctx.store, ctx.sessionId, ctx.ownerId || 'owner', 'Order', { service: c.id },
+          `Spend ${fmt} at ${c.label} — ${label}`, decision.note)
+        if (!approved) { await recordSpendDenied(ctx.store, category); return `Not approved — nothing was ordered.` }
+      }
+      const { createOrder, transition, orderWidget } = await import('../commerce/orders.js')
+      if (c.mechanism === 'api' && c.placeOrder) {
+        const placed = await c.placeOrder(ctx.store, member, cart)
+        const rec = await createOrder(ctx.store, { member, service: c.id, category, cart, source: 'api', serviceRef: placed.ref, eta: placed.eta, giftFor, state: 'draft' })
+        await transition(ctx.store, rec.id, 'placed', {})
+        const spent = await recordSpend(ctx.store, { member, category, amountCents: cart.totalCents, service: c.id, summary: label }, decision.decision === 'auto' ? 'auto' : 'approved')
+        emitWidget(ctx.sessionId, orderWidget((await (await import('../commerce/orders.js')).getOrder(ctx.store, rec.id))!) as any)
+        return `Ordered — ${fmt} at ${c.label} (${label}). ETA ${placed.eta || 'soon'}.` + (spent.offerAuto ? ` You've approved ${category} a few times now — want me to auto-approve small ${category} orders from here on? (Budgets toggle)` : '')
+      }
+      // handoff: cart → human pays
+      const url = c.checkoutUrl ? c.checkoutUrl(cart) : ''
+      const rec = await createOrder(ctx.store, { member, service: c.id, category, cart, source: 'handoff', checkoutUrl: url, giftFor, state: 'awaiting-payment' })
+      const { orderWidget: ow } = await import('../commerce/orders.js')
+      emitWidget(ctx.sessionId, ow(rec) as any)
+      return `Cart is ready at ${c.label} — ${fmt} for ${label}. Open the checkout in the order card and tap Pay; tell me (or tap Paid) when done and I'll track it. I have NOT placed this order.`
+    }
+    if (op === 'status') {
+      const { listOpenOrders, orderWidget } = await import('../commerce/orders.js')
+      const open = (await listOpenOrders(ctx.store)).filter(o => o.giftFor !== member)
+      if (!open.length) return 'No open orders.'
+      for (const o of open.slice(0, 4)) emitWidget(ctx.sessionId, orderWidget(o) as any)
+      return 'Open orders: ' + open.map(o => `${o.service} ${o.state}${o.eta ? ` (ETA ${o.eta})` : ''} $${(o.cart.totalCents / 100).toFixed(2)}`).join(' · ')
+    }
+    if (op === 'cancel') {
+      const { getOrder, transition } = await import('../commerce/orders.js')
+      const o = await getOrder(ctx.store, String(args?.order_id || ''))
+      if (!o) return 'No such order.'
+      const c = getConnector(o.service)
+      if (c?.cancel && o.serviceRef) await c.cancel(ctx.store, member, o.serviceRef).catch(() => {})
+      await transition(ctx.store, o.id, 'canceled')
+      return `Canceled the ${o.service} order.`
+    }
+    if (op === 'confirm_paid') {
+      const { getOrder, transition } = await import('../commerce/orders.js')
+      const o = await getOrder(ctx.store, String(args?.order_id || ''))
+      if (!o || o.state !== 'awaiting-payment') return 'No handoff order awaiting payment by that id.'
+      const { recordSpend } = await import('../commerce/policy.js')
+      await recordSpend(ctx.store, { member, category: o.category as any, amountCents: o.cart.totalCents, service: o.service, summary: o.cart.items.map(i => i.name).join(', ') }, 'approved')
+      await transition(ctx.store, o.id, 'placed', { serviceRef: o.serviceRef || `manual-${o.id}` })
+      return `Got it — marked as paid and placed. I'll track it.`
+    }
+    return `Unknown op "${op}".`
   })
   add('WebSearch', { readOnly: true }, async args => {
     const q = String(args?.query || '').trim()

@@ -370,6 +370,9 @@ services:
       # LAN bridge (host networking) — direct AirPlay + IPP, no HA needed
       ORB2_BRIDGE_URL: "${ORB2_BRIDGE_URL:-http://host.docker.internal:8997}"
       ORB2_BRIDGE_TOKEN: "${ORB2_BRIDGE_TOKEN:-}"
+      # Sim-commerce harness (SPEC Part V) — deterministic stores/couriers
+      ORB2_SIM_COMMERCE: "${ORB2_SIM_COMMERCE:-1}"
+      ORB2_SIM_SPEED_MS: "${ORB2_SIM_SPEED_MS:-2000}"
       # Semantic memory (embeddings)
       ORB2_EMBED_URL: http://embed:8994
       # Web search backend for the WebSearch tool (DDG is blocked server-side)

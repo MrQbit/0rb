@@ -71,6 +71,7 @@ export const CATALOG: Record<string, CatalogEntry> = {
   presence: { fields: { people: A, pill: S }, attention: 'ambient', refresh: 'live', hint: "who's home" },
   automations: { fields: { automations: A }, attention: 'glance', refresh: 'live', hint: 'HA automations' },
   printer3d: { fields: { name: S, state: S, progress: N, layer: N, total_layers: N, nozzle: N, nozzle_target: N, bed: N, bed_target: N, remaining_min: N, snapshot: S, stream: S, controls: B }, attention: 'glance', refresh: 'live', hint: '3D printer' },
+  order: { fields: { state: S, service: S, total_cents: N, eta: S, tracking: S, checkout_url: S, items: A }, attention: 'glance', refresh: 'live', hint: 'order status: items, state timeline, checkout/track' },
   energy: { fields: { total_w: N, today_kwh: N, devices: A }, attention: 'ambient', refresh: 'live', hint: 'power draw now + today by device' },
   familyboard: { fields: { notes: A, events: A }, attention: 'ambient', refresh: 'live', hint: 'family notes + events' },
   briefing: { fields: { briefing: O }, attention: 'ambient', refresh: 'snapshot', hint: 'day at a glance' },

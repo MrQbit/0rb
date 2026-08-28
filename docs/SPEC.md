@@ -112,7 +112,7 @@ UI edits persist; spend receipts render with refund-path wording.
 
 ### 2. Service-connector framework
 
-**Status: ☐ not started**
+**Status: ✅ shipped (v26.9)** — registry + sim connectors (api & handoff), fuzzy resolution, /v1/commerce/services
 
 **Why:** ten services must feel like one drawer; adding the eleventh must
 be a file, not a project.
@@ -154,7 +154,7 @@ provider additions, Settings accounts card, apiNativeTools.
 
 ### 3. Order lifecycle & the cart/handoff engine
 
-**Status: ☐ not started**
+**Status: ✅ shipped (v26.9)** — full state machine, Order tool, order widget, proactive tracking, handoff never claims placement; E2E green in console
 
 **Why:** the difference between "I ordered" and the truth is a state
 machine.

@@ -482,6 +482,7 @@ export async function startApiServer(config: ApiServerConfig) {
   const audit = createAuditEmitter(store)
 
   await ensureSessionSecret(store)
+  void import('./commerce/connector.js').then(m => m.initConnectors()).catch(() => { /* connectors optional */ })
   await bootstrapAdminKey(store)
   await announceSetupIfNeeded(store)
 
@@ -1922,6 +1923,30 @@ async function dispatch(
         return jsonResponse(200, { tracks: hits.map(h => ({ title: h.title, artist: h.artist, uri: h.uri, thumbnail: h.thumbnail })) })
       } catch (e) { return jsonResponse(502, { error: (e as Error).message }) }
     }
+  }
+  if (pathname === '/v1/commerce/services' && method === 'GET') {
+    const { initConnectors, listConnectors } = await import('./commerce/connector.js')
+    await initConnectors()
+    return jsonResponse(200, { services: listConnectors().map(c => ({ id: c.id, label: c.label, category: c.category, mechanism: c.mechanism })) })
+  }
+  // ─── Orders (SPEC §3) ───
+  {
+    const om = pathname.match(/^\/v1\/orders\/(ord-[A-Za-z0-9-]+)\/confirm-paid$/)
+    if (om && method === 'POST') {
+      const member = (attributionFor(identity).oid || '').replace(/^user:/, '')
+      const { getOrder, transition } = await import('./commerce/orders.js')
+      const o = await getOrder(ctx.store, om[1]!)
+      if (!o || o.state !== 'awaiting-payment') return jsonResponse(404, { error: 'not awaiting payment' })
+      const { recordSpend } = await import('./commerce/policy.js')
+      await recordSpend(ctx.store, { member, category: o.category as any, amountCents: o.cart.totalCents, service: o.service, summary: 'handoff paid' }, 'approved')
+      await transition(ctx.store, o.id, 'placed', { serviceRef: o.serviceRef || `manual-${o.id}` })
+      return jsonResponse(200, { ok: true })
+    }
+  }
+  if (pathname === '/v1/orders' && method === 'GET') {
+    const member = (attributionFor(identity).oid || '').replace(/^user:/, '')
+    const { listOpenOrders } = await import('./commerce/orders.js')
+    return jsonResponse(200, { orders: (await listOpenOrders(ctx.store)).filter(o => o.giftFor !== member) })
   }
   // ─── Event journal + budgets (SPEC §1/§4) ───
   if (pathname === '/v1/journal' && method === 'GET') {

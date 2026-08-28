@@ -422,6 +422,7 @@
     else if(spec.type==='presence'){ wg.style.width='340px'; wg.style.maxHeight='260px'; }
     else if(spec.type==='energy'){ wg.style.width='360px'; wg.style.maxHeight='340px'; }
     else if(spec.type==='tv'){ wg.style.width='380px'; wg.style.maxHeight='420px'; }
+    else if(spec.type==='order'){ wg.style.width='360px'; wg.style.maxHeight='380px'; }
     else if(spec.type==='spotify'){ wg.style.width='380px'; wg.style.maxHeight='520px'; }
     else if(spec.type==='automations'){ wg.style.width='420px'; wg.style.maxHeight='400px'; }
     else if(spec.type==='printer3d'){ wg.style.width='480px'; wg.style.height='560px'; }
@@ -722,6 +723,7 @@
     else if(spec.type==='presence') renderPresence(body, spec);
     else if(spec.type==='energy') renderEnergy(body, spec);
     else if(spec.type==='tv') renderTv(body, spec);
+    else if(spec.type==='order') renderOrder(body, spec);
     else if(spec.type==='spotify') renderSpotify(body, spec, wg);
     else if(spec.type==='automations') renderAutomations(body, spec);
     else if(spec.type==='printer3d') renderPrinter3d(body, spec, wg);
@@ -1023,6 +1025,42 @@
     const refresh=async()=>{ try{ draw(await (await fetch('/v1/spotify/overview',{credentials:'same-origin'})).json()); }catch{ draw(null); } };
     if(spec.now||spec.devices) draw(spec); else refresh();
     if(wg&&!wg._spTimer){ wg._spTimer=setInterval(()=>{ if(!wg.isConnected){ clearInterval(wg._spTimer); return; } refresh(); }, 30000); }
+  }
+
+
+  // ── order status (SPEC §3): items, state timeline, checkout/track ──
+  function renderOrder(body, spec){
+    const wrap=document.createElement('div'); wrap.className='wg-order'; body.appendChild(wrap);
+    const STATES=['placed','in-progress','delivered'];
+    const tl=document.createElement('div'); tl.className='wg-ord-tl';
+    const stName=s=>({'awaiting-payment':'awaiting payment','in-progress':'on the way'}[s]||s);
+    if(spec.state==='awaiting-payment'){
+      tl.innerHTML='<span class="wg-ord-step wait on">awaiting payment</span>';
+    } else if(spec.state==='canceled'||spec.state==='refunded'){
+      tl.innerHTML=`<span class="wg-ord-step off">${esc2(stName(spec.state))}</span>`;
+    } else {
+      const idx=STATES.indexOf(spec.state);
+      tl.innerHTML=STATES.map((st,i)=>`<span class="wg-ord-step${i<=idx?' on':''}">${esc2(stName(st))}</span>`).join('<i class="wg-ord-arrow">→</i>');
+    }
+    wrap.appendChild(tl);
+    const items=document.createElement('div'); items.className='wg-ord-items';
+    (spec.items||[]).forEach(it=>{ const r=document.createElement('div'); r.className='wg-ord-it';
+      r.innerHTML=`<span class="nm">${it.qty>1?it.qty+'× ':''}${esc2(it.name)}</span><span class="pr">$${((it.cents*(it.qty||1))/100).toFixed(2)}</span>`; items.appendChild(r); });
+    wrap.appendChild(items);
+    const tot=document.createElement('div'); tot.className='wg-ord-tot';
+    tot.innerHTML=`<span>Total</span><span>$${((spec.total_cents||0)/100).toFixed(2)}</span>`;
+    wrap.appendChild(tot);
+    if(spec.eta&&spec.state!=='delivered'){ const e=document.createElement('div'); e.className='set-muted small'; e.textContent='ETA '+spec.eta; wrap.appendChild(e); }
+    if(spec.state==='awaiting-payment'&&spec.checkout_url){
+      const row=document.createElement('div'); row.className='set-row';
+      const go=document.createElement('a'); go.className='set-btn'; go.textContent='Open checkout'; go.href=spec.checkout_url; go.target='_blank'; go.rel='noopener';
+      const paid=document.createElement('button'); paid.className='set-btn ghost'; paid.textContent='I paid';
+      paid.onclick=async()=>{ paid.disabled=true; try{
+        await fetch('/v1/orders/'+encodeURIComponent(String(spec.id).replace(/^order-/,''))+'/confirm-paid',{method:'POST',credentials:'same-origin'});
+        toast('Marked as paid — tracking it'); }catch{ toast('Failed'); } };
+      row.append(go,paid); wrap.appendChild(row);
+    }
+    if(spec.tracking){ const t=document.createElement('div'); t.className='set-muted small'; t.textContent='Tracking: '+spec.tracking; wrap.appendChild(t); }
   }
 
   // ── shopping: list + buy options ──

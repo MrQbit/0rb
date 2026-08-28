@@ -265,6 +265,10 @@ async function tick(): Promise<void> {
   }
   // Morning decks assemble ON DEMAND at first use after local sunrise
   // (v0.2 §3) — weather and news fetched fresh, nothing pre-built here.
+  if (pushStore) {
+    const { tickOrders } = await import('../commerce/orders.js')
+    await tickOrders(pushStore).catch(() => { /* best effort */ })
+  }
   await checkArrivals().catch(() => { /* best effort */ })
   await checkDeviceHealth().catch(() => { /* best effort */ })
   if (pushStore) { import('./briefing.js').then(m => m.maybeSendBriefing(pushStore!, notifyOwner)).catch(() => { /* optional */ }) }
