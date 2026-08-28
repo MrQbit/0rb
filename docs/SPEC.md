@@ -255,7 +255,7 @@ events land in journal; autonomy laddering verified (3 approvals → offer).
 
 ### 7. Replenishment engine
 
-**Status: ☐ not started**
+**Status: ✅ shipped (v26.12)** — metered+cadence models, engine tick (auto under earned tier for api services, one cart-ready notify otherwise, no double-order), live-verified: PETG burned to threshold → 'Cart ready at Sim Store — $26.40' → confirm-paid → spend $26.40 in budgets. Printer-driven gram auto-report awaits the X2D
 
 **Consumption models** (`src/api/commerce/replenish.ts`):
 - **Metered:** filament — printer job reports grams (X2D API/HA sensor);
@@ -312,7 +312,7 @@ calendar + ride pairing fire; cancellation propagates.
 
 ### 10. The watch layer (mail parsing, tracking, returns, subscriptions)
 
-**Status: ☐ not started**
+**Status: ✅ shipped (v26.12)** — parser fixture suite (10 formats incl. allowlist rejection), mail-driven handoff close verified, subs registry + spend deck card; live sweep engages when a mail account connects; carrier polling + returns portal remain follow-ups
 
 **Mail ingestion:** hub Gmail/Outlook read (exists) + parser pipeline
 (`src/api/commerce/mailwatch.ts`): order confirmations (total, items,

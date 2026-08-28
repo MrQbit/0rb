@@ -200,13 +200,17 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
       name: 'Order',
       description: "Order things in the real world (SPEC Hands): food delivery, consumables, parts — through connected services. op:'options' {intent, service?} lists what's available (e.g. intent 'thai'). If the user NAMES a service (uber, lyft, doordash, uber eats) pass it as service — don't substitute another. op:'order' {service, items:[{id,qty?}], gift_for?} builds the cart and runs it through the household BUDGET policy: it may auto-place (earned tier), raise an approval card, or refuse with the reason — relay refusals verbatim. Handoff services return a checkout the human must Pay in; NEVER claim those are placed until confirmed. op:'status' shows open orders; op:'cancel' {order_id}; op:'confirm_paid' {order_id} after the human paid a handoff checkout. Present options with time + cost; only order what the user chose.",
       input_schema: { type: 'object', properties: {
-        op: { type: 'string', enum: ['options', 'order', 'status', 'cancel', 'confirm_paid'] },
+        op: { type: 'string', enum: ['options', 'order', 'status', 'cancel', 'confirm_paid', 'track_consumable', 'consume', 'restock', 'consumables'] },
         intent: { type: 'string', description: "What they want ('thai food', 'petg filament')." },
         service: { type: 'string', description: 'Connector id (from options).' },
         items: { type: 'array', description: '[{id, qty?}] chosen from options.' },
         gift_for: { type: 'string', description: "Member email if this is a gift for them (hides it from their surfaces)." },
         destination: { type: 'string', description: 'For rides: where to (name or address) — prefilled in the ride app.' },
         order_id: { type: 'string' },
+        name: { type: 'string', description: 'Consumable name (track_consumable/consume/restock).' },
+        amount: { type: 'number', description: "consume: units used; restock: new remaining (e.g. grams). track_consumable: threshold." },
+        unit: { type: 'string', description: "track_consumable: unit ('g', 'count')." },
+        item_id: { type: 'string', description: 'track_consumable: the store item id (from options).' },
       }, required: ['op'] },
       available: true,
     },
@@ -859,6 +863,33 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
       const { orderWidget: ow } = await import('../commerce/orders.js')
       emitWidget(ctx.sessionId, ow(rec) as any)
       return `Cart is ready at ${c.label} — ${fmt} for ${label}. Open the checkout in the order card and tap Pay; tell me (or tap Paid) when done and I'll track it. I have NOT placed this order.`
+    }
+    if (op === 'track_consumable') {
+      const { upsertConsumable } = await import('../commerce/replenish.js')
+      const svc = resolveService(String(args?.service || '')) || getConnector(String(args?.service || ''))
+      const c = await upsertConsumable(ctx.store, {
+        name: String(args?.name || ''), service: svc?.id || String(args?.service || 'sim-store'), itemId: String(args?.item_id || ''),
+        model: { kind: 'metered', remaining: Number(args?.amount) || 0, unit: String(args?.unit || 'count'), threshold: Math.max(1, Math.round((Number(args?.amount) || 10) * 0.2)) },
+      })
+      return `Tracking ${c.name}: ${(c.model as any).remaining}${(c.model as any).unit} on hand, reorder at ${(c.model as any).threshold}${(c.model as any).unit} from ${c.service}.`
+    }
+    if (op === 'consume') {
+      const { consume } = await import('../commerce/replenish.js')
+      const c = await consume(ctx.store, String(args?.name || ''), Number(args?.amount) || 0)
+      return c ? `Noted — ${c.name} now at ${(c.model as any).remaining}${(c.model as any).unit}.` : 'Not tracking that consumable (op:track_consumable first).'
+    }
+    if (op === 'restock') {
+      const { restock } = await import('../commerce/replenish.js')
+      const c = await restock(ctx.store, String(args?.name || ''), args?.amount != null ? Number(args.amount) : undefined)
+      return c ? `Restocked — ${c.name}.` : 'Not tracking that consumable.'
+    }
+    if (op === 'consumables') {
+      const { listConsumables } = await import('../commerce/replenish.js')
+      const items = await listConsumables(ctx.store)
+      if (!items.length) return 'No consumables tracked yet.'
+      return items.map(c => c.model.kind === 'metered'
+        ? `${c.name}: ${c.model.remaining}${c.model.unit} (reorder ≤ ${c.model.threshold})`
+        : `${c.name}: every ${c.model.intervalDays}d`).join(' · ')
     }
     if (op === 'status') {
       const { listOpenOrders, orderWidget } = await import('../commerce/orders.js')
@@ -1514,7 +1545,7 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
       if (!matches.length) return `No device matching "${query}". Try Home op:list to see names.`
       const target = matches[0]!
 
-      if (op === 'status') {
+    if (op === 'status') {
         const extra = describeAttrs(target)
         emitWidget(ctx.sessionId, {
           id: 'home-device', type: 'stats', title: target.name,

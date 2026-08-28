@@ -33,6 +33,7 @@ export const DECK_TOPICS: Array<{ id: string; label: string; desc: string }> = [
   { id: 'threads', label: 'Open threads', desc: 'notes waiting, timers running' },
   { id: 'chores', label: 'Chores', desc: 'due today, yours first' },
   { id: 'presence', label: "Who's home", desc: 'people in and out' },
+  { id: 'spend', label: 'Spending', desc: 'this week against budgets, renewals seen' },
 ]
 
 // ── per-member topic choice ──────────────────────────────────────────────
@@ -260,6 +261,23 @@ export async function assembleDeck(store: Store, user: string, now = new Date())
         const rest = due.filter((c: any) => !mine.includes(c))
         cards.push({ topic: 'chores', spec: { id: 'deck-chores', type: 'todo', title: 'Chores today',
           items: [...mine, ...rest].slice(0, 8).map((c: any) => ({ content: `${c.title} — ${c.who}`, status: c.doneOn === today ? 'completed' : 'pending' })) } })
+      }
+    } catch { /* optional */ }
+  }
+
+  if (enabled.has('spend')) {
+    try {
+      const { getSpendPolicy, getWeekSpend } = await import('../commerce/policy.js')
+      const week = await getWeekSpend(store)
+      const policy = await getSpendPolicy(store)
+      const { listSubscriptions } = await import('../commerce/mailwatch.js')
+      const subs = (await listSubscriptions(store)).filter(x => Date.now() - x.lastSeen < 35 * 86400_000)
+      if (week.totalCents > 0 || subs.length) {
+        const fmt = (c: number) => `$${(c / 100).toFixed(0)}`
+        const rows = Object.entries(week.byCategory).map(([k, v]) => ({ label: k, value: fmt(v as number), sub: '' }))
+        rows.push({ label: 'week total', value: `${fmt(week.totalCents)} / ${fmt(policy.weeklyCapCents)}`, sub: '' })
+        for (const sub of subs.slice(0, 3)) rows.push({ label: sub.name.slice(0, 16), value: sub.amountCents ? fmt(sub.amountCents) : 'renewed', sub: 'subscription' })
+        cards.push({ topic: 'spend', spec: { id: 'deck-spend', type: 'stats', title: 'Spending', stats: rows.slice(0, 6) } })
       }
     } catch { /* optional */ }
   }
