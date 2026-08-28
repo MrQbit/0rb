@@ -444,7 +444,7 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
       name: 'Home',
       description: "Control and check the home's devices through Home Assistant — lights, switches/plugs, thermostats (climate), locks, window shades/blinds (cover), TVs & speakers (media_player), robot vacuums, fans, and door/window & motion sensors. This is how Orb acts as the house. Use op:'list' to see what's available (optionally a `type`), op:'status' to check a device by name, and op:'control' to change one: action on/off/toggle for lights/plugs/switches; lock/unlock for locks; open/close (or set with `value` 0-100) for shades; set with `value` for a thermostat's target temperature; play/pause/on/off (or set volume with `value` 0-100) for media; start/stop/dock for a vacuum. Always refer to devices by their friendly name (e.g. \"kitchen lights\", \"front door\").",
       input_schema: { type: 'object', properties: {
-        op: { type: 'string', enum: ['list', 'status', 'control', 'media', 'lights', 'climate', 'vacuum', 'covers', 'security', 'plugs', 'scenes', 'sensors', 'camera', 'tv', 'presence', 'automations', 'printer', 'energy', 'mode'], description: "list = overview dashboard; status/control = one device; each FUNCTION op shows a focused widget: media (SPEAKER/receiver remote — when the user names a device pass it as query; TVs automatically get the TV remote instead), tv (dedicated TV remote: power, INPUT/source switching, volume, transport — use for anything TV: 'switch to HDMI 2', 'TV volume'), lights (room-grouped), climate (thermostats), vacuum, covers (shades/blinds), security (locks + door/window/motion sensors), plugs (switches/outlets), scenes, sensors (readings: temperature/humidity/battery), camera (snapshots), presence (who's home/away), automations (list HA automations with on/off + run), printer (3D printer: live camera, progress, temps, pause/stop); energy (power draw now + today, per metered device); mode {mode:'home'|'away'|'vacation'|'guest', secure?:true} sets the HOUSE MODE — away/vacation = instant alerts incl. motion; guest = mute door nagging; secure:true when leaving also locks every lock and turns lights off (say what was done). Use for 'we're leaving', 'back home', 'guests are over'. ALWAYS prefer the function widget matching what the user is focused on — the overview dashboard (list) is for 'show me everything'." },
+        op: { type: 'string', enum: ['list', 'status', 'control', 'media', 'lights', 'climate', 'vacuum', 'covers', 'security', 'plugs', 'scenes', 'sensors', 'camera', 'tv', 'camera_events', 'presence', 'automations', 'printer', 'energy', 'mode'], description: "list = overview dashboard; status/control = one device; each FUNCTION op shows a focused widget: media (SPEAKER/receiver remote — when the user names a device pass it as query; TVs automatically get the TV remote instead), tv (dedicated TV remote: power, INPUT/source switching, volume, transport — use for anything TV: 'switch to HDMI 2', 'TV volume'), lights (room-grouped), climate (thermostats), vacuum, covers (shades/blinds), security (locks + door/window/motion sensors), plugs (switches/outlets), scenes, sensors (readings: temperature/humidity/battery), camera (snapshots), camera_events (past motion/door events with stored frames — pass ask:'what did you see…' to answer about the LATEST matching frame), presence (who's home/away), automations (list HA automations with on/off + run), printer (3D printer: live camera, progress, temps, pause/stop); energy (power draw now + today, per metered device); mode {mode:'home'|'away'|'vacation'|'guest', secure?:true} sets the HOUSE MODE — away/vacation = instant alerts incl. motion; guest = mute door nagging; secure:true when leaving also locks every lock and turns lights off (say what was done). Use for 'we're leaving', 'back home', 'guests are over'. ALWAYS prefer the function widget matching what the user is focused on — the overview dashboard (list) is for 'show me everything'." },
         query: { type: 'string', description: "Device name for status/control (e.g. 'living room lights', 'front door', 'bedroom thermostat')." },
         type: { type: 'string', enum: ['light', 'switch', 'climate', 'lock', 'cover', 'media_player', 'vacuum', 'fan', 'sensor', 'camera'], description: 'Optional device type filter for list.' },
         action: { type: 'string', enum: ['on', 'off', 'toggle', 'lock', 'unlock', 'open', 'close', 'play', 'pause', 'start', 'stop', 'dock', 'set', 'source'], description: 'What to do for op:control. source = switch a TV input (pass the input name in `source`).' },
@@ -1409,6 +1409,31 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
           snapshot: `/v1/home/ha-image?path=${encodeURIComponent(`/api/camera_proxy/${c.entity_id}`)}`,
         } as any)
         return `Showed camera widget${cams.length > 1 ? 's' : ''}: ${cams.slice(0, 4).map(c => c.name).join(', ')}.`
+      }
+      if (op === 'camera_events') {
+        // per-member camera permission
+        try {
+          const { findUser } = await import('../auth/otp.js')
+          const u = await findUser(ctx.store, (ctx.ownerId || '').replace(/^user:/, ''))
+          if (u && u.role !== 'owner' && (u.disabled_apps || []).includes('cameras')) {
+            return 'Cameras are turned off for this profile — the owner can enable them in Settings → Users.'
+          }
+        } catch { /* allow */ }
+        const { listCamEvents, getFrameJpeg } = await import('../camera/events.js')
+        const evs = await listCamEvents(ctx.store)
+        if (!evs.length) return 'No camera events recorded yet.'
+        const ask = String((args as any)?.ask || '').trim()
+        if (ask) {
+          const target = evs[evs.length - 1]!
+          const frame = await getFrameJpeg(ctx.store, target.id)
+          if (!frame) return `Latest event: ${target.cameraName} — ${target.trigger} (${new Date(target.t).toLocaleTimeString()}), but its frame has expired.`
+          const { askAboutImage } = await import('../vision/vision.js')
+          const answer = await askAboutImage(new Uint8Array(frame), ask)
+          emitWidget(ctx.sessionId, { id: `camev-${target.id}`, type: 'image', title: `${target.cameraName} · ${new Date(target.t).toLocaleTimeString()}`, url: `/v1/camera/frame/${target.id}`, caption: target.trigger } as any)
+          return `${target.cameraName} at ${new Date(target.t).toLocaleTimeString()} (${target.trigger}): ${answer}`
+        }
+        const recent = evs.slice(-6)
+        return 'Recent camera events: ' + recent.map(e => `${e.cameraName} — ${e.trigger} at ${new Date(e.t).toLocaleTimeString()}`).join(' · ')
       }
       if (op === 'energy') {
         // Energy intelligence scaffold (v0.2 §11): reads HA power/energy

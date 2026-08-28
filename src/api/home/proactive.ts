@@ -274,6 +274,8 @@ async function tick(): Promise<void> {
     await tickReplenish(pushStore).catch(() => { /* best effort */ })
     const { tickMailwatch } = await import('../commerce/mailwatch.js')
     await tickMailwatch(pushStore).catch(() => { /* best effort */ })
+    const { tickCameraEvents } = await import('../camera/events.js')
+    await tickCameraEvents(pushStore).catch(() => { /* best effort */ })
   }
   await checkArrivals().catch(() => { /* best effort */ })
   await checkDeviceHealth().catch(() => { /* best effort */ })

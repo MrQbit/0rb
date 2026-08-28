@@ -354,7 +354,7 @@ same facts; two members see different timelines.
 
 ### 12. Remote eyes — cameras with memory
 
-**Status: ☐ not started**
+**Status: ✅ shipped (v26.13)** — trigger→keyframe ring (7d, capped), journal events, /v1/camera/{events,frame}, agent camera_events op with vision Q&A over PAST frames (live-verified on the sim camera), per-member cameras toggle, watched watchers. Doorbell image push rides P-1
 
 **Ingestion:** HA camera + doorbell integrations (Ring via HA) → motion/
 person/doorbell events land in journal with a captured keyframe

@@ -7,6 +7,7 @@
 export const APP_GROUPS: Record<string, { label: string; desc: string; tools: string[] }> = {
   shopping: { label: 'Shopping & purchases', desc: 'shopping list, payment methods', tools: ['Shopping', 'Wallet'] },
   commerce: { label: 'Ordering & spending', desc: 'food delivery, rides, buying things', tools: ['Order', 'Ride'] },
+  cameras: { label: 'Cameras', desc: 'live views and past camera events', tools: [] },
   music: { label: 'Music & video', desc: 'Spotify, YouTube, speakers', tools: ['MusicSearch', 'MusicPlay', 'MusicControl', 'YouTubeSearch', 'AirPlay'] },
   home: { label: 'Home control', desc: 'lights, locks, devices, house modes', tools: ['Home', 'HomeAdmin'] },
   web: { label: 'Web & news', desc: 'internet search, headlines', tools: ['WebSearch', 'NewsSearch'] },

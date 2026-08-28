@@ -1929,6 +1929,31 @@ async function dispatch(
     await initConnectors()
     return jsonResponse(200, { services: listConnectors().map(c => ({ id: c.id, label: c.label, category: c.category, mechanism: c.mechanism })) })
   }
+  // ─── Remote eyes (SPEC §12) ───
+  if (pathname.startsWith('/v1/camera/')) {
+    const member = (attributionFor(identity).oid || '').replace(/^user:/, '')
+    // per-member camera access (owners always)
+    try {
+      const { findUser } = await import('./auth/otp.js')
+      const u = await findUser(ctx.store, member)
+      if (u && u.role !== 'owner' && (u.disabled_apps || []).includes('cameras')) {
+        return jsonResponse(403, { error: 'Cameras are turned off for this profile.' })
+      }
+    } catch { /* unknown → allow (household surface) */ }
+    if (pathname === '/v1/camera/events' && method === 'GET') {
+      const { listCamEvents } = await import('./camera/events.js')
+      const u = new URL(req.url)
+      return jsonResponse(200, { events: await listCamEvents(ctx.store, Number(u.searchParams.get('since')) || undefined) })
+    }
+    const fm = pathname.match(/^\/v1\/camera\/frame\/(cam-[A-Za-z0-9-]+)$/)
+    if (fm && method === 'GET') {
+      const { getFrameJpeg, noteView } = await import('./camera/events.js')
+      const buf = await getFrameJpeg(ctx.store, fm[1]!)
+      if (!buf) return jsonResponse(404, { error: 'frame expired' })
+      void noteView(ctx.store, member || 'someone', `the ${fm[1]} camera frame`).catch(() => {})
+      return new Response(new Uint8Array(buf), { status: 200, headers: { 'content-type': 'image/jpeg', 'cache-control': 'private, max-age=300' } })
+    }
+  }
   // ─── Orders (SPEC §3) ───
   {
     const om = pathname.match(/^\/v1\/orders\/(ord-[A-Za-z0-9-]+)\/confirm-paid$/)
