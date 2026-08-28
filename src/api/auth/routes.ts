@@ -96,6 +96,7 @@ export async function handleAuthRoutes(
     const patch: any = {}
     if (typeof b.first_name === 'string') patch.first_name = b.first_name.trim().slice(0, 40)
     if (typeof b.last_name === 'string') patch.last_name = b.last_name.trim().slice(0, 40)
+    if (typeof b.theme === 'string') patch.theme = b.theme.trim().slice(0, 20)
     if (Array.isArray(b.disabled_apps)) {
       if (!owner) return json(403, { error: 'only an owner can change app access' })
       const { APP_GROUPS } = await import('./appGroups.js')
@@ -249,9 +250,10 @@ export async function handleAuthRoutes(
     let token = /^Bearer\s+/i.test(auth) ? auth.replace(/^Bearer\s+/i, '').trim() : ''
     if (!token) token = parseCookies(req.headers.get('cookie'))[SESSION_COOKIE] ?? ''
     const payload = token ? verifySession(token) : null
-    return payload
-      ? json(200, { authenticated: true, username: payload.u })
-      : json(200, { authenticated: false })
+    if (!payload) return json(200, { authenticated: false })
+    let theme: string | undefined
+    try { const { findUser } = await import('./otp.js'); theme = (await findUser(store, payload.u))?.theme } catch { /* optional */ }
+    return json(200, { authenticated: true, username: payload.u, theme })
   }
 
   return null

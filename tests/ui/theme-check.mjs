@@ -1,0 +1,33 @@
+import { chromium } from 'playwright';
+const b = await chromium.launch();
+const page = await (await b.newContext({ viewport: { width: 1200, height: 800 } })).newPage();
+await page.context().addCookies([{ name: 'orb2_session', value: process.env.ORB_SESSION, domain: 'localhost', path: '/' }]);
+await page.goto('http://localhost:9080/', { waitUntil: 'networkidle' });
+await page.waitForTimeout(2500);
+const S = process.env.SHOTS_DIR || '.';
+await page.locator('#gearBtn').click();
+await page.locator('.tm-item[data-act="settings"]').click();
+await page.locator('.set-navi[data-sec="system"]').click();
+await page.waitForTimeout(1500);
+await page.locator('#settingsPanel .set-content').evaluate(el => { el.scrollTop = el.scrollHeight * 0.35; });
+const cards = await page.locator('.theme-card').count();
+console.log('theme cards:', cards);
+const readAccent = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--nv').trim());
+console.log('default accent:', await readAccent());
+await page.locator('.theme-card[data-theme="midnight"]').click();
+await page.waitForTimeout(800);
+console.log('midnight accent:', await readAccent(), '| data-theme:', await page.evaluate(() => document.documentElement.dataset.theme));
+await page.screenshot({ path: S + '/theme-midnight.png' });
+await page.locator('.theme-card[data-theme="paper"]').click();
+await page.waitForTimeout(800);
+console.log('paper accent:', await readAccent());
+await page.screenshot({ path: S + '/theme-paper.png' });
+// persistence: reload keeps it; profile saved
+await page.reload({ waitUntil: 'networkidle' });
+await page.waitForTimeout(2500);
+console.log('after reload:', await readAccent(), '| saved to profile:', await page.evaluate(async () => (await (await fetch('/v1/auth/me', { credentials: 'same-origin' })).json()).theme));
+await page.screenshot({ path: S + '/theme-paper-full.png' });
+// back to default for the user
+await page.evaluate(async () => { localStorage.setItem('orb_theme', 'verdant'); await fetch('/v1/profile', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ theme: 'verdant' }) }); });
+await b.close();
+process.exit(cards === 5 ? 0 : 1);

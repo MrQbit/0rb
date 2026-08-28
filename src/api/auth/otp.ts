@@ -87,6 +87,8 @@ export type AuthUser = {
   last_name?: string
   /** App groups the owner has switched OFF for this member (see appGroups.ts). */
   disabled_apps?: string[]
+  /** Console theme (verdant default). */
+  theme?: string
 }
 
 /** Display name: first name → label → email local part. */
@@ -96,7 +98,7 @@ export function displayName(u: AuthUser): string {
 }
 
 /** Update profile/permission fields on one user. */
-export async function updateUser(store: Store, email: string, patch: Partial<Pick<AuthUser, 'first_name' | 'last_name' | 'label' | 'disabled_apps' | 'person_entity'>>): Promise<AuthUser | null> {
+export async function updateUser(store: Store, email: string, patch: Partial<Pick<AuthUser, 'first_name' | 'last_name' | 'label' | 'disabled_apps' | 'person_entity' | 'theme'>>): Promise<AuthUser | null> {
   const users = await getUsers(store)
   const u = users.find(x => x.email === normalizeEmail(email))
   if (!u) return null

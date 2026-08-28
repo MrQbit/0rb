@@ -1,6 +1,15 @@
 // orb2 sign-in (email / Telegram OTP). External file so the page works
 // under a strict CSP (script-src 'self') — inline scripts are blocked.
 (function () {
+  // Follow the console theme cached on this device.
+  try {
+    var THEME_ACCENTS = { midnight:['#5aa2ff','#05070c','#e6edf7','#0c111c'], ember:['#ff9d3c','#0b0705','#f4ece2','#181008'], aurora:['#c07bff','#080511','#efe8f7','#140d20'], paper:['#2e7d32','#f4f2ec','#22281f','#ffffff'] };
+    var t = localStorage.getItem('orb_theme');
+    var a = t && THEME_ACCENTS[t];
+    if (a) { var r = document.documentElement.style;
+      r.setProperty('--nv', a[0]); r.setProperty('--bg', a[1]); r.setProperty('--text', a[2]); r.setProperty('--panel', a[3]);
+      r.setProperty('--nv-dim', a[0]); }
+  } catch (e) {}
   var emailEl = document.getElementById('email');
   var codeEl = document.getElementById('code');
   var msg = document.getElementById('msg');

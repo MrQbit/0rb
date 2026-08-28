@@ -35,10 +35,34 @@
   // ════════════════════════════════════════════════════════════════════════
   //  ORB — audio-reactive render (NVIDIA green)
   // ════════════════════════════════════════════════════════════════════════
-  const COLORS = {
-    idle:[118,185,0], listening:[118,185,0], connecting:[143,212,0],
-    thinking:[0,200,120], speaking:[143,212,0], error:[239,68,68],
-  };
+  // Orb palette derives from the ACTIVE THEME's tokens — switching themes
+  // recolors the orb itself, not just the chrome.
+  function hexToRgb(h){ h=h.trim(); if(h.startsWith('#')) h=h.slice(1); if(h.length===3) h=h.split('').map(c=>c+c).join('');
+    return [parseInt(h.slice(0,2),16)||118, parseInt(h.slice(2,4),16)||185, parseInt(h.slice(4,6),16)||0]; }
+  const COLORS = { idle:[118,185,0], listening:[118,185,0], connecting:[143,212,0], thinking:[0,200,120], speaking:[143,212,0], error:[239,68,68] };
+  function refreshOrbPalette(){
+    try{
+      const cs=getComputedStyle(document.documentElement);
+      const nv=hexToRgb(cs.getPropertyValue('--nv')||'#76b900');
+      const bright=hexToRgb(cs.getPropertyValue('--nv-bright')||'#8fd400');
+      const teal=hexToRgb(cs.getPropertyValue('--nv-teal')||'#00c878');
+      COLORS.idle=nv; COLORS.listening=nv; COLORS.connecting=bright; COLORS.speaking=bright; COLORS.thinking=teal;
+    }catch{}
+  }
+  const THEMES=['verdant','midnight','ember','aurora','paper'];
+  function applyTheme(name, persist){
+    const t=THEMES.includes(name)?name:'verdant';
+    if(t==='verdant') delete document.documentElement.dataset.theme;
+    else document.documentElement.dataset.theme=t;
+    try{ localStorage.setItem('orb_theme', t); }catch{}
+    refreshOrbPalette();
+    document.querySelectorAll('.theme-card').forEach(c=>c.classList.toggle('on', c.dataset.theme===t));
+    if(persist) fetch('/v1/profile',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({theme:t})}).catch(()=>{});
+  }
+  try{ applyTheme(localStorage.getItem('orb_theme')||'verdant', false); }catch{}
+  // after auth, the profile's saved theme wins over this device's cache
+  setTimeout(async()=>{ try{ const d=await (await fetch('/v1/auth/me',{credentials:'same-origin'})).json();
+    if(d&&d.theme&&d.theme!==(localStorage.getItem('orb_theme')||'verdant')) applyTheme(d.theme,false); }catch{} }, 1500);
   (function renderOrb() {
     const ctx = orbCanvas.getContext('2d');
     const W = orbCanvas.width, H = orbCanvas.height, cx = W/2, cy = H/2;
@@ -349,7 +373,8 @@
   //  TYPED WIDGETS — floating cards (chart / results / video / note)
   // ════════════════════════════════════════════════════════════════════════
   const widgetLayer = $('#widgetLayer');
-  const PALETTE = ['#76b900','#00c878','#8fd400','#4bc0c0','#ffb347','#ff6384','#36a2eb'];
+  const PALETTE = (()=>{ try{ const cs=getComputedStyle(document.documentElement);
+    return [cs.getPropertyValue('--nv').trim()||'#76b900', cs.getPropertyValue('--nv-teal').trim()||'#00c878', cs.getPropertyValue('--nv-bright').trim()||'#8fd400','#4bc0c0','#ffb347','#ff6384','#36a2eb']; }catch{ return ['#76b900','#00c878','#8fd400','#4bc0c0','#ffb347','#ff6384','#36a2eb']; } })();
   let wgCount = 0;
   const widgets = new Map();   // id → widget element (for update-in-place)
   function esc2(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
@@ -2136,7 +2161,7 @@
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'© OpenStreetMap' }).addTo(map);
     const bounds=[];
     mk.forEach(m=>{ const k=L.marker(m.p).addTo(map); if(m.label) k.bindPopup(esc2(m.label)); bounds.push(m.p); });
-    if(route.length>1){ L.polyline(route,{color:'#76b900',weight:5,opacity:.9}).addTo(map); route.forEach(p=>bounds.push(p)); }
+    if(route.length>1){ L.polyline(route,{color:(getComputedStyle(document.documentElement).getPropertyValue('--nv').trim()||'#76b900'),weight:5,opacity:.9}).addTo(map); route.forEach(p=>bounds.push(p)); }
     // The widget is attached before render, so sizes are real — but the card's
     // entrance animation can still settle; sync once now and once next frame.
     try{ map.invalidateSize(); }catch{}
@@ -2600,6 +2625,23 @@
           `<code>${t.rules||0} · ${t.local||0} · ${t.cloud||0}</code>`;
         $('#setSystem').appendChild(row);
       }
+      // Appearance (themes): the whole console reskins from one token set.
+      if($('#setSystem')&&!document.getElementById('themeGrid')){
+        const row=document.createElement('div'); row.className='set-item';
+        row.innerHTML=`<div class="grow"><div class="t">Appearance</div><div class="s">the orb, widgets, and chrome recolor together</div></div>`;
+        $('#setSystem').appendChild(row);
+        const grid=document.createElement('div'); grid.id='themeGrid'; grid.className='theme-grid';
+        const DEF={verdant:['#76b900','#06080a','#e9f1e2'],midnight:['#5aa2ff','#05070c','#e6edf7'],ember:['#ff9d3c','#0b0705','#f4ece2'],aurora:['#c07bff','#080511','#efe8f7'],paper:['#2e7d32','#f4f2ec','#22281f']};
+        Object.entries(DEF).forEach(([name,[a,b,c]])=>{
+          const card=document.createElement('button'); card.className='theme-card'; card.dataset.theme=name;
+          card.innerHTML=`<span class="sw"><i style="background:${a}"></i><i style="background:${b}"></i><i style="background:${c}"></i></span><span class="nm">${name[0].toUpperCase()+name.slice(1)}</span>`;
+          card.onclick=()=>applyTheme(name,true);
+          grid.appendChild(card);
+        });
+        $('#setSystem').appendChild(grid);
+        const cur=localStorage.getItem('orb_theme')||'verdant';
+        grid.querySelectorAll('.theme-card').forEach(x=>x.classList.toggle('on',x.dataset.theme===cur));
+      }
       // Re-run the first-run introduction (v0.2 S3) any time.
       if($('#setSystem')&&!document.getElementById('frRerun')){
         const row=document.createElement('div'); row.className='set-item';
@@ -3050,7 +3092,7 @@
         const role=u.role||(i===0?'owner':'member');
         const dispName=[u.first_name,u.last_name].filter(Boolean).join(' ')||u.label||u.email.split('@')[0];
         const initials=esc((dispName||'?').split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase());
-        it.innerHTML=`<span class="avatar"><img src="/v1/profile/avatar?email=${encodeURIComponent(u.email)}" alt="" onerror="this.remove()"/><i>${initials}</i></span>`+
+        it.innerHTML=`<span class="avatar"><img src="/v1/profile/avatar?email=${encodeURIComponent(u.email)}" alt=""/><i>${initials}</i></span>`+
           `<div class="grow"><div class="t">${esc(dispName)} <span class="role-badge${role==='owner'?' owner':''}">${esc(role)}</span></div>`+
           `<div class="s">${esc(u.email)}${u.telegram_chat_id?' · Telegram':''}${u.person_entity?' · presence: '+esc(u.person_entity):''}</div></div>`;
         const rl=document.createElement('button'); rl.className='set-btn ghost'; rl.textContent=role==='owner'?'Make member':'Make owner';
@@ -3141,6 +3183,7 @@
             }
           }catch{ panel.innerHTML='<div class="set-muted small">Could not load.</div>'; }
         };
+        const av=it.querySelector('.avatar img'); if(av) av.onerror=()=>av.remove();
         it.appendChild(info); it.appendChild(rl); it.appendChild(del); list.appendChild(it); list.appendChild(panel);
       });
     }catch{ list.innerHTML='<div class="set-muted">Failed to load.</div>'; }
