@@ -84,6 +84,21 @@ async function match(store: Store, user: string, t: string): Promise<string | nu
     return `${cap(target.label)} timer cancelled.`
   }
 
+  // ── 
+  // "catch me up" / "what happened while I was gone" → spoken digest (§11)
+  if (/^(catch me up|what(’|')?s? happened|what did i miss|anything happen)/.test(t)) {
+    try {
+      const { listEvents, digest } = await import('../events/journal.js')
+      const seenKey = `journal:seen:${user.replace(/^user:/, '')}`
+      const lastSeen = Number(await store.getKv(seenKey).catch(() => null)) || (Date.now() - 8 * 3600_000)
+      const events = await listEvents(store, { since: lastSeen, member: user.replace(/^user:/, '') })
+      await store.putKv(seenKey, String(Date.now()), 0).catch(() => {})
+      const d = digest(events)
+      const top = events.slice(-3).map(e => e.summary).join('. ')
+      return d.line + (top ? ' ' + top + '.' : '')
+    } catch { /* fall through to the model */ }
+  }
+
   // ── house mode (non-secure only; secure is confirm-class → the agent) ──
   m = t.match(/^set (?:the )?house (?:mode )?to (home|away|vacation|guests?)$/)
     || t.match(/^(?:i'?m|we'?re) (leaving|heading out|home|back)$/)

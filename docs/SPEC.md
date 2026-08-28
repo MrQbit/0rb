@@ -338,7 +338,7 @@ senders untouched).
 
 ### 11. The away timeline — "what happened while I was gone?"
 
-**Status: ☐ not started**
+**Status: ✅ shipped (v26.10)** — /v1/journal(+catchup w/ last-seen), console arrival card, voice fast-path digest, agent chat digest; app timeline server-ready (client blocked on P-1)
 
 **Source:** event journal (§4) filtered per member + attention ≥ glance,
 grouped (deliveries, house, people, spending) with a generated 2-line

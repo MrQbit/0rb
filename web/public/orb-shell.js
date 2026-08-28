@@ -564,6 +564,15 @@
     document.body.appendChild(card);
     sayLine(v.narration||'');
   }
+  // ── while-you-were-out (SPEC §11): one quiet card after a real absence ──
+  setTimeout(async()=>{
+    try{
+      const d=await (await fetch('/v1/journal/catchup',{credentials:'same-origin'})).json();
+      if(!d.show) return;
+      spawnWidget({ id:'catchup', type:'note', title:'While you were out',
+        text: d.line + '\n\n' + (d.events||[]).map(e=>'• '+e.summary).join('\n'), attention:'glance' });
+    }catch{}
+  }, 3000);
   setTimeout(firstRunTick, 1600);
   try { window.__orbFirstRunTick = firstRunTick; } catch { /* strict contexts */ }
 

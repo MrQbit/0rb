@@ -1959,6 +1959,19 @@ async function dispatch(
     })
     return jsonResponse(200, { events, digest: digest(events).line })
   }
+  if (pathname === '/v1/journal/catchup' && method === 'GET') {
+    const member = (attributionFor(identity).oid || '').replace(/^user:/, '')
+    const { listEvents, digest } = await import('./events/journal.js')
+    const seenKey = `journal:seen:${member}`
+    const lastSeen = Number(await ctx.store.getKv(seenKey).catch(() => null)) || 0
+    const gapMin = (Date.now() - lastSeen) / 60000
+    const events = lastSeen ? await listEvents(ctx.store, { since: lastSeen, member }) : []
+    await ctx.store.putKv(seenKey, String(Date.now()), 0).catch(() => {})
+    const d = digest(events)
+    // show only after a real absence with something to say
+    return jsonResponse(200, { show: gapMin > 30 && events.length > 0, line: d.line, gapMin: Math.round(gapMin),
+      events: events.slice(-12).map(e => ({ t: e.t, kind: e.kind, summary: e.summary })) })
+  }
   if (pathname === '/v1/budgets' && method === 'GET') {
     const { getSpendPolicy, getWeekSpend, getEarned, SPEND_CATEGORIES } = await import('./commerce/policy.js')
     const policy = await getSpendPolicy(ctx.store)
