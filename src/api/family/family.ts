@@ -37,6 +37,8 @@ export interface FamilyEvent {
   who?: string
   /** 'yearly' = birthdays/anniversaries — rolls to the next occurrence */
   repeat?: 'yearly'
+  /** Optional place — powers the leave-by engine (SPEC §6). */
+  where?: string
 }
 
 function rid(prefix: string): string {
@@ -191,7 +193,7 @@ export async function listEvents(store: Store): Promise<FamilyEvent[]> {
     return materialized.filter(e => e.date >= cutoff).sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''))
   } catch { return [] }
 }
-export async function addEvent(store: Store, ev: { title: string; date: string; time?: string; who?: string; repeat?: 'yearly' }): Promise<FamilyEvent | { error: string }> {
+export async function addEvent(store: Store, ev: { title: string; date: string; time?: string; who?: string; repeat?: 'yearly'; where?: string }): Promise<FamilyEvent | { error: string }> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(ev.date)) return { error: 'date must be YYYY-MM-DD' }
   if (ev.time && !/^\d{1,2}:\d{2}$/.test(ev.time)) return { error: 'time must be HH:MM' }
   let events: FamilyEvent[] = []

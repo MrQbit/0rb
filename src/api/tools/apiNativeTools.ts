@@ -198,13 +198,14 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
     },
     {
       name: 'Order',
-      description: "Order things in the real world (SPEC Hands): food delivery, consumables, parts — through connected services. op:'options' {intent, service?} lists what's available (e.g. intent 'thai'). op:'order' {service, items:[{id,qty?}], gift_for?} builds the cart and runs it through the household BUDGET policy: it may auto-place (earned tier), raise an approval card, or refuse with the reason — relay refusals verbatim. Handoff services return a checkout the human must Pay in; NEVER claim those are placed until confirmed. op:'status' shows open orders; op:'cancel' {order_id}; op:'confirm_paid' {order_id} after the human paid a handoff checkout. Present options with time + cost; only order what the user chose.",
+      description: "Order things in the real world (SPEC Hands): food delivery, consumables, parts — through connected services. op:'options' {intent, service?} lists what's available (e.g. intent 'thai'). If the user NAMES a service (uber, lyft, doordash, uber eats) pass it as service — don't substitute another. op:'order' {service, items:[{id,qty?}], gift_for?} builds the cart and runs it through the household BUDGET policy: it may auto-place (earned tier), raise an approval card, or refuse with the reason — relay refusals verbatim. Handoff services return a checkout the human must Pay in; NEVER claim those are placed until confirmed. op:'status' shows open orders; op:'cancel' {order_id}; op:'confirm_paid' {order_id} after the human paid a handoff checkout. Present options with time + cost; only order what the user chose.",
       input_schema: { type: 'object', properties: {
         op: { type: 'string', enum: ['options', 'order', 'status', 'cancel', 'confirm_paid'] },
         intent: { type: 'string', description: "What they want ('thai food', 'petg filament')." },
         service: { type: 'string', description: 'Connector id (from options).' },
         items: { type: 'array', description: '[{id, qty?}] chosen from options.' },
         gift_for: { type: 'string', description: "Member email if this is a gift for them (hides it from their surfaces)." },
+        destination: { type: 'string', description: 'For rides: where to (name or address) — prefilled in the ride app.' },
         order_id: { type: 'string' },
       }, required: ['op'] },
       available: true,
@@ -530,7 +531,7 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
         text: { type: 'string', description: 'Note text.' },
         when: { type: 'string', enum: ['next', 'home'], description: "note delivery: next chat (default) or arrives-home." },
         label: { type: 'string' }, minutes: { type: 'number' }, at: { type: 'string' },
-        title: { type: 'string' }, date: { type: 'string' }, time: { type: 'string' }, who: { type: 'string' },
+        title: { type: 'string' }, date: { type: 'string' }, time: { type: 'string' }, where: { type: 'string', description: 'Optional place/address for the event — enables leave-by departure nudges.' }, who: { type: 'string' },
         message: { type: 'string', description: 'What to announce aloud.' },
         query: { type: 'string' },
         key: { type: 'string', description: "Preference name for op:'pref'." },
@@ -823,14 +824,19 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
       if (!c) return `Unknown service "${args?.service}". Connected: ${listConnectors().map(x => `${x.label} [${x.id}]`).join(', ') || 'none'}. Use op:'options' first.`
       const items = Array.isArray(args?.items) ? args.items : []
       if (!items.length) return 'Pick items first (op:options → pass their ids).'
-      const cart = await c.buildCart(ctx.store, member, items)
+      const enriched = args?.destination ? items.map((i: any, ix: number) => ix === 0 ? { ...i, dname: String(args.destination) } : i) : items
+      const cart = await c.buildCart(ctx.store, member, enriched)
       if (!cart.items.length) return 'None of those item ids exist on that service.'
       const giftFor = String(args?.gift_for || '') || undefined
       const category = giftFor ? 'gifts' as const : cart.category
       const { authorizeSpend, recordSpend, recordSpendDenied } = await import('../commerce/policy.js')
       const label = cart.items.map(i => i.name).join(', ')
       const fmt = `$${(cart.totalCents / 100).toFixed(2)}`
-      const decision = await authorizeSpend(ctx.store, { member, category, amountCents: cart.totalCents, service: c.id, summary: label })
+      // A zero-amount handoff commits no money — the merchant checkout is
+      // the approval; budgets engage when a real total is known.
+      const decision = cart.totalCents === 0 && c.mechanism === 'handoff'
+        ? { decision: 'auto' as const, note: 'no committed amount — pay at the merchant' }
+        : await authorizeSpend(ctx.store, { member, category, amountCents: cart.totalCents, service: c.id, summary: label })
       if (decision.decision === 'refused') return `I can't place that: ${decision.reason}`
       if (decision.decision === 'ask') {
         const { requestApproval } = await import('../policy/policy.js')
@@ -2020,7 +2026,7 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
         return `Set — I'll remind ${rec.label || rec.email.split('@')[0]} ${Math.round((at - Date.now()) / 60_000)} min from now${rec.telegram_chat_id ? ' on their Telegram' : " (no Telegram linked — it'll reach the house channels)"}.`
       }
       if (op === 'calendar_add') {
-        const r = await fam.addEvent(ctx.store, { title: String(args?.title || ''), date: String(args?.date || ''), time: args?.time ? String(args.time) : undefined, who: args?.who ? String(args.who) : undefined, repeat: (args as any)?.repeat === 'yearly' ? 'yearly' : undefined })
+        const r = await fam.addEvent(ctx.store, { where: (args as any)?.where, title: String(args?.title || ''), date: String(args?.date || ''), time: args?.time ? String(args.time) : undefined, who: args?.who ? String(args.who) : undefined, repeat: (args as any)?.repeat === 'yearly' ? 'yearly' : undefined })
         if ('error' in r) return `[Family] ${r.error}`
         const events = await fam.listEvents(ctx.store)
         emitWidget(ctx.sessionId, { id: 'familycal', type: 'calendar', title: 'Family calendar',

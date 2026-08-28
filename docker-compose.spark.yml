@@ -371,6 +371,9 @@ services:
       ORB2_BRIDGE_URL: "${ORB2_BRIDGE_URL:-http://host.docker.internal:8997}"
       ORB2_BRIDGE_TOKEN: "${ORB2_BRIDGE_TOKEN:-}"
       # Sim-commerce harness (SPEC Part V) — deterministic stores/couriers
+      # House wall-clock: local-time features (routines, leave-by, quiet
+      # hours, deck fallback) must tick in the household's timezone.
+      TZ: "${TZ:-America/Chicago}"
       ORB2_SIM_COMMERCE: "${ORB2_SIM_COMMERCE:-1}"
       ORB2_SIM_SPEED_MS: "${ORB2_SIM_SPEED_MS:-2000}"
       # Semantic memory (embeddings)

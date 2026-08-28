@@ -225,7 +225,7 @@ paginates.
 
 ### 5. Food: order-in
 
-**Status: ☐ not started**
+**Status: ✅ shipped (v26.11)** — sim api flow E2E; Uber Eats/DoorDash search-handoff connectors (menus can't be enumerated without partner APIs — honest intents + estimate carts)
 
 **Flow:** "orb, lunch" → options calculus: leftovers (kitchen memory ⏳
 inventory-lite: leftovers logged by cooking sessions + expiry heuristic),
@@ -239,7 +239,7 @@ resolves correctly per member; courier chime fires once; receipt correct.
 
 ### 6. Rides + the leave-by engine
 
-**Status: ☐ not started**
+**Status: ✅ shipped (v26.11)** — Uber/Lyft deep-link handoff (fare in app, $0 carts skip spend approval), leave-by engine live-verified (geocode + road-factor estimate + buffer, one nudge, TZ-correct); Uber API upgrade awaits developer approval (P-2)
 
 **Leave-by:** calendar event with location + travel-time source (OSRM
 self-hosted against OSM for privacy; Google Routes optional key) + prep
