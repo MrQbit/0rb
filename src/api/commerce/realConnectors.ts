@@ -54,8 +54,24 @@ function rideHandoff(id: string, label: string, url: (o: { dlat?: number; dlng?:
   }
 }
 
+/** Zero-amount handoff for bookings — the confirmation is the merchant's. */
+function bookingHandoff(id: string, label: string, category: 'other' | 'food', url: (query: string) => string): ServiceConnector {
+  return {
+    id, label, category, mechanism: 'handoff', link: 'none',
+    async options(_s, _m, intent) { return [{ id: `book:${intent.trim() || 'nearby'}`, name: `${label}: ${intent.trim() || 'search'}`, qty: 1, cents: 0 }] },
+    async buildCart(_s, _m, items) {
+      const first = items[0]?.id || 'book:nearby'
+      const query = first.replace(/^book:/, '')
+      return { service: id, category, items: [{ id: first, name: `${label}: ${query}`, qty: 1, cents: 0 }], subtotalCents: 0, feesCents: 0, totalCents: 0, note: 'booked/paid at the venue' }
+    },
+    checkoutUrl(cart) { return url(cart.items[0]!.id.replace(/^book:/, '')) },
+  }
+}
+
 export function realConnectors(): ServiceConnector[] {
   return [
+    bookingHandoff('opentable', 'OpenTable', 'other', query => `https://www.opentable.com/s?term=${encodeURIComponent(query)}`),
+    bookingHandoff('flowers', '1-800-Flowers', 'other', query => `https://www.1800flowers.com/searchterm?q=${encodeURIComponent(query || 'bouquet')}`),
     foodHandoff('ubereats', 'Uber Eats', query => `https://www.ubereats.com/search?q=${q(query)}`),
     foodHandoff('doordash', 'DoorDash', query => `https://www.doordash.com/search/store/${q(query)}`),
     rideHandoff('uber', 'Uber', o => `https://m.uber.com/ul/?action=setPickup&pickup=my_location${o.dname ? `&dropoff%5Bnickname%5D=${q(o.dname)}` : ''}${o.dlat != null ? `&dropoff%5Blatitude%5D=${o.dlat}&dropoff%5Blongitude%5D=${o.dlng}` : ''}`),

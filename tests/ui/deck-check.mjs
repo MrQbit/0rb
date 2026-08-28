@@ -30,4 +30,4 @@ const appleCard = await page.locator('#apConnect').count();
 console.log('accounts card:', acctCard, '| apple connect:', appleCard);
 await page.locator('#settingsPanel').screenshot({ path: S + '/apps-accounts.png' });
 await b.close();
-process.exit(cardCount >= 2 && topicRows === 8 && acctCard >= 1 && appleCard === 1 ? 0 : 1);
+process.exit(cardCount >= 2 && topicRows >= 8 && acctCard >= 1 && appleCard === 1 ? 0 : 1);

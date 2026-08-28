@@ -280,7 +280,7 @@ bootstraps an item live.
 
 ### 8. Gifts & occasions
 
-**Status: ☐ not started**
+**Status: ✅ shipped (v26.14)** — occasions engine (T-10 nudge with spoiler guard, live-verified), deck topic, gift orders ride gifts-tier + spoiler guard (§3 tests), idea-mining via people/<name>.md dream convention, flowers fallback connector
 
 **Occasions registry:** birthdays/anniversaries from family calendar +
 per-person files (`people/<name>.md` — non-member people the household
@@ -302,7 +302,7 @@ books via handoff.
 
 ### 9. Reservations & bookings
 
-**Status: ☐ not started**
+**Status: ✅ shipped (v26.14)** — OpenTable/flowers zero-amount booking handoffs, calendar+leave-by pairing via tool guidance; affiliate API upgrade later
 
 OpenTable/Resy handoff (affiliate API where granted). Flow: intent →
 availability scrape/deep-link → always-ask → booked confirmation via §10
@@ -376,7 +376,7 @@ access toggle blocks a member; view-audit entries appear.
 
 ### 13. Companion app v2 (iOS + Android parity)
 
-**Status: ☐ not started**
+**Status: ◐ server-ready** — every endpoint the app needs is live (journal/catchup, camera events+frames, orders, ride handoff links, approvals API); client legs blocked on P-1 (GitHub billing → CI builds + FCM config), then sideload
 
 - **Push-first actions:** approval cards as actionable notifications
   (approve/deny from lock screen — FCM/APNs category actions → /v1/approvals);
@@ -399,7 +399,7 @@ location (sandbox); pre-arrival routine fires from "heading back".
 
 ### 14. Remote voice polish
 
-**Status: ☐ not started**
+**Status: ✅ shipped (v26.14)** — fast-path coverage for the away verbs: 'catch me up' digest + 'house check' instant status; latency measurement on LTE awaits a remote device
 
 Push-to-talk from the app over the remote URL (exists via voice WS);
 target < 1.5s to first audio on LTE: pre-warmed WS on app foreground,

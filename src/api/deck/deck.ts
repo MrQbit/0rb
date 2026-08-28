@@ -34,6 +34,7 @@ export const DECK_TOPICS: Array<{ id: string; label: string; desc: string }> = [
   { id: 'chores', label: 'Chores', desc: 'due today, yours first' },
   { id: 'presence', label: "Who's home", desc: 'people in and out' },
   { id: 'spend', label: 'Spending', desc: 'this week against budgets, renewals seen' },
+  { id: 'occasions', label: 'Occasions', desc: 'birthdays & anniversaries coming up' },
 ]
 
 // ── per-member topic choice ──────────────────────────────────────────────
@@ -262,6 +263,15 @@ export async function assembleDeck(store: Store, user: string, now = new Date())
         cards.push({ topic: 'chores', spec: { id: 'deck-chores', type: 'todo', title: 'Chores today',
           items: [...mine, ...rest].slice(0, 8).map((c: any) => ({ content: `${c.title} — ${c.who}`, status: c.doneOn === today ? 'completed' : 'pending' })) } })
       }
+    } catch { /* optional */ }
+  }
+
+  if (enabled.has('occasions')) {
+    try {
+      const { upcomingOccasions } = await import('../commerce/occasions.js')
+      const ups = (await upcomingOccasions(store)).filter(o => (o.who || '').toLowerCase() !== user.toLowerCase())
+      if (ups.length) cards.push({ topic: 'occasions', spec: { id: 'deck-occ', type: 'note', title: 'Coming up',
+        text: ups.map(o => `${o.title} — ${o.daysOut === 0 ? 'today' : o.daysOut + 'd'} (${o.date})`).join('\n') } })
     } catch { /* optional */ }
   }
 

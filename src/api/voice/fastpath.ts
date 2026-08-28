@@ -99,6 +99,25 @@ async function match(store: Store, user: string, t: string): Promise<string | nu
     } catch { /* fall through to the model */ }
   }
 
+  // ── house check: "is the house okay/locked?" → instant status ──
+  if (/^(is the house (ok(ay)?|locked|secure)|house check|is everything (ok(ay)?|locked|closed))\??$/.test(t)) {
+    try {
+      const { haEnabled, haStates } = await import('../connectors/homeAssistant.js')
+      if (haEnabled()) {
+        const [locks, bins] = [await haStates(['lock']), await haStates(['binary_sensor'])]
+        const unlocked = locks.filter(l => l.state === 'unlocked').map(l => l.name)
+        const open = bins.filter(b => ['door', 'window', 'garage_door', 'opening'].includes(String(b.attributes?.device_class)) && b.state === 'on').map(b => b.name)
+        const { getMode } = await import('../home/mode.js')
+        const mode = await getMode(store)
+        if (!unlocked.length && !open.length) return `All good — house is ${mode}, everything locked and closed.`
+        const bits = []
+        if (unlocked.length) bits.push(`unlocked: ${unlocked.join(', ')}`)
+        if (open.length) bits.push(`open: ${open.join(', ')}`)
+        return `House is ${mode} — ${bits.join('; ')}.`
+      }
+    } catch { /* model fallback */ }
+  }
+
   // ── house mode (non-secure only; secure is confirm-class → the agent) ──
   m = t.match(/^set (?:the )?house (?:mode )?to (home|away|vacation|guests?)$/)
     || t.match(/^(?:i'?m|we'?re) (leaving|heading out|home|back)$/)
