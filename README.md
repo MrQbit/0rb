@@ -320,7 +320,8 @@ services/                  tts stt embed blender av-webrtc whatsapp searxng brid
 src/api/                   the agent API (auth, policy, voice, family, deck, routines, accounts, home, widgets, connectors)
 web/public/                the orb console (index.html, orb.css, orb-shell.js)
 tests/ui/                  Playwright suites — smoke, 49-widget gallery, live user-flow checks
-docs/                      v2 spec, setup & integrations, widget-plugin contract
+docs/                      SPEC.md (THE living spec), setup & integrations, widget-plugin contract
+playbook.md                the north-star narrative the spec builds toward
 iOS/                       native app source
 ```
 
