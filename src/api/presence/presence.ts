@@ -41,6 +41,12 @@ export async function reportPresence(store: Store, email: string, home: boolean,
     const { handleArrivalForUser } = await import('../home/proactive.js')
     handleArrivalForUser(store, email, name).catch(() => { /* best effort */ })
   }
+  if (changed) {
+    void import('../events/journal.js').then(({ logEvent }) => logEvent(store, {
+      kind: home ? 'arrival' : 'departure', member: email,
+      summary: `${email.split('@')[0]} ${home ? 'arrived home' : 'left'}`, attention: 'glance',
+    })).catch(() => {})
+  }
   return { changed, arrived }
 }
 

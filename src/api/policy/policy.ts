@@ -120,6 +120,11 @@ export async function recordReceipt(store: Store, r: Omit<Receipt, 'id' | 'ts'>)
   list.push(receipt)
   while (list.length > RING_MAX) list.shift()
   await store.putKv(RING_KEY, JSON.stringify(list), 0)
+  // Event journal (SPEC §4): receipts are journal events too.
+  void import('../events/journal.js').then(({ logEvent }) => logEvent(store, {
+    kind: 'receipt', member: (r.user || '').replace(/^user:/, ''), summary: r.summary,
+    ref: receipt.id, attention: 'glance',
+  })).catch(() => { /* journal is best-effort */ })
   return receipt
 }
 

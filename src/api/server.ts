@@ -1923,6 +1923,46 @@ async function dispatch(
       } catch (e) { return jsonResponse(502, { error: (e as Error).message }) }
     }
   }
+  // ─── Event journal + budgets (SPEC §1/§4) ───
+  if (pathname === '/v1/journal' && method === 'GET') {
+    const member = (attributionFor(identity).oid || '').replace(/^user:/, '')
+    const u = new URL(req.url)
+    const { listEvents, digest } = await import('./events/journal.js')
+    const events = await listEvents(ctx.store, {
+      since: Number(u.searchParams.get('since')) || undefined,
+      member, max: Number(u.searchParams.get('max')) || 200,
+    })
+    return jsonResponse(200, { events, digest: digest(events).line })
+  }
+  if (pathname === '/v1/budgets' && method === 'GET') {
+    const { getSpendPolicy, getWeekSpend, getEarned, SPEND_CATEGORIES } = await import('./commerce/policy.js')
+    const policy = await getSpendPolicy(ctx.store)
+    const week = await getWeekSpend(ctx.store)
+    const earned: Record<string, any> = {}
+    for (const c of SPEND_CATEGORIES) earned[c] = await getEarned(ctx.store, c)
+    return jsonResponse(200, { policy, week, earned })
+  }
+  if (pathname === '/v1/budgets' && method === 'POST') {
+    const user = (attributionFor(identity).oid || '').replace(/^user:/, '')
+    const { isOwner } = await import('./auth/otp.js')
+    if (!user || !(await isOwner(ctx.store, user))) return jsonResponse(403, { error: 'owner only' })
+    const b = await req.json().catch(() => ({})) as any
+    const { setSpendPolicy, setAutoTier } = await import('./commerce/policy.js')
+    if (b.autoTier) { await setAutoTier(ctx.store, b.autoTier.category, !!b.autoTier.auto); return jsonResponse(200, { ok: true }) }
+    return jsonResponse(200, { policy: await setSpendPolicy(ctx.store, b) })
+  }
+  if (pathname === '/v1/notifs' && method === 'GET') {
+    const member = (attributionFor(identity).oid || '').replace(/^user:/, '')
+    const { getNotifPrefs } = await import('./events/journal.js')
+    return jsonResponse(200, { prefs: await getNotifPrefs(ctx.store, member) })
+  }
+  if (pathname === '/v1/notifs' && method === 'POST') {
+    const member = (attributionFor(identity).oid || '').replace(/^user:/, '')
+    const b = await req.json().catch(() => ({})) as any
+    const { setNotifPrefs } = await import('./events/journal.js')
+    await setNotifPrefs(ctx.store, member, b)
+    return jsonResponse(200, { ok: true })
+  }
   // ─── Apple account (CalDAV via app-specific password) ───
   if (pathname.startsWith('/v1/apple/')) {
     const member = (attributionFor(identity).oid || 'owner').replace(/^user:/, '')

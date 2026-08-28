@@ -21,6 +21,9 @@ export async function getMode(store: Store): Promise<HouseMode> {
 }
 
 export async function setMode(store: Store, mode: HouseMode): Promise<void> {
+  void import('../events/journal.js').then(({ logEvent }) => logEvent(store, {
+    kind: 'mode', summary: `House mode → ${mode}`, attention: 'glance',
+  })).catch(() => {})
   await store.putKv(KEY, mode, 0)
 }
 

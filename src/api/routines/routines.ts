@@ -119,6 +119,9 @@ export async function tickRoutines(store: Store, now = new Date()): Promise<void
       summary: `Routine ran: “${due.instruction.slice(0, 60)}”`,
     })
     log.info('routine_ran', { id: due.id, owner: due.owner })
+    void import('../events/journal.js').then(({ logEvent }) => logEvent(store, {
+      kind: 'routine', member: due.owner, summary: `Routine ran: ${due.instruction.slice(0, 60)}`, attention: 'ambient',
+    })).catch(() => {})
   } catch (e) {
     due.failures += 1
     due.lastResult = `failed: ${(e as Error).message.slice(0, 200)}`

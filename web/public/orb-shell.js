@@ -2994,6 +2994,7 @@
     }catch{ el.innerHTML='<div class="set-muted">Audit unavailable (owner only).</div>'; }
   }
   async function loadUsers(){
+    loadBudgets().catch(()=>{});
     const list=$('#setUsersList');
     try{ const d=await (await fetch('/v1/auth/users',{credentials:'same-origin'})).json(); const us=d.users||[];
       if(!us.length){ list.innerHTML='<div class="set-muted">No users yet.</div>'; return; }
@@ -3108,6 +3109,42 @@
       msg.appendChild(cp);
     }catch{ msg.textContent='Failed.'; }
   }
+  // ── Budgets (SPEC §1): owner-editable spend policy ──
+  async function loadBudgets(){
+    const box=$('#setBudgets'); if(!box) return;
+    let d=null; try{ d=await (await fetch('/v1/budgets',{credentials:'same-origin'})).json(); }catch{ box.innerHTML='<div class="set-muted small">Unavailable.</div>'; return; }
+    const fmt=c=>'$'+(c/100).toFixed(0);
+    box.replaceChildren();
+    const meter=document.createElement('div'); meter.className='set-row';
+    meter.innerHTML=`<div class="grow"><div class="t">This week</div><div class="s set-muted small">${fmt(d.week.totalCents||0)} of ${fmt(d.policy.weeklyCapCents)} weekly cap</div></div>`;
+    box.appendChild(meter);
+    const CATS={food:'Food & delivery',rides:'Rides',consumables:'Consumables & parts',gifts:'Gifts',other:'Everything else'};
+    Object.entries(CATS).forEach(([id,label])=>{
+      const c=d.policy.categories[id]||{}; const spent=(d.week.byCategory||{})[id]||0; const earned=(d.earned||{})[id]||{};
+      const row=document.createElement('div'); row.className='set-row';
+      const tierTxt = id==='gifts' ? 'always asks' : (earned.auto ? 'auto under '+fmt(c.askUnder) : 'asks first'+(earned.count?` · ${earned.count}/3 toward auto`:''));
+      row.innerHTML=`<div class="grow"><div class="t" style="font-size:13px;">${label}</div><div class="s set-muted small">${tierTxt} · never over <input data-cat="${id}" class="bud-in" type="number" value="${Math.round(c.neverOver/100)}" style="width:60px;background:rgba(0,0,0,.3);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:2px 6px;"> · ${fmt(spent)} this week</div></div>`;
+      if(id!=='gifts'){
+        const sw=document.createElement('button'); sw.className='set-switch'+(earned.auto?' on':''); sw.title='Auto under the ask threshold'; sw.innerHTML='<span class="knob"></span>';
+        sw.onclick=async()=>{ const r=await fetch('/v1/budgets',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({autoTier:{category:id,auto:!earned.auto}})});
+          if(r.ok) loadBudgets(); else toast('Owner only'); };
+        row.appendChild(sw);
+      }
+      box.appendChild(row);
+    });
+    box.querySelectorAll('.bud-in').forEach(inp=>{ inp.onchange=async()=>{
+      const cat=inp.dataset.cat; const cents=Math.max(0,Math.round(Number(inp.value)*100));
+      const patch={categories:{}}; patch.categories[cat]={...d.policy.categories[cat],neverOver:cents};
+      const r=await fetch('/v1/budgets',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify(patch)});
+      if(r.ok){ toast('Budget saved'); } else toast('Owner only'); }; });
+    const cap=document.createElement('div'); cap.className='set-row';
+    cap.innerHTML=`<div class="grow"><div class="s set-muted small">Weekly hard cap: $<input id="budCap" type="number" value="${Math.round(d.policy.weeklyCapCents/100)}" style="width:70px;background:rgba(0,0,0,.3);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:2px 6px;"> — the orb stops and says so.</div></div>`;
+    box.appendChild(cap);
+    const ci=box.querySelector('#budCap'); ci.onchange=async()=>{
+      const r=await fetch('/v1/budgets',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({weeklyCapCents:Math.max(0,Math.round(Number(ci.value)*100))})});
+      if(r.ok) toast('Cap saved'); else toast('Owner only'); };
+  }
+
   async function addUser(){
     const email=$('#setUserEmail').value.trim(), tg=$('#setUserTg').value.trim(), label=$('#setUserLabel').value.trim(), msg=$('#setUserMsg');
     if(!email){ msg.textContent='Email required.'; return; } msg.textContent='Saving…';

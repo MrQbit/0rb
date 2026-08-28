@@ -66,7 +66,7 @@ consumption tracking, no notification router beyond notifyOwner.
 
 ### 1. Budget & spend policy engine (trust layer, extended to money)
 
-**Status: ☐ not started**
+**Status: ✅ shipped (v26.8)** — authorizeSpend choke point, tiers/caps/earned ladder unit-tested, Budgets UI live
 
 **Why:** money must enter the SAME gradient as door locks, or nothing else
 in this spec is safe to ship.
@@ -192,7 +192,7 @@ order widget in gallery; open orders survive api restart.
 
 ### 4. Event journal & notification router v2
 
-**Status: ☐ not started**
+**Status: ✅ shipped (v26.8)** — journal ring + writers (receipts/mode/presence/routines), /v1/journal, prefs; push leg degrades to digest until P-1
 
 **Why:** both the away-timeline (§11) and sane notifications need one
 stream of "what happened", routed by attention and presence.
