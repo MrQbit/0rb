@@ -1132,6 +1132,12 @@
     const ctl=document.createElement('div'); ctl.className='set-row';
     const rf=document.createElement('button'); rf.className='set-btn ghost'; rf.textContent='Refresh'; rf.onclick=bump;
     ctl.appendChild(rf);
+    if(spec.live_stream){
+      const live=document.createElement('button'); live.className='set-btn'; live.textContent='Live';
+      live.onclick=()=>spawnWidget({ id:'ringlive-'+spec.entity_id, type:'app', title:(spec.name||'Ring')+' · live',
+        url:'/go2rtc/stream.html?src='+encodeURIComponent(spec.live_stream)+'&mode=webrtc' });
+      ctl.appendChild(live);
+    }
     if(spec.siren_entity){
       const sir=document.createElement('button'); sir.className='set-btn danger'; sir.textContent='Siren';
       sir.onclick=async()=>{ if(!confirm('Sound the siren on '+(spec.name||'this Ring')+'?'))return;

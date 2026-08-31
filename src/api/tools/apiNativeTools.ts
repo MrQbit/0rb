@@ -1388,6 +1388,11 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
           const ringCams = cams.filter(c => (regById.get(c.entity_id) as any)?.platform === 'ring'
             || /ring/i.test(String(c.attributes.attribution || '')))
           if (ringCams.length) {
+            let liveStreams: string[] = []
+            try {
+              const g = await fetch('http://host.docker.internal:1984/api/streams', { signal: AbortSignal.timeout(2500) })
+              if (g.ok) liveStreams = Object.keys(await g.json() as any)
+            } catch { /* ring-mqtt not authenticated yet */ }
             const all = await haStates()
             const { listCamEvents } = await import('../camera/events.js')
             const camEvents = await listCamEvents(ctx.store)
@@ -1408,6 +1413,7 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
                 last_motion: motion?.attributes?.last_changed || (motion?.state === 'on' ? 'now' : undefined),
                 last_ding: ding?.state === 'on' ? 'now' : undefined,
                 siren_entity: siren?.entity_id,
+                live_stream: liveStreams.find(n => n.endsWith('_live')),
                 events: evs,
               } as any)
             }

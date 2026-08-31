@@ -67,7 +67,7 @@ export const CATALOG: Record<string, CatalogEntry> = {
   scenes: { fields: { scenes: A }, attention: 'glance', refresh: 'snapshot', hint: 'one-tap scenes' },
   sensors: { fields: { groups: A }, attention: 'ambient', refresh: 'live', hint: 'readings by room' },
   camera: { fields: { name: S, snapshot: S }, attention: 'glance', refresh: 'live', hint: 'camera snapshot' },
-  ring: { fields: { entity_id: S, name: S, snapshot: S, battery: N, last_motion: S, last_ding: S, siren_entity: S, events: A }, attention: 'glance', refresh: 'live', hint: 'Ring device: snapshot, motion/ding history, battery, siren' },
+  ring: { fields: { entity_id: S, name: S, snapshot: S, battery: N, last_motion: S, last_ding: S, siren_entity: S, live_stream: S, events: A }, attention: 'glance', refresh: 'live', hint: 'Ring device: snapshot, motion/ding history, battery, siren' },
   timers: { fields: { timers: A }, attention: 'ambient', refresh: 'live', hint: 'countdowns' },
   presence: { fields: { people: A, pill: S }, attention: 'ambient', refresh: 'live', hint: "who's home" },
   automations: { fields: { automations: A }, attention: 'glance', refresh: 'live', hint: 'HA automations' },

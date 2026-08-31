@@ -531,6 +531,9 @@ services:
     container_name: orb2-ui
     depends_on:
       - orb2-api
+    extra_hosts:
+      # /go2rtc/ proxy → ring-mqtt's embedded go2rtc on the host network
+      - "host.docker.internal:host-gateway"
     ports:
       - "${ORB2_UI_PORT:-9080}:8080"
       # HTTPS (self-signed) so camera/mic work from other devices on the LAN.
@@ -546,6 +549,46 @@ services:
   # Restarts any sibling that goes unhealthy or exits (Docker's restart
   # policy only reacts to exits, not failed healthchecks), with backoff
   # and troubleshooting logs. Sees the others via the mounted socket.
+  # ── Ring bridge: mosquitto + ring-mqtt (live RTSP/WebRTC via go2rtc,
+  #    two-way audio) + the ringvoice satellite (Ring mic/speaker ⇄ orb). ──
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: orb2-mosquitto
+    volumes:
+      - ./services/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - orb2-mosquitto:/mosquitto/data
+    ports:
+      - "1883:1883"
+    restart: unless-stopped
+
+  ring-mqtt:
+    image: tsightler/ring-mqtt:latest
+    container_name: orb2-ring-mqtt
+    network_mode: host          # RTSP/WebRTC + LAN discovery
+    environment:
+      MQTTHOST: "127.0.0.1"
+      MQTTPORT: "1883"
+      LIVESTREAMUSER: "orb"
+      LIVESTREAMPASSWORD: "${ORB2_RING_STREAM_PASSWORD:-orbstream}"
+    volumes:
+      - orb2-ringmqtt:/data
+    depends_on:
+      - mosquitto
+    restart: unless-stopped
+
+  ringvoice:
+    image: localhost:5001/orb2-ringvoice:dev
+    container_name: orb2-ringvoice
+    network_mode: host          # reach ring-mqtt rtsp + orb api on host ports
+    environment:
+      ORB2_VOICE_WS: "${ORB2_RINGVOICE_WS:-ws://127.0.0.1:9080/v1/voice/ws}"
+      ORB2_VOICE_TOKEN: "${ORB2_RINGVOICE_TOKEN:-}"
+      RING_RTSP: "${ORB2_RING_RTSP:-}"            # e.g. rtsp://orb:orbstream@127.0.0.1:8554/<camera_id>_live
+      GO2RTC_API: "${ORB2_RING_GO2RTC:-http://127.0.0.1:1984}"
+      RING_STREAM: "${ORB2_RING_STREAM:-}"        # go2rtc stream name for speaker backchannel
+      WAKE_WORDS: "${ORB2_RING_WAKE:-hey orb,orb}"
+    restart: unless-stopped
+
   watchdog:
     image: docker:cli
     container_name: orb2-watchdog
@@ -558,6 +601,8 @@ services:
 
 volumes:
   redis-data:
+  orb2-mosquitto:
+  orb2-ringmqtt:
   orb2-matter:
   orb2-files:
   orb2-workspace:
