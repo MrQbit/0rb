@@ -2442,8 +2442,56 @@
     $('#haAddStart')?.addEventListener('click', haStartAdd);
   }
 
+  // ── Ring: account link via the proxied ring-mqtt authenticator ──
+  async function loadRing(){
+    const card=$('#ringCard'); if(!card) return;
+    const dot=$('#ringDot'), state=$('#ringState'), login=$('#ringLoginForm'), codeF=$('#ringCodeForm');
+    let d=null;
+    try{ d=await (await fetch('/v1/ring/status',{credentials:'same-origin'})).json(); }catch{}
+    if(!d||!d.running){ card.style.display='none'; return; }   // sidecar not installed
+    card.style.display='';
+    if(d.connected){
+      dot.className='pill-dot ok';
+      const n=(d.streams||[]).length;
+      state.textContent='Connected'+(n?` · ${n} camera${n===1?'':'s'} live`:' · starting streams…');
+      login.style.display='none'; codeF.style.display='none';
+      return;
+    }
+    dot.className='pill-dot'; state.textContent='Not connected';
+    login.style.display=''; codeF.style.display='none';
+    const post=async(body)=>{
+      const r=await fetch('/v1/ring/connect',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+      const j=await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error(j.error||(r.status===403?'Owner only':'Failed'));
+      return j;
+    };
+    $('#ringConnect').onclick=async()=>{
+      const email=($('#ringEmail').value||'').trim(), password=$('#ringPass').value||'';
+      if(!email||!password){ toast('Email and password first'); return; }
+      $('#ringConnect').disabled=true;
+      try{
+        const j=await post({email,password});
+        if(j.requires2fa){ login.style.display='none'; codeF.style.display=''; $('#ringCode').focus(); }
+        else if(j.success){ toast('Ring connected'); setTimeout(loadRing,1500); }
+      }catch(e){ toast(e.message); }
+      finally{ $('#ringConnect').disabled=false; }
+    };
+    $('#ringVerify').onclick=async()=>{
+      const code=($('#ringCode').value||'').trim();
+      if(!code){ toast('Enter the code Ring sent you'); return; }
+      $('#ringVerify').disabled=true;
+      try{
+        const j=await post({code});
+        if(j.success){ $('#ringPass').value=''; toast('Ring connected — cameras coming online'); setTimeout(loadRing,2500); }
+        else toast('Ring did not accept that code');
+      }catch(e){ toast(e.message); }
+      finally{ $('#ringVerify').disabled=false; }
+    };
+  }
+
   // ── Smart home: HA status + integrations + pending setup + devices ──
   async function loadSmartHome(){
+    loadRing();
     const dot=$('#haDot'), state=$('#haState'), open=$('#haOpen'), tokForm=$('#haTokenForm');
     const entries=$('#haEntries'), flowsWrap=$('#haFlowsWrap'), flows=$('#haFlows'), devs=$('#haDevices');
     if(!dot) return;

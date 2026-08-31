@@ -325,6 +325,16 @@ export async function haDeviceAreas(): Promise<Map<string, string>> {
   return out
 }
 
+/** device_id → manufacturer, for platform-agnostic brand detection
+ * (a Ring camera arrives as platform 'ring' via cloud or 'mqtt' via
+ * ring-mqtt discovery — the device manufacturer says "Ring" either way). */
+export async function haDeviceManufacturers(): Promise<Map<string, string>> {
+  const r = (await haWsCommand('config/device_registry/list')) as any[]
+  const out = new Map<string, string>()
+  for (const d of r) if (d.id && d.manufacturer) out.set(d.id, String(d.manufacturer))
+  return out
+}
+
 export async function haEntityRegistry(): Promise<HaRegistryEntry[]> {
   const r = (await haWsCommand('config/entity_registry/list')) as any[]
   return r.map(e => ({

@@ -1641,6 +1641,13 @@ async function dispatch(
   // ─── Home (device dashboard refresh + tap-to-control via Home Assistant) ───
   const homeResp = await tryHandleHomeRoute(method, pathname, req, ctx.store)
   if (homeResp) return homeResp
+  // ─── Ring account linking (proxied ring-mqtt authenticator) ───
+  {
+    const { tryHandleRingRoute } = await import('./ring/routes.js')
+    const ringUser = (attributionFor(identity).oid || '').replace(/^user:/, '')
+    const ringResp = await tryHandleRingRoute(method, pathname, req, ctx.store, ringUser)
+    if (ringResp) return ringResp
+  }
   // ─── Remote mode: lan (tailnet for away) vs direct (DynDNS + router port) ───
   if (pathname === '/v1/remote/status' && method === 'GET') {
     const { getRemoteMode, applyRemote } = await import('./devicecert/remote.js')

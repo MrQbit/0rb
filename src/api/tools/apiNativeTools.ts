@@ -1383,10 +1383,15 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
         // Ring devices get their NATIVE widget: snapshot + motion/ding
         // history + battery + siren, assembled from the device's siblings.
         try {
-          const reg = await haEntityRegistry()
+          const { haDeviceManufacturers } = await import('../connectors/homeAssistant.js')
+          const [reg, mfg] = await Promise.all([haEntityRegistry(), haDeviceManufacturers().catch(() => new Map<string, string>())])
           const regById = new Map(reg.map((r: any) => [r.entity_id, r]))
-          const ringCams = cams.filter(c => (regById.get(c.entity_id) as any)?.platform === 'ring'
-            || /ring/i.test(String(c.attributes.attribution || '')))
+          const ringCams = cams.filter(c => {
+            const re = regById.get(c.entity_id) as any
+            return re?.platform === 'ring'
+              || /ring/i.test(String(c.attributes.attribution || ''))
+              || /ring/i.test(mfg.get(re?.device_id || '') || '')
+          })
           if (ringCams.length) {
             let liveStreams: string[] = []
             try {
