@@ -448,6 +448,7 @@
     else if(spec.type==='energy'){ wg.style.width='360px'; wg.style.maxHeight='340px'; }
     else if(spec.type==='tv'){ wg.style.width='380px'; wg.style.maxHeight='420px'; }
     else if(spec.type==='order'){ wg.style.width='360px'; wg.style.maxHeight='380px'; }
+    else if(spec.type==='ring'){ wg.style.width='400px'; wg.style.maxHeight='460px'; }
     else if(spec.type==='spotify'){ wg.style.width='380px'; wg.style.maxHeight='520px'; }
     else if(spec.type==='automations'){ wg.style.width='420px'; wg.style.maxHeight='400px'; }
     else if(spec.type==='printer3d'){ wg.style.width='480px'; wg.style.height='560px'; }
@@ -758,6 +759,7 @@
     else if(spec.type==='energy') renderEnergy(body, spec);
     else if(spec.type==='tv') renderTv(body, spec);
     else if(spec.type==='order') renderOrder(body, spec);
+    else if(spec.type==='ring') renderRing(body, spec, wg);
     else if(spec.type==='spotify') renderSpotify(body, spec, wg);
     else if(spec.type==='automations') renderAutomations(body, spec);
     else if(spec.type==='printer3d') renderPrinter3d(body, spec, wg);
@@ -1095,6 +1097,51 @@
       row.append(go,paid); wrap.appendChild(row);
     }
     if(spec.tracking){ const t=document.createElement('div'); t.className='set-muted small'; t.textContent='Tracking: '+spec.tracking; wrap.appendChild(t); }
+  }
+
+
+  // ── Ring: native device card — feed, motion/ding history, battery, siren ──
+  function renderRing(body, spec, wg){
+    const wrap=document.createElement('div'); wrap.className='wg-ring'; body.appendChild(wrap);
+    const shot=document.createElement('div'); shot.className='wg-ring-shot';
+    const img=document.createElement('img'); img.alt=spec.name||'Ring';
+    const snapUrl=spec.snapshot&&safeUrl(spec.snapshot);
+    const bump=()=>{ if(snapUrl) img.src=snapUrl+(snapUrl.includes('?')?'&':'?')+'t='+Date.now(); };
+    img.onerror=()=>{ shot.innerHTML='<div class="wg-empty">No frame from the camera right now — it may be waking up.</div>'; };
+    if(snapUrl){ bump(); shot.appendChild(img); } else shot.innerHTML='<div class="wg-empty">Feed appears once the Ring is connected.</div>';
+    wrap.appendChild(shot);
+    if(wg&&!wg._ringTimer){ wg._ringTimer=setInterval(()=>{ if(!wg.isConnected){ clearInterval(wg._ringTimer); return; } bump(); }, 20000); }
+    const meta=document.createElement('div'); meta.className='wg-ring-meta';
+    const bits=[];
+    if(spec.battery!=null&&!Number.isNaN(spec.battery)) bits.push(`🔋 ${spec.battery}%`);
+    if(spec.last_ding) bits.push(`🔔 ding ${spec.last_ding==='now'?'right now':spec.last_ding}`);
+    if(spec.last_motion) bits.push(`motion ${spec.last_motion==='now'?'right now':''}`);
+    meta.textContent=bits.join(' · ')||'quiet';
+    wrap.appendChild(meta);
+    if((spec.events||[]).length){
+      const evs=document.createElement('div'); evs.className='wg-ring-evs';
+      spec.events.slice(-5).reverse().forEach(ev=>{
+        const row=document.createElement('button'); row.className='wg-sp-row';
+        const time=new Date(ev.t).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+        row.innerHTML=(ev.frame?`<img src="${esc2(ev.frame)}" alt=""/>`:'')+`<span class="t">${esc2(ev.trigger)}</span><span class="a">${esc2(time)}</span>`;
+        row.onclick=()=>{ if(ev.frame) spawnWidget({ id:'ringframe-'+ev.t, type:'image', title:(spec.name||'Ring')+' · '+time, url:ev.frame, caption:ev.trigger }); };
+        evs.appendChild(row);
+      });
+      wrap.appendChild(evs);
+    }
+    const ctl=document.createElement('div'); ctl.className='set-row';
+    const rf=document.createElement('button'); rf.className='set-btn ghost'; rf.textContent='Refresh'; rf.onclick=bump;
+    ctl.appendChild(rf);
+    if(spec.siren_entity){
+      const sir=document.createElement('button'); sir.className='set-btn danger'; sir.textContent='Siren';
+      sir.onclick=async()=>{ if(!confirm('Sound the siren on '+(spec.name||'this Ring')+'?'))return;
+        try{ const r=await fetch('/v1/home/control',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({entity_id:spec.siren_entity,action:'on'})});
+          toast(r.ok?'Siren on — tap again to stop':'Failed');
+          sir.textContent='Stop siren'; sir.onclick=async()=>{ await fetch('/v1/home/control',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({entity_id:spec.siren_entity,action:'off'})}); toast('Siren off'); };
+        }catch{ toast('Failed'); } };
+      ctl.appendChild(sir);
+    }
+    wrap.appendChild(ctl);
   }
 
   // ── shopping: list + buy options ──

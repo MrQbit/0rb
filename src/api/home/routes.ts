@@ -61,6 +61,10 @@ export function serviceFor(domain: string, action: string, value?: number): { se
       if (action === 'stop') return { service: 'stop', data: {} }
       if (action === 'dock') return { service: 'return_to_base', data: {} }
       return null
+    case 'siren':
+      if (action === 'on') return { service: 'turn_on', data: {} }
+      if (action === 'off' || action === 'toggle') return { service: 'turn_off', data: {} }
+      return null
     case 'scene':
       if (action === 'on' || action === 'toggle' || action === 'activate') return { service: 'turn_on', data: {} }
       return null

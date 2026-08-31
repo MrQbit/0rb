@@ -1380,6 +1380,46 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
       if (op === 'camera') {
         const cams = await haJoinAreas(await haStates(['camera']))
         if (!cams.length) return 'No cameras in Home Assistant.'
+        // Ring devices get their NATIVE widget: snapshot + motion/ding
+        // history + battery + siren, assembled from the device's siblings.
+        try {
+          const reg = await haEntityRegistry()
+          const regById = new Map(reg.map((r: any) => [r.entity_id, r]))
+          const ringCams = cams.filter(c => (regById.get(c.entity_id) as any)?.platform === 'ring'
+            || /ring/i.test(String(c.attributes.attribution || '')))
+          if (ringCams.length) {
+            const all = await haStates()
+            const { listCamEvents } = await import('../camera/events.js')
+            const camEvents = await listCamEvents(ctx.store)
+            for (const cam of ringCams.slice(0, 3)) {
+              const dev = (regById.get(cam.entity_id) as any)?.device_id
+              const siblings = dev ? all.filter(e => (regById.get(e.entity_id) as any)?.device_id === dev) : []
+              const batt = siblings.find(e => String(e.attributes.device_class) === 'battery')
+              const motion = siblings.find(e => e.domain === 'binary_sensor' && String(e.attributes.device_class) === 'motion')
+              const ding = siblings.find(e => e.domain === 'binary_sensor' && /ding|doorbell/i.test(e.entity_id + e.name))
+              const siren = siblings.find(e => e.domain === 'siren')
+              const evs = camEvents.filter(ev => ev.camera === cam.entity_id).slice(-5)
+                .map(ev => ({ t: ev.t, trigger: ev.trigger, frame: `/v1/camera/frame/${ev.id}` }))
+              emitWidget(ctx.sessionId, {
+                id: `ring-${cam.entity_id}`, type: 'ring', title: cam.name,
+                entity_id: cam.entity_id, name: cam.name,
+                snapshot: `/v1/home/ha-image?path=${encodeURIComponent(`/api/camera_proxy/${cam.entity_id}`)}`,
+                battery: batt ? Number(batt.state) : undefined,
+                last_motion: motion?.attributes?.last_changed || (motion?.state === 'on' ? 'now' : undefined),
+                last_ding: ding?.state === 'on' ? 'now' : undefined,
+                siren_entity: siren?.entity_id,
+                events: evs,
+              } as any)
+            }
+            const rest = cams.filter(c => !ringCams.includes(c))
+            for (const c of rest.slice(0, 2)) emitWidget(ctx.sessionId, {
+              id: `camera-${c.entity_id}`, type: 'camera', title: c.name,
+              entity_id: c.entity_id, name: c.name, area: c.area,
+              snapshot: `/v1/home/ha-image?path=${encodeURIComponent(`/api/camera_proxy/${c.entity_id}`)}`,
+            } as any)
+            return `Showed ${ringCams.length} Ring camera${ringCams.length > 1 ? 's' : ''}${rest.length ? ` and ${rest.length} other camera${rest.length > 1 ? 's' : ''}` : ''}.`
+          }
+        } catch { /* fall through to generic path */ }
         // Camera intelligence (v0.2 §12): ask:"is the package still there?"
         // grabs a fresh frame and puts it to the vision brain.
         const ask = String((args as any)?.ask || '').trim()
