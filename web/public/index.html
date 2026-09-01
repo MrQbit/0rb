@@ -138,6 +138,18 @@
                 <button id="ringVerify" class="set-btn">Verify</button>
               </div>
             </div>
+            <div id="ringTwoway" style="display:none;">
+              <div class="set-row" style="margin-top:10px;"><span class="pill-dot" id="ringTwDot"></span><div class="info-label" style="color:var(--ink);">Camera speaker</div><span id="ringTwState" class="set-muted small"></span></div>
+              <div id="ringTwForm" style="display:none;">
+                <p class="set-muted small">Let the orb answer through the camera itself. This needs one more Ring sign-in (a separate token for the audio session) — replies use the room speaker until then.</p>
+                <div class="set-form">
+                  <input id="ringTwEmail" type="email" placeholder="Ring email" autocomplete="off" />
+                  <input id="ringTwPass" type="password" placeholder="Password" autocomplete="off" />
+                  <input id="ringTwCode" type="text" inputmode="numeric" placeholder="2FA code (after first try)" autocomplete="off" style="max-width:150px;" />
+                  <button id="ringTwEnable" class="set-btn">Enable</button>
+                </div>
+              </div>
+            </div>
           </div>
           <h4 class="set-h4">Home Assistant — deep control</h4>
           <div class="set-card">

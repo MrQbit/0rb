@@ -2455,6 +2455,28 @@
       const n=(d.streams||[]).length;
       state.textContent='Connected'+(n?` · ${n} camera${n===1?'':'s'} live`:' · starting streams…');
       login.style.display='none'; codeF.style.display='none';
+      // Two-way audio (camera speaker) sub-card
+      const tw=$('#ringTwoway'); if(tw){
+        tw.style.display='';
+        const twDot=$('#ringTwDot'), twState=$('#ringTwState'), twForm=$('#ringTwForm');
+        if(d.twoway){ twDot.className='pill-dot ok'; twState.textContent='Enabled — orb answers through the camera'; twForm.style.display='none'; }
+        else{
+          twDot.className='pill-dot'; twState.textContent='Off — replies use the room speaker'; twForm.style.display='';
+          $('#ringTwEnable').onclick=async()=>{
+            const email=($('#ringTwEmail').value||'').trim(), password=$('#ringTwPass').value||'', code=($('#ringTwCode').value||'').trim();
+            if(!email||!password){ toast('Email and password first'); return; }
+            $('#ringTwEnable').disabled=true;
+            try{
+              const r=await fetch('/v1/ring/twoway/connect',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({email,password,code:code||undefined})});
+              const j=await r.json().catch(()=>({}));
+              if(!r.ok) toast(j.error||(r.status===403?'Owner only':'Failed'));
+              else if(j.requires2fa) toast(j.prompt||'Enter the code Ring sent you, then Enable again');
+              else if(j.success){ $('#ringTwPass').value=''; $('#ringTwCode').value=''; toast('Camera speaker enabled'); setTimeout(loadRing,1500); }
+            }catch{ toast('Failed'); }
+            finally{ $('#ringTwEnable').disabled=false; }
+          };
+        }
+      }
       return;
     }
     dot.className='pill-dot'; state.textContent='Not connected';

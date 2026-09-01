@@ -89,6 +89,102 @@ def _lock(dev_id: str) -> asyncio.Lock:
     return locks.setdefault(dev_id, asyncio.Lock())
 
 
+# ── Sonos native playback (UPnP AVTransport) ─────────────────────────────
+# Era-series Sonos accept pyatv's RAOP session but render SILENCE (the
+# session holds, volume acks, no audio). Their own UPnP rail — the one the
+# Sonos app and Home Assistant TTS use — is fully reliable: we host the
+# WAV over HTTP and tell the speaker to fetch and play it.
+_sonos_cache: dict[str, bool] = {}      # address -> is-sonos
+media_files: dict[str, str] = {}        # token -> temp file path
+
+async def _is_sonos(address: str) -> bool:
+    if address in _sonos_cache:
+        return _sonos_cache[address]
+    import aiohttp
+    ok = False
+    try:
+        async with aiohttp.ClientSession() as s:
+            async with s.get(f"http://{address}:1400/xml/device_description.xml",
+                             timeout=aiohttp.ClientTimeout(total=3)) as r:
+                ok = r.status == 200 and "sonos" in (await r.text()).lower()
+    except Exception:
+        ok = False
+    _sonos_cache[address] = ok
+    return ok
+
+async def _sonos_soap(address: str, service: str, action: str, args: dict) -> str:
+    import aiohttp
+    path = {"AVTransport": "/MediaRenderer/AVTransport/Control",
+            "RenderingControl": "/MediaRenderer/RenderingControl/Control"}[service]
+    body_args = "".join(f"<{k}>{v}</{k}>" for k, v in args.items())
+    envelope = (
+        '<?xml version="1.0" encoding="utf-8"?>'
+        '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" '
+        's:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body>'
+        f'<u:{action} xmlns:u="urn:schemas-upnp-org:service:{service}:1">{body_args}</u:{action}>'
+        '</s:Body></s:Envelope>')
+    headers = {"Content-Type": 'text/xml; charset="utf-8"',
+               "SOAPACTION": f'"urn:schemas-upnp-org:service:{service}:1#{action}"'}
+    async with aiohttp.ClientSession() as s:
+        async with s.post(f"http://{address}:1400{path}", data=envelope.encode(), headers=headers,
+                          timeout=aiohttp.ClientTimeout(total=8)) as r:
+            text = await r.text()
+            if r.status != 200:
+                raise RuntimeError(f"sonos {action} {r.status}: {text[:150]}")
+            return text
+
+async def sonos_play(dev_id: str, address: str, source: str, volume: float | None, cleanup: str | None):
+    """Host `source` at /media/<token> and drive the speaker to play it."""
+    import re as _re
+    import secrets
+    token = secrets.token_urlsafe(12) + os.path.splitext(source)[1]
+    media_files[token] = source
+    url = f"http://{lan_ip()}:{PORT}/media/{token}"
+    prev_volume = None
+    if volume is not None:
+        try:
+            got = await _sonos_soap(address, "RenderingControl", "GetVolume",
+                                    {"InstanceID": 0, "Channel": "Master"})
+            m = _re.search(r"<CurrentVolume>(\d+)</CurrentVolume>", got)
+            prev_volume = int(m.group(1)) if m else None
+            await _sonos_soap(address, "RenderingControl", "SetVolume",
+                              {"InstanceID": 0, "Channel": "Master", "DesiredVolume": int(max(0, min(100, volume)))})
+        except Exception as e:
+            log.warning("sonos volume failed on %s: %s", address, e)
+    await _sonos_soap(address, "AVTransport", "SetAVTransportURI",
+                      {"InstanceID": 0, "CurrentURI": url, "CurrentURIMetaData": ""})
+    await _sonos_soap(address, "AVTransport", "Play", {"InstanceID": 0, "Speed": 1})
+    log.info("sonos playing %s on %s", token, address)
+
+    async def watch():
+        try:
+            for _ in range(60):           # cap 2 min
+                await asyncio.sleep(2)
+                info = await _sonos_soap(address, "AVTransport", "GetTransportInfo", {"InstanceID": 0})
+                if "PLAYING" not in info and "TRANSITIONING" not in info:
+                    break
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            log.warning("sonos watch on %s: %s", address, e)
+        finally:
+            players.pop(dev_id, None)
+            media_files.pop(token, None)
+            if prev_volume is not None:      # leave the speaker as we found it
+                try:
+                    await _sonos_soap(address, "RenderingControl", "SetVolume",
+                                      {"InstanceID": 0, "Channel": "Master", "DesiredVolume": prev_volume})
+                except Exception:
+                    pass
+            if cleanup:
+                try:
+                    os.unlink(cleanup)
+                except OSError:
+                    pass
+
+    players[dev_id] = {"sonos": address, "task": asyncio.create_task(watch()), "started": time.time()}
+
+
 async def _connect(dev_id: str):
     conf = speaker_confs.get(dev_id)
     if conf is None:
@@ -105,6 +201,12 @@ async def stop_playback(dev_id: str):
         await p["task"]
     except (asyncio.CancelledError, Exception):
         pass
+    if p.get("sonos"):
+        try:
+            await _sonos_soap(p["sonos"], "AVTransport", "Stop", {"InstanceID": 0})
+        except Exception:
+            pass
+        return True
     try:
         p["atv"].close()
     except Exception:
@@ -116,6 +218,11 @@ async def start_playback(dev_id: str, source: str, volume: float | None, cleanup
     """Stream `source` (file path or URL) to the device as a background task."""
     async with _lock(dev_id):
         await stop_playback(dev_id)
+        # Sonos renders RAOP sessions silently — use its native UPnP rail.
+        addr = (speakers.get(dev_id) or {}).get("address", "")
+        if addr and os.path.exists(source) and await _is_sonos(addr):
+            await sonos_play(dev_id, addr, source, volume, cleanup)
+            return
         atv = await _connect(dev_id)
         if volume is not None:
             try:
@@ -437,10 +544,13 @@ async def h_status(req):
     out = {"playing": bool(p)}
     if p:
         out["since"] = int(time.time() - p["started"])
-        try:
-            out["volume"] = p["atv"].audio.volume
-        except Exception:
-            pass
+        if p.get("sonos"):
+            out["via"] = "sonos-upnp"
+        else:
+            try:
+                out["volume"] = p["atv"].audio.volume
+            except Exception:
+                pass
     return web.json_response(out)
 
 
@@ -565,6 +675,13 @@ async def main():
     app.router.add_post("/volume", h_volume)
     app.router.add_get("/status", h_status)
     app.router.add_post("/announce", h_announce)
+    # Media host for the Sonos rail (tokened, LAN-only — Sonos can't auth).
+    async def h_media(req):
+        path = media_files.get(req.match_info["token"])
+        if not path or not os.path.exists(path):
+            raise web.HTTPNotFound()
+        return web.FileResponse(path, headers={"Content-Type": "audio/wav" if path.endswith(".wav") else "audio/mpeg"})
+    app.router.add_get("/media/{token}", h_media)
     app.router.add_get("/printer", h_printer)
     app.router.add_post("/print", h_print)
     app.router.add_get("/upnp", h_upnp)

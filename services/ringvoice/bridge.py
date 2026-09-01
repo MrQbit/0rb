@@ -24,32 +24,47 @@ CHUNK = 3200                     # 100ms
 UTTER_SILENCE_S = 1.2            # end-of-utterance
 UTTER_MAX_S = 12
 
+# Self-echo guard (§16): while orb's own reply is playing in the room, the
+# camera mic hears it — suppress wake-spotting until playback ends + tail.
+suppress_until = 0.0
+
 def log(*a): print("[ringvoice]", *a, flush=True)
 
 def speak_to_ring(pcm24k: bytes):
     """TTS PCM (24k mono s16le) → WAV → go2rtc backchannel → Ring speaker.
     WAVs land in /ringaudio, a volume SHARED with the go2rtc container —
     go2rtc's ffmpeg source resolves the path in its own filesystem."""
+    global suppress_until
+    suppress_until = time.time() + len(pcm24k) / 48000 + 2.0   # clip + tail
     if not STREAM:
         log("no RING_STREAM set — skipping speaker output"); return
     with tempfile.NamedTemporaryFile(suffix=".wav", dir="/ringaudio", delete=False) as f:
         w = wave.open(f, "wb"); w.setnchannels(1); w.setsampwidth(2); w.setframerate(24000)
         w.writeframes(pcm24k); w.close(); path = f.name
-    # go2rtc two-way: POST the audio file as a producer into the stream's backchannel
-    src = f"ffmpeg:{path}#audio=opus"
-    url = f"{GO2RTC}/api/streams?dst={STREAM}&src={urllib.parse.quote(src, safe='')}"
+    # Preferred rail (§16.4): the `ring_talk` stream — go2rtc's native ring:
+    # source, the only path that reaches the camera's own speaker. It exists
+    # once two-way audio is enabled in Settings. ring-mqtt's external RTSP
+    # (STREAM) is one-way, so with no ring_talk we go straight to the room
+    # speaker instead of poking a dead backchannel.
+    spoke = False
     try:
-        req = urllib.request.Request(url, method="POST")
-        urllib.request.urlopen(req, timeout=15).read()
-        log("spoke", len(pcm24k) // 48000, "s to the Ring speaker")
-    except Exception as e:
-        # ring-mqtt's external RTSP is one-way (exec producer, no backchannel)
-        # — answer through the nearest AirPlay speaker via orb instead.
-        log("Ring backchannel unavailable:", e, "— falling back to room speaker")
+        with urllib.request.urlopen(GO2RTC + "/api/streams", timeout=4) as r:
+            has_talk = "ring_talk" in json.loads(r.read())
+    except Exception:
+        has_talk = False
+    if has_talk:
+        src = f"ffmpeg:{path}#audio=opus"
+        url = f"{GO2RTC}/api/streams?dst=ring_talk&src={urllib.parse.quote(src, safe='')}"
+        try:
+            urllib.request.urlopen(urllib.request.Request(url, method="POST"), timeout=15).read()
+            log("spoke", len(pcm24k) // 48000, "s out the Ring's speaker")
+            spoke = True
+        except Exception as e:
+            log("ring_talk push failed:", e)
+    if not spoke:
         speak_to_room(path)
-    finally:
-        # give go2rtc time to play before unlink
-        threading.Timer(30, lambda: os.unlink(path) if os.path.exists(path) else None).start()
+    # give go2rtc time to play before unlink
+    threading.Timer(30, lambda: os.unlink(path) if os.path.exists(path) else None).start()
 
 def speak_to_room(wav_path: str):
     """Fallback reply path: POST the TTS WAV to orb, which announces it on
@@ -197,6 +212,8 @@ def main():
             while True:
                 chunk = ff.stdout.read(CHUNK)
                 if not chunk: raise RuntimeError("stream ended")
+                if time.time() < suppress_until:
+                    continue                     # orb is talking — don't wake on our own voice
                 if not awake:
                     if rec.AcceptWaveform(chunk):
                         txt = json.loads(rec.Result()).get("text", "")

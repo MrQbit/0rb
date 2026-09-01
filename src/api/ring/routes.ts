@@ -52,7 +52,31 @@ export async function tryHandleRingRoute(
         }
       } catch { /* HA optional */ }
     }
-    return jsonResponse(200, { running, connected, streams })
+    // Two-way audio (§16.4): with a token stored, keep the ring_talk stream
+    // registered (go2rtc forgets runtime streams on restart).
+    let twoway = false
+    try {
+      const { getTwowayToken, ensureTwowayStream } = await import('./oauth.js')
+      if (await getTwowayToken(store)) {
+        const camId = streams[0]?.replace(/_live$/, '') || ''
+        twoway = await ensureTwowayStream(store, GO2RTC, camId)
+      }
+    } catch { /* optional */ }
+    return jsonResponse(200, { running, connected, streams, twoway })
+  }
+
+  // Two-way audio enable: a SECOND Ring login (its own token — see oauth.ts).
+  if (method === 'POST' && pathname === '/v1/ring/twoway/connect') {
+    const { isOwner } = await import('../auth/otp.js')
+    if (!user || !(await isOwner(store, user))) return jsonResponse(403, { error: 'owner only' })
+    const b = await req.json().catch(() => ({})) as any
+    const email = String(b?.email || '').trim(), password = String(b?.password || ''), code = String(b?.code || '').trim()
+    if (!email || !password) return jsonResponse(400, { error: 'email and password required (resend both with the 2FA code)' })
+    const { ringOauth } = await import('./oauth.js')
+    const r = await ringOauth(store, { email, password, code: code || undefined })
+    if (!r.ok && r.requires2fa) return jsonResponse(200, { requires2fa: true, prompt: r.prompt })
+    if (!r.ok) return jsonResponse(502, { error: r.error })
+    return jsonResponse(200, { success: true })
   }
 
   // Voice-satellite reply fallback: the Ring's own speaker needs a two-way
@@ -71,7 +95,10 @@ export async function tryHandleRingRoute(
       if (!sp) return jsonResponse(404, { error: 'no speakers on the network' })
       const wav = new Uint8Array(await req.arrayBuffer())
       if (!wav.length) return jsonResponse(400, { error: 'empty audio body' })
-      await bridgeAnnounce(sp.id, wav, 'audio/wav')
+      // Audible-by-construction: announce at a clear level, and the bridge
+      // restores the speaker's previous volume when the clip ends.
+      const vol = Number(new URL(req.url).searchParams.get('volume') || 45)
+      await bridgeAnnounce(sp.id, wav, 'audio/wav', Math.max(10, Math.min(80, vol)))
       return jsonResponse(200, { ok: true, speaker: sp.name })
     } catch (e) {
       return jsonResponse(502, { error: (e as Error).message })
