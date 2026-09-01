@@ -492,6 +492,135 @@ Settings lists/pauses/drops. ✅ shipped v26.19.
 
 ---
 
+## §16 — The audio stack: hear well, everywhere ◐
+
+**Shipped (v26.20–21):** STT on the GPU it never used — CTranslate2 has
+no CUDA on aarch64, so faster-whisper always ran CPU on the Spark; the
+`hf-whisper` engine runs **whisper-large-v3-turbo** via transformers on
+torch-CUDA (6s utterance → 0.24s, exact). Ring satellite hears: MQTT
+camera discovery, own go2rtc, speechnorm gain (Ring mic ≈ −40 dB at
+distance), **grammar-constrained Vosk** wake ("orb" decodes as "or" in
+open vocab; grammar verified to −40 dB, zero false triggers), replies
+via the room's Sonos (`/v1/ring/speak` → bridgeAnnounce).
+
+**Planned, in order of payoff:**
+1. **Custom wake model** — train "hey orb" with openWakeWord (positives
+   generated with our own TTS across voices/rates/noise); one server-side
+   spotter serves EVERY satellite (Ring, future ESP32 pucks via
+   microWakeWord export). Vosk-grammar stays as the fallback.
+2. **Self-echo guard** — the satellite must not wake on orb's own reply
+   coming out of the Sonos: suppress wake-spotting during playback
+   windows (+2s tail), and long-term subtract the known TTS reference.
+3. **Parakeet TDT engine** — `ORB2_STT_ENGINE=parakeet` (NeMo): NVIDIA's
+   streaming RNN-T, first-class on this hardware, benched against
+   hf-whisper on real household audio before switching defaults.
+4. **Ring two-way audio** — our go2rtc's native `ring:` source with its
+   OWN refresh token (Settings → Ring card gains "enable speaker": a
+   second token mint through orb2-api's Ring OAuth flow; NEVER share
+   ring-mqtt's token — rotation races invalidate it). Sonos fallback
+   remains for rooms with better speakers than the camera's.
+5. **TTS**: Kokoro stays the realtime voice. Optional persona voice via
+   Chatterbox (MIT) for non-realtime narration — briefings, the diary —
+   where its quality beats latency concerns. SenseVoice paralinguistics
+   (vocal tone → `vocalContext`) revisits once accuracy is tuned
+   (env-gated today).
+
+**Done when:** wake false-accept < 1/day and false-reject < 1/10 at
+3 m in kitchen noise (logged over a real week); echo guard: zero
+self-wakes during a 50-reply soak; STT bench published in docs (WER +
+latency, whisper vs parakeet, on-box); two-way: "hey orb" → answer from
+the RING speaker with Sonos fallback intact.
+
+---
+
+## §17 — The hybrid brain: sovereign by default, frontier on demand ◐
+
+**Doctrine.** The harness is the product; the model is a component.
+Voice, home control, cameras, money, presence: **local, always** — the
+household's intimate data never leaves the box as a side effect. But the
+local model is the weakest link for deep reasoning, and `modelRouter`
+already routes hard turns (coding/reasoning/length heuristics) to a
+stronger model when enabled. §17 makes that a first-class, governed
+capability instead of a heuristic.
+
+1. **Route classes, not regexes.** Explicit classes with per-class
+   Settings toggles (owner): `planning` (specs, multi-step designs),
+   `dream` (nightly consolidation), `watch-research` (§15 worker turns
+   flagged research-heavy), `deep-chat` (user says "think hard").
+   Voice and anything device/money-touching stay local, non-negotiable.
+2. **The privacy firewall.** Outbound context is allow-listed per class,
+   scrubbed by construction: no camera frames, no journal dumps, no
+   member locations, no ledger, no memory files wholesale — the turn
+   carries only the task and the minimum context the class permits. A
+   Settings card ("What leaves the box") states each class's policy in
+   plain language.
+3. **Visible and metered.** Every cloud turn journals an ambient
+   `cloud` event (class, tokens, cost) and rides the §1 money rails:
+   monthly cloud-reasoning budget with the same ask/earned/never tiers
+   and receipts as any other spend. Cloud unreachable → silent fallback
+   to local; the orb is never dumber than its own hardware.
+4. **Engine.** Anthropic SDK (Claude) as the first provider; the
+   provider override plumbing already exists (`providerOverride`), so
+   this is routing + firewall + metering, not a rework.
+
+**Done when:** each class togglable and OFF by default except
+`deep-chat`; firewall proven by a test that greps outbound payloads for
+forbidden material (frames/locations/ledger) across a scripted week;
+cloud budget enforced + receipted; kill-switch (one toggle → 100% local)
+verified live.
+
+---
+
+## §18 — The digital twin: a house the orb can point at ☐
+
+**Why.** The orb knows *entities*; it should know *places*. "Where did I
+leave my phone", "turn off everything upstairs", "answer through the
+speaker nearest the kitchen", camera→room association, and §11's leave-by
+all want one thing: a spatial model of the home.
+
+1. **The plan.** `twin:plan` (kv): floors → rooms (simple polygons on a
+   grid canvas) → placements: every device/entity pinned to a room and
+   optional x,y (Ring cam, speakers, TV, printer, sensors, matter
+   devices). Seeded automatically from HA areas (area ≈ room) so day one
+   isn't blank; refined in a Settings floor-plan editor (drag rooms,
+   drop devices). A `house-map` widget renders it live: device states in
+   place, presence dots, camera-event badges — the deck's home view.
+2. **Twin-aware behavior.** Nearest-output selection (the §16 Ring
+   fallback speaker becomes twin-driven, not an env var); `associateCamera`
+   uses geometry instead of name heuristics; "everything upstairs / in
+   the office" resolves through the plan; energy and routines group by
+   room; journal events carry room context ("motion — living room" from
+   geometry, not entity naming).
+3. **Presence, two tiers, consent-shaped:**
+   - **Inside** (no app required): room-level presence inferred from
+     twin-anchored signals — motion/occupancy, camera person events,
+     which satellite heard the wake word, whose phone is on Wi-Fi
+     (home/away only). Stored as `presence:<member>` {room, confidence,
+     last_seen}; decays to "home, somewhere" honestly rather than
+     guessing.
+   - **Outside**: ONLY with the phone app installed AND that member's
+     explicit location-share opt-in — per-member toggle, OFF by default,
+     revocable anytime in app/Settings, and the OWNER CANNOT ENABLE IT
+     for someone else: consent belongs to the member. Coarse location
+     (geohash + timestamp) powers leave-by, arrival cards, "get me a
+     ride back" — never continuous tracking, never stored beyond the
+     journal's ring.
+   - **Watched watchers, symmetric:** any "where is <member>" asked by
+     someone else is itself journaled and visible to the asked-about
+     member; per-viewer visibility grants (a member chooses who may see
+     their presence) with gift-spoiler-grade enforcement. Presence never
+     leaves the box (§17 firewall forbids it categorically).
+
+**Done when:** plan editor round-trips (seed from HA areas → edit →
+persist → widget renders); "turn off everything upstairs" resolves by
+geometry in the sim fleet; nearest-speaker answer verified from two
+rooms; inside-presence shows the right room in a scripted walkthrough
+(sim motion sequence); outside tier hard-blocked without app+opt-in
+(test: owner toggling another member fails); every cross-member
+presence query journaled.
+
+---
+
 ## Part V — Testing: the sim-commerce harness (Part V)
 
 `src/api/commerce/sim.ts` — a full ServiceConnector (`sim-store`,
@@ -525,6 +654,16 @@ Stages ship in order, one calendar release (`v26.N`) each:
    §6 Uber API upgrade (if approved) + §14 voice polish + the playbook
    walkthrough as the release test: one scripted week in sim time,
    every diary beat asserted.
+8. **Stage 8 — ears (§16):** custom wake model + self-echo guard first
+   (they compound every voice interaction), then the Parakeet bench and
+   Ring two-way audio.
+9. **Stage 9 — the twin (§18):** plan model + HA-area seeding + editor +
+   house-map widget, then twin-aware behaviors, then inside presence;
+   the outside tier lands only WITH the phone app (Part III / P-1).
+10. **Stage 10 — hybrid brain (§17):** route classes + privacy firewall
+    + metering. Deliberately last: it upgrades every earlier stage's
+    reasoning once the data-boundary rules it must respect (§18
+    presence, §12 frames, §1 ledger) all exist to be enforced.
 
 Each release: version bump, tag, docs, gallery/smoke green, and the
 relevant playbook ⏳ markers flipped.
