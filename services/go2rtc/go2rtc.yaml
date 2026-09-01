@@ -1,0 +1,19 @@
+# Orb's own go2rtc — the streaming hub for the Ring satellite.
+#
+# ring-mqtt's embedded go2rtc serves RTSP on :8554 but exposes no API and
+# no WebRTC page, so we run our own instance next to it for three jobs:
+#   1. /api + WebRTC player  → the console's Ring widget "Live" button
+#      (proxied same-origin at /go2rtc/)
+#   2. backchannel POST      → TTS out the Ring's speaker (ringvoice)
+#   3. /api/streams          → stream discovery for /v1/ring/status
+# Streams are registered at runtime by ringvoice (PUT /api/streams) once
+# it discovers the camera id over MQTT — no ids are hardcoded here.
+api:
+  listen: ":1984"
+rtsp:
+  # ring-mqtt owns :8554 (and 127.0.0.1:18554 internally) — stay clear.
+  listen: ":8556"
+webrtc:
+  listen: ":8555"
+log:
+  level: info

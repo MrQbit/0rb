@@ -576,10 +576,26 @@ services:
       - mosquitto
     restart: unless-stopped
 
+  # Orb's own go2rtc — WebRTC live page + speaker backchannel + stream API
+  # (ring-mqtt's embedded go2rtc serves RTSP only, no API). Streams are
+  # registered at runtime by ringvoice once it discovers cameras over MQTT.
+  go2rtc:
+    image: alexxit/go2rtc:latest
+    container_name: orb2-go2rtc
+    network_mode: host          # api :1984, webrtc :8555, rtsp :8556
+    volumes:
+      - ./services/go2rtc/go2rtc.yaml:/config/go2rtc.yaml:ro
+      # Shared with ringvoice: TTS WAVs it plays out the Ring's speaker —
+      # go2rtc's ffmpeg source needs the file visible in ITS filesystem.
+      - orb2-ringaudio:/ringaudio
+    restart: unless-stopped
+
   ringvoice:
     image: localhost:5001/orb2-ringvoice:dev
     container_name: orb2-ringvoice
     network_mode: host          # reach ring-mqtt rtsp + orb api on host ports
+    depends_on:
+      - go2rtc
     environment:
       ORB2_VOICE_WS: "${ORB2_RINGVOICE_WS:-ws://127.0.0.1:9080/v1/voice/ws}"
       ORB2_VOICE_TOKEN: "${ORB2_RINGVOICE_TOKEN:-}"
@@ -587,6 +603,9 @@ services:
       GO2RTC_API: "${ORB2_RING_GO2RTC:-http://127.0.0.1:1984}"
       RING_STREAM: "${ORB2_RING_STREAM:-}"        # go2rtc stream name for speaker backchannel
       WAKE_WORDS: "${ORB2_RING_WAKE:-hey orb,orb}"
+      RING_FALLBACK_SPEAKER: "${ORB2_RING_FALLBACK_SPEAKER:-living room}"
+    volumes:
+      - orb2-ringaudio:/ringaudio
     restart: unless-stopped
 
   watchdog:
@@ -603,6 +622,7 @@ volumes:
   redis-data:
   orb2-mosquitto:
   orb2-ringmqtt:
+  orb2-ringaudio:
   orb2-matter:
   orb2-files:
   orb2-workspace:

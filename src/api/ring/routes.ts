@@ -29,16 +29,53 @@ export async function tryHandleRingRoute(
   if (!pathname.startsWith('/v1/ring/')) return null
 
   if (method === 'GET' && pathname === '/v1/ring/status') {
+    // Pre-auth: ring-mqtt's authenticator UI answers on :55123. Post-auth it
+    // SHUTS DOWN, so the durable signals are our go2rtc's registered streams
+    // (ringvoice adds them after MQTT discovery) and, as a fallback, Ring
+    // devices present in HA via MQTT discovery.
     let running = false, connected = false, streams: string[] = []
     try {
       const r = await fetch(`${RINGMQTT}/get-state`, { signal: AbortSignal.timeout(2500) })
       if (r.ok) { running = true; connected = !!((await r.json()) as any)?.connected }
-    } catch { /* sidecar not deployed / not up */ }
+    } catch { /* authenticator gone = either not deployed, or already authed */ }
     try {
       const g = await fetch(`${GO2RTC}/api/streams`, { signal: AbortSignal.timeout(2500) })
       if (g.ok) streams = Object.keys((await g.json()) as any).filter(n => n.endsWith('_live'))
-    } catch { /* go2rtc starts only once authenticated */ }
+    } catch { /* our go2rtc not up */ }
+    if (streams.length) { running = true; connected = true }
+    if (!connected) {
+      try {
+        const { haEnabled, haEntityRegistry, haDeviceManufacturers } = await import('../connectors/homeAssistant.js')
+        if (haEnabled()) {
+          const [reg, mfg] = await Promise.all([haEntityRegistry(), haDeviceManufacturers()])
+          if (reg.some(e => /ring/i.test(mfg.get((e as any).device_id || '') || ''))) { running = true; connected = true }
+        }
+      } catch { /* HA optional */ }
+    }
     return jsonResponse(200, { running, connected, streams })
+  }
+
+  // Voice-satellite reply fallback: the Ring's own speaker needs a two-way
+  // session ring-mqtt's external RTSP can't carry, so when the backchannel
+  // isn't available ringvoice POSTs its TTS WAV here and orb answers through
+  // the nearest AirPlay speaker instead (Sonos in the same room).
+  if (method === 'POST' && pathname === '/v1/ring/speak') {
+    if (!user) return jsonResponse(401, { error: 'authentication required' })
+    const name = new URL(req.url).searchParams.get('speaker') || 'living room'
+    try {
+      const { bridgeEnabled, bridgeDevices, bridgeAnnounce } = await import('../connectors/bridge.js')
+      if (!bridgeEnabled()) return jsonResponse(503, { error: 'bridge disabled' })
+      const { speakers } = await bridgeDevices()
+      const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
+      const sp = speakers.find(s => norm(s.name).includes(norm(name)) || norm(name).includes(norm(s.name))) ?? speakers[0]
+      if (!sp) return jsonResponse(404, { error: 'no speakers on the network' })
+      const wav = new Uint8Array(await req.arrayBuffer())
+      if (!wav.length) return jsonResponse(400, { error: 'empty audio body' })
+      await bridgeAnnounce(sp.id, wav, 'audio/wav')
+      return jsonResponse(200, { ok: true, speaker: sp.name })
+    } catch (e) {
+      return jsonResponse(502, { error: (e as Error).message })
+    }
   }
 
   if (method === 'POST' && pathname === '/v1/ring/connect') {

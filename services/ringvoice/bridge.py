@@ -27,10 +27,12 @@ UTTER_MAX_S = 12
 def log(*a): print("[ringvoice]", *a, flush=True)
 
 def speak_to_ring(pcm24k: bytes):
-    """TTS PCM (24k mono s16le) → WAV → go2rtc backchannel → Ring speaker."""
+    """TTS PCM (24k mono s16le) → WAV → go2rtc backchannel → Ring speaker.
+    WAVs land in /ringaudio, a volume SHARED with the go2rtc container —
+    go2rtc's ffmpeg source resolves the path in its own filesystem."""
     if not STREAM:
         log("no RING_STREAM set — skipping speaker output"); return
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+    with tempfile.NamedTemporaryFile(suffix=".wav", dir="/ringaudio", delete=False) as f:
         w = wave.open(f, "wb"); w.setnchannels(1); w.setsampwidth(2); w.setframerate(24000)
         w.writeframes(pcm24k); w.close(); path = f.name
     # go2rtc two-way: POST the audio file as a producer into the stream's backchannel
@@ -41,10 +43,29 @@ def speak_to_ring(pcm24k: bytes):
         urllib.request.urlopen(req, timeout=15).read()
         log("spoke", len(pcm24k) // 48000, "s to the Ring speaker")
     except Exception as e:
-        log("speaker push failed:", e)
+        # ring-mqtt's external RTSP is one-way (exec producer, no backchannel)
+        # — answer through the nearest AirPlay speaker via orb instead.
+        log("Ring backchannel unavailable:", e, "— falling back to room speaker")
+        speak_to_room(path)
     finally:
         # give go2rtc time to play before unlink
         threading.Timer(30, lambda: os.unlink(path) if os.path.exists(path) else None).start()
+
+def speak_to_room(wav_path: str):
+    """Fallback reply path: POST the TTS WAV to orb, which announces it on
+    the nearest AirPlay speaker (same room as the Ring)."""
+    api = os.environ.get("ORB2_API", "http://127.0.0.1:9080").rstrip("/")
+    speaker = os.environ.get("RING_FALLBACK_SPEAKER", "living room")
+    try:
+        with open(wav_path, "rb") as f: wav = f.read()
+        req = urllib.request.Request(
+            f"{api}/v1/ring/speak?speaker={urllib.parse.quote(speaker)}",
+            data=wav, method="POST",
+            headers={"Content-Type": "audio/wav", "Authorization": f"Bearer {TOKEN}"})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            log("room speaker reply:", r.read()[:120].decode(errors="replace"))
+    except Exception as e:
+        log("room speaker fallback failed:", e)
 
 import urllib.parse
 
@@ -77,40 +98,100 @@ def run_session(utterance_pcm: bytes):
     except Exception: pass
     if tts: speak_to_ring(bytes(tts))
 
+MQTT_HOST = os.environ.get("MQTT_HOST", "127.0.0.1")
+MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
+
+def discover_mqtt():
+    """Find camera device ids from ring-mqtt's topics (ring/<loc>/camera/<id>/…).
+    This is the only discovery channel that exists post-auth: ring-mqtt's
+    authenticator UI (:55123) shuts down once it holds a token, and its
+    embedded go2rtc exposes no API — but MQTT chatters constantly."""
+    import paho.mqtt.client as mqtt
+    found: set[str] = set()
+    done = threading.Event()
+    def on_msg(_c, _u, m):
+        parts = m.topic.split("/")
+        if len(parts) >= 4 and parts[0] == "ring" and parts[2] == "camera":
+            found.add(parts[3])
+            done.set()
+    c = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    c.on_message = on_msg
+    c.connect(MQTT_HOST, MQTT_PORT, 30)
+    c.subscribe("ring/#")
+    c.loop_start()
+    done.wait(timeout=90)
+    c.loop_stop()
+    try: c.disconnect()
+    except Exception: pass
+    return sorted(found)
+
+def register_stream(name: str, src: str):
+    """Idempotently register the ring RTSP as a stream in OUR go2rtc, so the
+    console's Live button (WebRTC via /go2rtc/) and the speaker backchannel
+    have something to talk to."""
+    url = f"{GO2RTC}/api/streams?name={urllib.parse.quote(name)}&src={urllib.parse.quote(src, safe='')}"
+    try:
+        req = urllib.request.Request(url, method="PUT")
+        urllib.request.urlopen(req, timeout=5).read()
+        return True
+    except Exception as e:
+        log("go2rtc register failed:", e)
+        return False
+
 def discover():
-    """Poll go2rtc for the first *_live stream once ring-mqtt is authenticated."""
+    """MQTT camera-id discovery → construct RTSP + register with go2rtc."""
     global RTSP, STREAM
     user = os.environ.get("LIVESTREAM_USER", "orb"); pw = os.environ.get("LIVESTREAM_PASS", "orbstream")
     while not RTSP:
         try:
-            with urllib.request.urlopen(GO2RTC + "/api/streams", timeout=5) as r:
-                names = list(json.loads(r.read()).keys())
-            live = [n for n in names if n.endswith("_live")]
-            if live:
-                STREAM = STREAM or live[0]
-                RTSP = f"rtsp://{user}:{pw}@127.0.0.1:8554/{live[0]}"
-                log("autodiscovered stream:", live[0])
-                return
-        except Exception:
-            pass
-        log("waiting for ring-mqtt streams (authenticate at :55123)…")
+            ids = discover_mqtt()
+        except Exception as e:
+            log("mqtt discovery error:", e); ids = []
+        if ids:
+            cam = ids[0]
+            STREAM = STREAM or f"{cam}_live"
+            RTSP = f"rtsp://{user}:{pw}@127.0.0.1:8554/{cam}_live"
+            log("autodiscovered camera:", cam, "→", STREAM)
+            break
+        log("no ring cameras on MQTT yet (sign in via Settings → Home → Ring)…")
         time.sleep(60)
+    # Keep the stream registered in our go2rtc (it forgets on restart).
+    def keep_registered():
+        while True:
+            register_stream(STREAM, RTSP)
+            time.sleep(300)
+    threading.Thread(target=keep_registered, daemon=True).start()
 
 def main():
     if not RTSP:
         discover()
+    else:
+        if STREAM: register_stream(STREAM, RTSP)
     from vosk import Model, KaldiRecognizer
     model_path = "/model"
     log("loading vosk model…")
     model = Model(model_path)
-    rec = KaldiRecognizer(model, RATE)
-    rec.SetWords(False)
+    # Constrained grammar: "orb" is a rare word — open-vocabulary decoding
+    # hears "or"/"herb". Restricting the recognizer to the wake phrases +
+    # [unk] makes spotting reliable; everything else decodes to [unk].
+    grammar = json.dumps(WAKE + ["[unk]"])
+    def wake_rec():
+        r = KaldiRecognizer(model, RATE, grammar)
+        r.SetWords(False)
+        return r
+    rec = wake_rec()
     log("watching", RTSP, "for wake words:", WAKE)
     while True:
         try:
+            # Ring's mic runs HOT-room quiet (~-60dB room tone, speech at
+            # distance ~-40dB) — without gain the wake word sits at Vosk's
+            # floor. speechnorm lifts speech toward full scale (noise less so);
+            # highpass kills HVAC rumble first. Map the AAC track explicitly
+            # (the stream carries aac+opus and default selection may vary).
             ff = subprocess.Popen(
                 ["ffmpeg", "-nostdin", "-loglevel", "error", "-rtsp_transport", "tcp", "-i", RTSP,
-                 "-vn", "-ac", "1", "-ar", str(RATE), "-f", "s16le", "-"],
+                 "-vn", "-map", "0:a:0", "-af", "highpass=f=80,speechnorm=e=12.5:r=0.0001:l=1",
+                 "-ac", "1", "-ar", str(RATE), "-f", "s16le", "-"],
                 stdout=subprocess.PIPE)
             awake = False; buf = bytearray(); last_voice = time.time(); started = 0.0
             while True:
@@ -124,12 +205,12 @@ def main():
                     if txt and any(w in txt for w in WAKE):
                         log("WAKE:", txt)
                         awake = True; buf = bytearray(); started = time.time(); last_voice = time.time()
-                        rec = KaldiRecognizer(model, RATE)
+                        rec = wake_rec()
                 else:
                     buf.extend(chunk)
                     # crude energy VAD for end-of-utterance
                     import audioop
-                    if audioop.rms(chunk, 2) > 500: last_voice = time.time()
+                    if audioop.rms(chunk, 2) > 1200: last_voice = time.time()  # post-speechnorm scale
                     if (time.time() - last_voice > UTTER_SILENCE_S and len(buf) > RATE) or time.time() - started > UTTER_MAX_S:
                         awake = False
                         threading.Thread(target=run_session, args=(bytes(buf),), daemon=True).start()
