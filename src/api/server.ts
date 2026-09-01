@@ -1647,6 +1647,10 @@ async function dispatch(
     const ringUser = (attributionFor(identity).oid || '').replace(/^user:/, '')
     const ringResp = await tryHandleRingRoute(method, pathname, req, ctx.store, ringUser)
     if (ringResp) return ringResp
+    // ─── Standing intents (SPEC §15) — visible background work ───
+    const { tryHandleIntentsRoute } = await import('./intents/routes.js')
+    const intResp = await tryHandleIntentsRoute(method, pathname, req, ctx.store, ringUser)
+    if (intResp) return intResp
   }
   // ─── Remote mode: lan (tailnet for away) vs direct (DynDNS + router port) ───
   if (pathname === '/v1/remote/status' && method === 'GET') {

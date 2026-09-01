@@ -445,6 +445,53 @@ LTE logged; fast-path hits for the four away intents.
 
 ---
 
+## §15 — Standing intents: the agent's own lanes ✅
+
+**The gap it closes.** Every proactive lane above (leave-by, replenish,
+mail-watch, occasions…) is code WE wrote. §15 makes the loop
+self-extending: the agent can hold an intention over days or weeks —
+"watch the price of Martin's usual milk, speak up under $4" — and work
+on it between conversations, without a purpose-built checker per case.
+
+**Model.** An Intent is `{goal, member, cadence_min, next_at, state,
+status, origin chat|dream, expires_at}` in kv `intents:all`
+(`src/api/intents/engine.ts`). The tick chain gains `tickIntents`: due
+intents (max 2/tick, serialized, 4-min wall-clock cap each) each get a
+**headless agent turn** through `runChannelTurn` — the full chat runtime
+(native tools, memory recall, consent gradient, receipts, episodes) with
+a worker charter instead of a user message (`intents/turn.ts`). Runs are
+STATELESS: continuity lives in the intent's `state` scratchpad (baseline
+price, seen-set, dates), so per-run cost is bounded forever. The worker
+files its result via Watch op:'report' (kv mailbox) → `quiet` updates
+state; `notify`/`done` route through the journal's attention rules
+(quiet hours, away push); a run that never reports is treated as quiet.
+
+**Registration — three doors.** (1) Conversation: the system prompt
+forbids promising monitoring without registering (Watch op:'add'); "tell
+me when X" becomes an intent in the same turn. (2) Dream: consolidation
+step 4 may register AT MOST ONE watch per night from an observed habit
+(usual product + typical price), announced with an ambient journal note
+— no silent watchers, ever. (3) Never by code: no hardcoded watch types.
+
+**Trust.** Watches are visible and controllable in Settings → Users →
+"Standing watches" (`/v1/intents` GET/PATCH/DELETE; pause/resume/drop;
+members see theirs, owners all). Worker turns cannot place orders or
+take gated actions — an unattended approval resolves "not approved" and
+the worker escalates a recommendation instead; anything it wants bought
+goes through §2 budgets like every other hand.
+
+**Bounds.** ≤20 active per household; cadence floor 30 min (default
+daily); default expiry 60 days (ambient nudge on expiry, renewable);
+finished intents kept 30 days for the Settings list.
+
+**Done when:** unit suite (engine.test.ts: schedule/report/expiry/pause/
+cap); live: "watch X, tell me if under $N" registers + first run files a
+baseline report; forced run with a met condition lands a notify in the
+journal/deck; dream registers ≤1 habit watch with its announcement;
+Settings lists/pauses/drops. ✅ shipped v26.19.
+
+---
+
 ## Part V — Testing: the sim-commerce harness (Part V)
 
 `src/api/commerce/sim.ts` — a full ServiceConnector (`sim-store`,

@@ -59,6 +59,12 @@ export async function runDreamConsolidation(store: Store, trigger: 'manual' | 's
     `   CONTRADICTS an old one, don't silently delete — supersede: "X (until ${new Date().toISOString().slice(0, 7)}); now Y".`,
     `3. TIDY: merge duplicates, sharpen vague entries, prune truly dead facts, fix [[links]],`,
     `   keep MEMORY.md a tight one-line-per-memory index. Don't invent facts.`,
+    `4. WATCH (SPEC §15): check the Watch tool (op:'list'). If the episodes or your memory show a`,
+    `   RECURRING habit worth quietly monitoring for the household (a usual product + typical price,`,
+    `   an awaited restock/release, an approaching deadline), register AT MOST ONE new watch via`,
+    `   Watch op:'add' — set member to the email of the person it serves, and write the goal with`,
+    `   the baseline and the speak-up condition. Skip this step entirely if nothing clearly recurs`,
+    `   or a similar watch already exists; a wrong watch is worse than none.`,
     `When done, reply with a one-paragraph summary of what you learned and changed.`,
     episodeBlock,
   ].filter(Boolean).join('\n')

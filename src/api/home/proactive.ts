@@ -278,6 +278,10 @@ async function tick(): Promise<void> {
     await tickCameraEvents(pushStore).catch(() => { /* best effort */ })
     const { tickOccasions } = await import('../commerce/occasions.js')
     await tickOccasions(pushStore).catch(() => { /* best effort */ })
+    // SPEC §15: the agent's own lanes — due standing intents get a headless
+    // worker turn (fire-and-forget; the engine serializes and bounds itself,
+    // and a slow model turn must never stall the deterministic lanes above).
+    import('../intents/engine.js').then(m => m.tickIntents(pushStore!)).catch(() => { /* best effort */ })
   }
   await checkArrivals().catch(() => { /* best effort */ })
   await checkDeviceHealth().catch(() => { /* best effort */ })

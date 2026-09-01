@@ -197,6 +197,22 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
       available: true,
     },
     {
+      name: 'Watch',
+      description: "Standing intents — background goals YOU keep working on between conversations (SPEC §15). You CANNOT passively 'keep an eye on' anything yourself: if the user wants ongoing monitoring (price drop on their usual item, a restock, a date window, 'tell me when…'), you MUST register it here or it will never happen. op:'add' {goal, cadence?, expires_days?, member?} — goal is YOUR future worker's charter: say WHAT to check, the BASELINE if known (usual brand/price), and WHEN to speak up ('notify if under $4'). cadence: 'hourly'|'daily'|'weekly'|'45m'|'2h' (default daily, min 30m). op:'list' shows the user's watches (tell them what you're quietly working on when asked). op:'pause'/'resume'/'cancel' {intent_id}. op:'run_now' {intent_id} forces a check within a minute. op:'report' {intent_id, outcome:'quiet'|'notify'|'done', state?, message?} is used ONLY inside a background watch run to file its result.",
+      input_schema: { type: 'object', properties: {
+        op: { type: 'string', enum: ['add', 'list', 'pause', 'resume', 'cancel', 'run_now', 'report'] },
+        goal: { type: 'string', description: "add: the charter — what to check, baseline, when to notify. E.g. \"Fairlife 2% milk, usually $4.29 at H-E-B — check the price daily, notify if it drops under $4 or there's a promo.\"" },
+        cadence: { type: 'string', description: "add: 'hourly'|'daily'|'weekly'|'45m'|'2h'|'3d' (default daily)." },
+        expires_days: { type: 'number', description: 'add: auto-expire after N days (default 60).' },
+        member: { type: 'string', description: 'add: email of the member this watch serves (defaults to the current user; set explicitly in dream consolidation).' },
+        intent_id: { type: 'string' },
+        outcome: { type: 'string', enum: ['quiet', 'notify', 'done'], description: 'report only.' },
+        state: { type: 'string', description: 'report: your notes for the next run (baseline, seen items, dates).' },
+        message: { type: 'string', description: 'report notify/done: one short sentence for the user.' },
+      }, required: ['op'] },
+      available: true,
+    },
+    {
       name: 'Order',
       description: "Order things in the real world (SPEC Hands): food delivery, consumables, parts — through connected services. op:'options' {intent, service?} lists what's available (e.g. intent 'thai'). If the user NAMES a service (uber, lyft, doordash, uber eats, opentable, flowers) pass it as service — don't substitute another. Reservations/flowers are zero-amount handoffs: build the cart, give them the checkout link, add the calendar event (with where) once confirmed. op:'order' {service, items:[{id,qty?}], gift_for?} builds the cart and runs it through the household BUDGET policy: it may auto-place (earned tier), raise an approval card, or refuse with the reason — relay refusals verbatim. Handoff services return a checkout the human must Pay in; NEVER claim those are placed until confirmed. op:'status' shows open orders; op:'cancel' {order_id}; op:'confirm_paid' {order_id} after the human paid a handoff checkout. Present options with time + cost; only order what the user chose.",
       input_schema: { type: 'object', properties: {
@@ -799,6 +815,51 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
       return `Done (${action}).`
     } catch (e) { return `[ERROR] ${(e as Error).message}` }
   })
+  add('Watch', { readOnly: true }, async (args: any) => {
+    const { addIntent, listIntents, updateIntent, removeIntent, fileReport } = await import('../intents/engine.js')
+    const me = (ctx.ownerId || 'owner').replace(/^user:/, '')
+    const op = String(args?.op || 'list')
+    if (op === 'add') {
+      const member = String(args?.member || '').trim() || me
+      const r = await addIntent(ctx.store, { goal: String(args?.goal || ''), member, cadence: args?.cadence, expires_days: args?.expires_days, origin: me === 'dream' ? 'dream' : 'chat' })
+      if (!r.ok || !r.intent) return `[ERROR] ${r.error || 'could not register the watch'}`
+      if (r.intent.origin === 'dream') {
+        // Watched watchers: a self-registered watch is never silent.
+        const { logEvent } = await import('../events/journal.js')
+        await logEvent(ctx.store, { kind: 'note', member, attention: 'ambient', ref: r.intent.id, summary: `I started quietly watching: ${r.intent.goal.slice(0, 120)} — say "drop that watch" if you'd rather I didn't.` }).catch(() => {})
+      }
+      const every = r.intent.cadence_min >= 1440 ? `${Math.round(r.intent.cadence_min / 1440)}d` : `${r.intent.cadence_min}m`
+      return `Watching (${r.intent.id}): "${r.intent.goal}" — checking every ${every} until ${r.intent.expires_at.slice(0, 10)}. First check runs within the minute.`
+    }
+    if (op === 'report') {
+      const id = String(args?.intent_id || '')
+      const outcome = String(args?.outcome || '')
+      if (!id || !['quiet', 'notify', 'done'].includes(outcome)) return "[ERROR] report needs intent_id and outcome quiet|notify|done"
+      await fileReport(ctx.store, id, { outcome: outcome as any, state: args?.state, message: args?.message })
+      return `Report filed for ${id} (${outcome}).`
+    }
+    if (op === 'list') {
+      const all = await listIntents(ctx.store)
+      const { isOwner } = await import('../auth/otp.js')
+      // Owners and the dream consolidator see all (dupe avoidance needs the full picture).
+      const seeAll = me === 'dream' || await isOwner(ctx.store, me).catch(() => false)
+      const mine = seeAll ? all : all.filter(i => i.member === me)
+      const live = mine.filter(i => i.status === 'active' || i.status === 'paused')
+      if (!live.length) return 'No standing watches right now.'
+      return live.map(i => {
+        const last = i.last_run_at ? `last check ${new Date(i.last_run_at).toLocaleString()} → ${i.last_result}${i.last_note ? ` ("${i.last_note}")` : ''}` : 'not yet run'
+        return `- ${i.id} [${i.status}] (${i.member}, every ${i.cadence_min >= 1440 ? Math.round(i.cadence_min / 1440) + 'd' : i.cadence_min + 'm'}): ${i.goal} — ${last}`
+      }).join('\n')
+    }
+    const id = String(args?.intent_id || '')
+    if (!id) return '[ERROR] intent_id required'
+    if (op === 'cancel') return (await removeIntent(ctx.store, id)) ? `Canceled ${id}.` : `[ERROR] no watch ${id}`
+    if (op === 'pause') return (await updateIntent(ctx.store, id, { status: 'paused' })) ? `Paused ${id}.` : `[ERROR] no watch ${id}`
+    if (op === 'resume') return (await updateIntent(ctx.store, id, { status: 'active', next_at: Date.now() })) ? `Resumed ${id}.` : `[ERROR] no watch ${id}`
+    if (op === 'run_now') return (await updateIntent(ctx.store, id, { next_at: Date.now() })) ? `${id} will check within the minute.` : `[ERROR] no watch ${id}`
+    return `[ERROR] unknown op '${op}'`
+  })
+
   add('Order', {}, async (args: any) => {
     const member = (ctx.ownerId || '').replace(/^user:/, '')
     const { getConnector, listConnectors, initConnectors } = await import('../commerce/connector.js')

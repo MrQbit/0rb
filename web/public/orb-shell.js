@@ -3185,6 +3185,7 @@
   }
   async function loadUsers(){
     loadBudgets().catch(()=>{});
+    loadIntents().catch(()=>{});
     const list=$('#setUsersList');
     try{ const d=await (await fetch('/v1/auth/users',{credentials:'same-origin'})).json(); const us=d.users||[];
       if(!us.length){ list.innerHTML='<div class="set-muted">No users yet.</div>'; return; }
@@ -3301,6 +3302,28 @@
     }catch{ msg.textContent='Failed.'; }
   }
   // ── Budgets (SPEC §1): owner-editable spend policy ──
+  // ── Standing watches (SPEC §15): visible background work ──
+  async function loadIntents(){
+    const box=$('#setIntents'); if(!box) return;
+    let d=null;
+    try{ d=await (await fetch('/v1/intents',{credentials:'same-origin'})).json(); }catch{}
+    const list=(d&&d.intents)||[];
+    const live=list.filter(i=>i.status==='active'||i.status==='paused');
+    if(!live.length){ box.innerHTML='<div class="set-muted">None right now — ask the orb to keep an eye on something ("tell me if my usual milk drops under $4").</div>'; return; }
+    box.innerHTML='';
+    live.forEach(i=>{
+      const row=document.createElement('div'); row.className='set-item';
+      const every=i.cadence_min>=1440?Math.round(i.cadence_min/1440)+'d':i.cadence_min+'m';
+      const last=i.last_run_at?new Date(i.last_run_at).toLocaleString()+' · '+(i.last_result||''):'not yet run';
+      row.innerHTML=`<div class="grow"><div class="t">${esc(i.goal)}</div><div class="s">${esc(i.member.split('@')[0])} · every ${every} · last: ${esc(last)}${i.last_note?' — “'+esc(i.last_note)+'”':''}${i.status==='paused'?' · <b>paused</b>':''}</div></div>`;
+      const act=document.createElement('button'); act.className='set-btn ghost'; act.textContent=i.status==='paused'?'Resume':'Pause';
+      act.onclick=async()=>{ try{ const r=await fetch('/v1/intents/'+i.id,{method:'PATCH',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({status:i.status==='paused'?'active':'paused'})}); if(r.ok) loadIntents(); else toast('Not yours to change'); }catch{ toast('Failed'); } };
+      const del=document.createElement('button'); del.className='set-btn ghost'; del.textContent='Drop';
+      del.onclick=async()=>{ try{ const r=await fetch('/v1/intents/'+i.id,{method:'DELETE',credentials:'same-origin'}); if(r.ok) loadIntents(); else toast('Not yours to drop'); }catch{ toast('Failed'); } };
+      row.appendChild(act); row.appendChild(del); box.appendChild(row);
+    });
+  }
+
   async function loadBudgets(){
     const box=$('#setBudgets'); if(!box) return;
     let d=null; try{ d=await (await fetch('/v1/budgets',{credentials:'same-origin'})).json(); }catch{ box.innerHTML='<div class="set-muted small">Unavailable.</div>'; return; }
