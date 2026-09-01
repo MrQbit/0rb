@@ -138,6 +138,11 @@
                 <button id="ringVerify" class="set-btn">Verify</button>
               </div>
             </div>
+            <div class="set-row" id="ringSatRow" style="display:none;margin-top:10px;">
+              <span class="pill-dot" id="ringSatDot"></span>
+              <div class="grow"><div class="info-label" style="color:var(--ink);">Voice satellite</div><div class="set-muted small">"Hey orb" at the camera. <b>Listening holds the camera's live stream open 24/7</b> (that's how it hears the wake word); Off releases the camera completely. Motion-window and scheduled listening are coming (§16).</div></div>
+              <button id="ringSatBtn" class="set-btn ghost">…</button>
+            </div>
             <div id="ringTwoway" style="display:none;">
               <div class="set-row" style="margin-top:10px;"><span class="pill-dot" id="ringTwDot"></span><div class="info-label" style="color:var(--ink);">Camera speaker</div><span id="ringTwState" class="set-muted small"></span></div>
               <div id="ringTwForm" style="display:none;">
@@ -321,6 +326,10 @@
             <div class="set-row"><span class="pill-dot" id="brainDot"></span><div class="info-label" style="color:var(--ink);">Cloud reasoning</div><span id="brainState" class="set-muted small"></span></div>
             <p class="set-muted small">Everything runs on this box by default. When enabled, ONLY the turn types below may use a stronger cloud model — each sends the task alone, never camera frames, locations, money records, or your journal. Every cloud call is logged and budgeted.</p>
             <div id="brainClasses" class="set-list"></div>
+            <div class="set-form" style="margin-top:8px;">
+              <input id="brainKey" type="password" placeholder="Anthropic API key (sk-ant-…)" style="flex:2;" autocomplete="off" />
+              <button id="brainKeySave" class="set-btn">Set key</button>
+            </div>
             <div class="set-form" style="margin-top:8px;">
               <input id="brainCap" type="number" min="0" step="1" placeholder="Monthly cap $" style="max-width:130px;" />
               <input id="brainModel" type="text" placeholder="Model (default: claude-sonnet-5)" />

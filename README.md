@@ -75,9 +75,16 @@ Raspberry Pi) are in **[DEPLOYMENT.md](DEPLOYMENT.md)**.
 ### Voice & vision
 
 - Continuous speech with **barge-in** and **streaming TTS** — it starts
-  speaking the first sentence while still thinking. GPU STT (faster-whisper) →
-  agent → GPU neural TTS (Kokoro), with Orpheus (llama.cpp) as an optional
-  expressive engine.
+  speaking the first sentence while still thinking. GPU STT (Whisper
+  large-v3-turbo on CUDA) → agent → GPU neural TTS (Kokoro), with Orpheus
+  (llama.cpp) as an optional expressive engine.
+- **Bilingual by design:** language is detected per utterance and per reply —
+  a Spanish question gets a Spanish answer in a native Spanish voice, an
+  English one stays English, with no mixing inside a reply.
+- **Screenless satellites:** a Ring camera becomes a voice endpoint — say
+  "hey orb" at the camera (grammar-constrained wake spotting with a self-echo
+  guard) and the reply plays through the camera's speaker or the nearest
+  room speaker. On/off lives in Settings.
 - **A deterministic fast-path answers before the LLM.** Device commands,
   timers, house modes, time/date and "undo that" match a grammar against the
   real device list and execute in **milliseconds** (measured: reply 14 ms
@@ -240,6 +247,10 @@ all services on one network, each with a healthcheck and restart policy:
 | `matter` | Matter bridge **and controller** (host net) — Apple Home / Siri pairing, device adoption, fabric storage | |
 | `homeassistant` | Home Assistant (host networking for discovery, console :8123) | |
 | `ui` | nginx console — front door (HTTP :9080, HTTPS :9443) | |
+| `mosquitto` | MQTT broker (:1883) for the Ring bridge | |
+| `ring-mqtt` | Ring cloud bridge (host net) — cameras, sensors, RTSP live streams | |
+| `go2rtc` | streaming hub (host net, :1984) — WebRTC live view + speaker backchannel | |
+| `ringvoice` | voice satellite — wake-word on the Ring camera mic, replies by speaker | |
 | `watchdog` | restarts any service that goes unhealthy | |
 
 Only the **GPU** rows need an NVIDIA GPU; the rest run anywhere Docker does.

@@ -90,6 +90,8 @@ dk build -t $REG/orb2-ui:dev  -f web/Dockerfile web/    && dk push $REG/orb2-ui:
 dk build -t $REG/orb2-whatsapp:dev services/whatsapp/   && dk push $REG/orb2-whatsapp:dev
 dk build -t $REG/orb2-bridge:dev services/bridge/       && dk push $REG/orb2-bridge:dev
 dk build -t $REG/orb2-matter:dev services/matter/       && dk push $REG/orb2-matter:dev
+dk build -t $REG/orb2-ringvoice:dev services/ringvoice/ && dk push $REG/orb2-ringvoice:dev
+dk build -t $REG/orb2-blender:dev services/blender/     && dk push $REG/orb2-blender:dev
 
 # ── 5. GPU service images (need the personaplex:cuda base) ────────────────
 # Pre-rebrand boxes already have these built as rak00n-* — retag, don't rebuild.

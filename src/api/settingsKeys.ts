@@ -28,6 +28,10 @@ export const SETTINGS_KEYS = [
   'OPENAI_MODEL', 'OPENAI_BASE_URL', 'OPENAI_API_KEY', 'ORB2_HF_TOKEN',
   // Model router — default local; route by intent to OpenRouter when enabled.
   'ORB2_ROUTER_ENABLED', 'ORB2_OPENROUTER_KEY', 'ORB2_ROUTER_STRONG_MODEL',
+  // Hybrid brain (§17) — cloud key for the governed route classes.
+  'ORB2_ANTHROPIC_KEY',
+  // Bilingual TTS (Spanish voice) + Ring satellite reply speaker
+  'ORB2_TTS_VOICE_ES', 'ORB2_RING_FALLBACK_SPEAKER', 'ORB2_STT_MODEL',
   // Connected apps (set from Settings → Apps; enable the matching tools live)
   'ORB2_YOUTUBE_API_KEY', 'ORB2_SPOTIFY_CLIENT_ID', 'ORB2_SPOTIFY_CLIENT_SECRET', 'ORB2_BRAVE_API_KEY',
   'ORB2_NEWSAPI_KEY', 'ORB2_VERCEL_TOKEN', 'ORB2_VERCEL_TEAM_ID',
@@ -46,6 +50,7 @@ export const SETTINGS_PLAINTEXT_KEYS = new Set([
   'ORB2_SMTP_HOST', 'ORB2_SMTP_PORT', 'ORB2_SMTP_FROM',
   'ORB2_TELEGRAM_OWNER_ID', 'ORB2_OWNER_PHONE', 'OPENAI_MODEL', 'OPENAI_BASE_URL',
   'ORB2_WIDGETS_DISABLED', 'ORB2_ROUTER_ENABLED', 'ORB2_ROUTER_STRONG_MODEL',
+  'ORB2_TTS_VOICE_ES', 'ORB2_RING_FALLBACK_SPEAKER', 'ORB2_STT_MODEL',
 ])
 
 /**

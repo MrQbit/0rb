@@ -2475,6 +2475,21 @@
       const n=(d.streams||[]).length;
       state.textContent='Connected'+(n?` · ${n} camera${n===1?'':'s'} live`:' · starting streams…');
       login.style.display='none'; codeF.style.display='none';
+      // Voice satellite master switch (kv-backed; ringvoice polls it)
+      const satRow=$('#ringSatRow'); if(satRow){
+        satRow.style.display='';
+        try{
+          const s=await (await fetch('/v1/ring/satellite',{credentials:'same-origin'})).json();
+          const on=s.enabled!==false;
+          $('#ringSatDot').className='pill-dot'+(on?' ok':'');
+          const b=$('#ringSatBtn'); b.textContent=on?'Listening 24/7':'Off'; b.className='set-btn'+(on?'':' ghost');
+          b.onclick=async()=>{
+            const r=await fetch('/v1/ring/satellite',{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({enabled:!on})});
+            if(r.ok){ toast(!on?'Satellite listening':'Satellite off — camera released'); setTimeout(loadRing,600); }
+            else toast('Owner only');
+          };
+        }catch{}
+      }
       // Two-way audio (camera speaker) sub-card
       const tw=$('#ringTwoway'); if(tw){
         tw.style.display='';
@@ -3189,6 +3204,11 @@
       b.onclick=async()=>{ const r=await fetch('/v1/brain',{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({classes:{[k]:!on}})}); if(r.ok) loadBrain(); else toast('Owner only'); };
       row.appendChild(b); list.appendChild(row);
     });
+    $('#brainKeySave').onclick=async()=>{
+      const k=($('#brainKey').value||'').trim(); if(!k){ toast('Paste a key first'); return; }
+      const r=await fetch('/v1/settings',{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({ORB2_ANTHROPIC_KEY:k})});
+      if(r.ok){ $('#brainKey').value=''; toast('Key set'); setTimeout(loadBrain,800); } else toast(r.status===403?'Owner only':'Failed');
+    };
     $('#brainCap').value=(d.monthly_cap_cents/100).toFixed(0);
     $('#brainModel').value=d.model||'';
     $('#brainSave').onclick=async()=>{

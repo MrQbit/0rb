@@ -28,6 +28,26 @@ UTTER_MAX_S = 12
 # camera mic hears it — suppress wake-spotting until playback ends + tail.
 suppress_until = 0.0
 
+# Settings master switch: the api holds ring:satellite; we poll it and idle
+# (ffmpeg killed, Ring live session released) when the owner turns it off.
+enabled = True
+
+def poll_enabled():
+    global enabled
+    api = os.environ.get("ORB2_API", "http://127.0.0.1:9080").rstrip("/")
+    while True:
+        try:
+            req = urllib.request.Request(f"{api}/v1/ring/satellite",
+                                         headers={"Authorization": f"Bearer {TOKEN}"})
+            with urllib.request.urlopen(req, timeout=5) as r:
+                now = bool(json.loads(r.read()).get("enabled", True))
+            if now != enabled:
+                log("satellite", "ENABLED" if now else "DISABLED", "from Settings")
+            enabled = now
+        except Exception:
+            pass                     # api briefly down → keep last state
+        time.sleep(20)
+
 def log(*a): print("[ringvoice]", *a, flush=True)
 
 def speak_to_ring(pcm24k: bytes):
@@ -195,8 +215,12 @@ def main():
         r.SetWords(False)
         return r
     rec = wake_rec()
+    threading.Thread(target=poll_enabled, daemon=True).start()
     log("watching", RTSP, "for wake words:", WAKE)
     while True:
+        if not enabled:
+            time.sleep(5)
+            continue
         try:
             # Ring's mic runs HOT-room quiet (~-60dB room tone, speech at
             # distance ~-40dB) — without gain the wake word sits at Vosk's
@@ -210,6 +234,10 @@ def main():
                 stdout=subprocess.PIPE)
             awake = False; buf = bytearray(); last_voice = time.time(); started = 0.0
             while True:
+                if not enabled:
+                    log("satellite disabled — releasing the camera stream")
+                    ff.kill()
+                    break
                 chunk = ff.stdout.read(CHUNK)
                 if not chunk: raise RuntimeError("stream ended")
                 if time.time() < suppress_until:

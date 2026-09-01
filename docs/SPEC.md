@@ -525,6 +525,31 @@ via the room's Sonos (`/v1/ring/speak` → bridgeAnnounce).
    (vocal tone → `vocalContext`) revisits once accuracy is tuned
    (env-gated today).
 
+**§16.6 — Satellite duty cycle & reply latency (field feedback, 2026-09-01).**
+Two findings from the first day of real use:
+1. *"The audio loop kept running permanently once it woke up"* — correct
+   observation: continuous wake-spotting HOLDS the Ring live stream open
+   24/7. That is one valid mode, not the only one. Ship LISTENING MODES
+   on the satellite Settings row: `off` / `continuous` (today's) /
+   `motion-window` (ring-mqtt motion event opens a 90-second listen
+   window, then releases the camera — near-zero standing stream, small
+   chance of missing a cold "hey orb") / `scheduled` (cron windows,
+   e.g. 8am–11pm). Mode is kv-backed like the on/off flag; ringvoice
+   polls it; the Settings row shows the LIVE stream state (held/released)
+   so the owner can SEE what the camera is doing.
+2. *~10s wake→Sonos delay* — measured budget to attack, per leg:
+   utterance tail (1.6s silence padding) + server VAD finalize + agent
+   generation + FULL TTS collection before any audio moves + WAV
+   transcode + UPnP SetURI/Play round trips. Fixes, in order: (a) emit
+   per-leg timings in ringvoice logs so the budget is measured not
+   guessed; (b) explicit end-of-utterance signal to the voice WS instead
+   of the 1.6s silence tail; (c) sentence-streaming to the speaker —
+   play sentence 1's audio the moment it lands instead of collecting the
+   whole reply (UPnP gapless via a single growing stream URL, or accept
+   small inter-sentence gaps); (d) pre-warm the Sonos SOAP session.
+   Target: ≤3.5s wake→first audible word. Done when a logged real
+   exchange shows ≤3.5s and the mode row controls the stream honestly.
+
 **Done when:** wake false-accept < 1/day and false-reject < 1/10 at
 3 m in kitchen noise (logged over a real week); echo guard: zero
 self-wakes during a 50-reply soak; STT bench published in docs (WER +
@@ -641,6 +666,106 @@ presence query journaled.
 
 ---
 
+## §19 — The workshop: orb as engineering partner, home-first, Vercel as the door ☐
+
+**The ask (owner, 2026-09-01):** JARVIS territory — help with design,
+software specs, deployment pipelines, data analysis. The right tools,
+local AND cloud. **Data privacy is keystone**: services orb stands up
+live IN the home by default; when something must be reachable from the
+internet, **Vercel is the one sanctioned egress rail** — and it hosts
+compute + public artifacts, never the household's data.
+
+### 19.1 Doctrine
+- **Home-first**: anything orb builds runs on the Spark as an orb-owned
+  Docker workload. The GB10 is the datacenter.
+- **Egress is an act, not a default**: exposing a service publicly is an
+  explicit, per-service, owner-approved step (a consent card naming
+  exactly what becomes public and what data it can reach), receipted and
+  journaled like money.
+- **Vercel hosts code, not data**: static/SSR frontends, serverless
+  functions, API relays. State stays home; public functions reach it
+  only through the existing relay/tailnet with scoped, revocable tokens.
+- **Private by default** everywhere: scaffolded repos private, deploys
+  password/team-gated unless the owner says public, secrets pushed as
+  Vercel env vars at deploy time and never logged.
+
+### 19.2 Local resource deployments — the Workbench
+A registry of orb-managed workloads (kv `workbench:services`): each
+`{name, source (repo/path), runtime: docker, ports, env, health, autostart,
+resources {cpu, mem}}`.
+- **Agent tool `Workbench`**: op scaffold (from templates: static site,
+  bun/node api, python api, worker, notebook), build, run, stop, logs,
+  list, remove. Every mutation classified through the §1/§2-style
+  gradient (run/stop = reversible; remove = confirm) + receipts.
+- **Guardrails**: dedicated port range (e.g. 9500–9599), per-workload
+  mem/cpu caps, max N workloads, total RAM/VRAM budget visible; names
+  prefixed `wb-` so `docker ps` reads honestly; workloads NEVER get the
+  docker socket, the orb repo, or the household network's credentials.
+- **Self-evolve lineage**: the existing self-build/promote pipeline
+  (ORB2_SELF_MODIFY_ENABLED, orb2-promote.sh) is the ancestor — the
+  Workbench generalizes it from "orb's own code" to "anything the owner
+  asks orb to build and run".
+
+### 19.3 Vercel egress — publish classes
+Extends the existing page publisher (ORB2_VERCEL_TOKEN):
+- **page** (exists): single shareable page.
+- **app**: full project deploy (build → vercel deploy of a Workbench
+  workload's repo dir); production vs preview; custom domain attach.
+- **api-relay**: serverless functions that proxy back to a home service
+  through the relay with a scoped signed token (rotatable, revocable
+  from Settings) — the pattern that lets a public UI use home data
+  without the data leaving home wholesale.
+- **Publications registry** (kv `publish:registry`): every live deploy
+  {class, url, project, workload?, deployed_at, access: public|gated} —
+  nothing orb has put on the internet is ever invisible.
+
+### 19.4 Engineering workflows (what "help me with…" means)
+- **Design/spec sessions**: artifacts land in the workspace as files
+  (specs, diagrams via Canvas/Blender, ADRs); orb keeps ONE working doc
+  per project (the SPEC.md lesson, §14 of life).
+- **Pipelines**: orb runs build/test loops locally on the Workbench,
+  gates promotion on green tests, deploys to Vercel only on approval —
+  the same classified→approved→receipted spine as money.
+- **Data analysis**: local-first with Files + RunCode + widgets
+  (tables/charts); datasets never leave the box; a *published* dashboard
+  is an api-relay app whose data calls come home through scoped tokens.
+- **Hybrid brain**: `planning` route class (§17) is the natural home for
+  the heavy design/spec turns — owner-toggled, firewalled, budgeted.
+
+### 19.5 UI elements
+- **Settings → Workbench** (new section): local workloads list (status,
+  ports, cpu/mem, log tail, start/stop/remove), resource meter (orb
+  workloads vs system total), port registry.
+- **Publications card**: every Vercel deploy with class, URL, access
+  level, last deploy time, and a **Take down** button; take-down also
+  revokes the deploy's relay token.
+- **Consent card** (deploy-time): "This makes X public. It can reach: Y.
+  It cannot reach: journal, memory, presence, money, cameras." Approve /
+  keep it home.
+- **Accounts**: Vercel token/team (exists, Settings → Apps); GitHub
+  account link for scaffolded repos (private default); both surfaced
+  with the same brand-row pattern as other integrations.
+- **Widgets**: `workload` (status/logs/actions) and `deployment`
+  (url/state/last build) types for chat-surface control.
+
+### 19.6 Documentation
+Operator doc gains a "Workshop & publishing" section (local guardrails,
+egress doctrine, token scopes, take-down); README gets the public-safe
+paragraph (home-first workloads, explicit publishing). CLAUDE-facing:
+the Workbench tool description carries the doctrine so the agent never
+"helpfully" exposes something.
+
+### 19.7 Build order & Done
+Ships as three slices: (1) Workbench local (tool + registry + Settings
+section + guardrails + receipts), (2) publish classes app/api-relay +
+publications registry + consent card + take-down, (3) workflows polish
+(templates, pipeline gates, dashboard pattern). **Done when:** a real
+request — "build me a small dashboard for X and put it online" — runs
+end-to-end: scaffold → local run (visible in Settings) → owner approves
+the consent card → Vercel URL live → publication listed → Take down
+removes it and revokes its token; and a refused consent keeps everything
+fully functional at home.
+
 ## Part V — Testing: the sim-commerce harness (Part V)
 
 `src/api/commerce/sim.ts` — a full ServiceConnector (`sim-store`,
@@ -684,6 +809,10 @@ Stages ship in order, one calendar release (`v26.N`) each:
     + metering. Deliberately last: it upgrades every earlier stage's
     reasoning once the data-boundary rules it must respect (§18
     presence, §12 frames, §1 ledger) all exist to be enforced.
+11. **Stage 11 — the workshop (§19):** Workbench local slice first
+    (guardrails before power), then publish classes + consent +
+    take-down, then workflow polish. §16.6 duty-cycle/latency work
+    interleaves as the audio-troubleshoot track.
 
 Each release: version bump, tag, docs, gallery/smoke green, and the
 relevant playbook ⏳ markers flipped.

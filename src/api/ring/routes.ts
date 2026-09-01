@@ -65,6 +65,29 @@ export async function tryHandleRingRoute(
     return jsonResponse(200, { running, connected, streams, twoway })
   }
 
+  // Voice-satellite master switch. The ringvoice container polls this and
+  // idles (mic released, Ring live session closed) when off — Settings can
+  // stop/start listening without touching docker.
+  if (pathname === '/v1/ring/satellite') {
+    const KEY = 'ring:satellite'
+    if (method === 'GET') {
+      const v = await store.getKv(KEY).catch(() => null)
+      return jsonResponse(200, { enabled: v !== '0' })
+    }
+    if (method === 'PUT') {
+      const { isOwner } = await import('../auth/otp.js')
+      if (!user || !(await isOwner(store, user))) return jsonResponse(403, { error: 'owner only' })
+      const b = await req.json().catch(() => ({})) as any
+      const on = b?.enabled === true
+      await store.putKv(KEY, on ? '1' : '0', 60 * 60 * 24 * 365 * 5)
+      try {
+        const { logEvent } = await import('../events/journal.js')
+        await logEvent(store, { kind: 'note', attention: 'ambient', summary: `Ring voice satellite turned ${on ? 'ON' : 'OFF'} by ${user.split('@')[0]}` }).catch(() => {})
+      } catch { /* best effort */ }
+      return jsonResponse(200, { enabled: on })
+    }
+  }
+
   // Two-way audio enable: a SECOND Ring login (its own token — see oauth.ts).
   if (method === 'POST' && pathname === '/v1/ring/twoway/connect') {
     const { isOwner } = await import('../auth/otp.js')
