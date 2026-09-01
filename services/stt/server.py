@@ -132,6 +132,25 @@ def _load_whisper():
     raise RuntimeError(f"faster-whisper failed on all devices: {last_err}")
 
 
+def _load_hf_whisper():
+    """Whisper via transformers on torch-CUDA. On aarch64 (DGX Spark) the
+    CTranslate2 wheels ship WITHOUT CUDA, so faster-whisper silently runs
+    CPU — large-v3-turbo there is ~1.6x SLOWER than realtime. torch has
+    full CUDA on this box, so the transformers pipeline puts the same
+    model on the GPU where it belongs."""
+    import torch
+    from transformers import pipeline
+    model_id = WHISPER_MODEL if "/" in WHISPER_MODEL else "openai/whisper-large-v3-turbo"
+    dev = "cuda:0" if torch.cuda.is_available() else "cpu"
+    log.info("loading hf-whisper '%s' on %s", model_id, dev)
+    p = pipeline(
+        "automatic-speech-recognition", model=model_id, device=dev,
+        dtype=torch.float16 if dev.startswith("cuda") else torch.float32,
+    )
+    log.info("hf-whisper ready on %s", dev)
+    return p, ("cuda" if dev.startswith("cuda") else "cpu")
+
+
 def model():
     """Lazily load the selected engine; fall back to whisper if SenseVoice dies."""
     global _model, _device, _engine
@@ -143,6 +162,14 @@ def model():
             return _model
         except Exception as e:  # noqa: BLE001 — keep voice alive on the old engine
             log.error("SenseVoice unavailable, falling back to faster-whisper: %s", e)
+            _engine = "faster-whisper"
+    if _engine in ("hf", "hf-whisper"):
+        try:
+            _model, _device = _load_hf_whisper()
+            _engine = "hf-whisper"
+            return _model
+        except Exception as e:  # noqa: BLE001
+            log.error("hf-whisper unavailable, falling back to faster-whisper: %s", e)
             _engine = "faster-whisper"
     _model, _device = _load_whisper()
     return _model
@@ -207,6 +234,13 @@ def _transcribe(samples: np.ndarray):
             )
         raw = (res[0].get("text") if res else "") or ""
         return _parse_sensevoice(raw)
+    if _engine == "hf-whisper":
+        out = m(
+            {"array": samples, "sampling_rate": SAMPLE_RATE},
+            generate_kwargs={} if LANG == "auto" else {"language": LANG},
+            return_timestamps=False,
+        )
+        return (out.get("text") or "").strip(), "", [], (LANG if LANG != "auto" else "")
     # faster-whisper: transcript only, no paralinguistics.
     segments, info = m.transcribe(
         samples,

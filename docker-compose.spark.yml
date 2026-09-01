@@ -141,7 +141,11 @@ services:
       # faster-whisper (English-accurate) restored as the transcriber — SenseVoice
       # garbled conversational English. Set ORB2_STT_ENGINE=sensevoice to revisit
       # the emotion-tag path once its accuracy is tuned.
-      ORB2_STT_ENGINE: whisper
+      # hf-whisper = transformers on torch-CUDA. faster-whisper (CTranslate2)
+      # has NO CUDA on aarch64, so it always ran CPU here — large-v3-turbo
+      # on the GPU is both far more accurate than small.en AND faster.
+      ORB2_STT_ENGINE: hf-whisper
+      ORB2_STT_MODEL: "${ORB2_STT_MODEL:-openai/whisper-large-v3-turbo}"
       # Pull SenseVoice from the (fast) HuggingFace CDN; ms = ModelScope.
       ORB2_SENSEVOICE_HUB: hf
       HF_HUB_DISABLE_XET: "1"
