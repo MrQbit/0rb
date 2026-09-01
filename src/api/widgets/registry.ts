@@ -63,6 +63,7 @@ export const WIDGET_CATALOG: WidgetDef[] = [
   { id: 'sensors', name: 'Readings', desc: 'Temperature, humidity, battery, energy.', category: 'Home', setup: 'none', icon: '📊', envKeys: ['ORB2_HA_TOKEN'] },
   { id: 'camera', name: 'Cameras', desc: 'Camera snapshots.', category: 'Home', setup: 'none', icon: '📷', envKeys: ['ORB2_HA_TOKEN'] },
   { id: 'ring', name: 'Ring', desc: 'Ring doorbell & cameras — feed, motion, ding, siren.', category: 'Home', setup: 'none', icon: '🔔', envKeys: ['ORB2_HA_TOKEN'] },
+  { id: 'house-map', name: 'House map', desc: 'The digital twin — rooms, devices in place, live activity.', category: 'Home', setup: 'none', icon: '🗺️', envKeys: [] },
   { id: 'housemode', name: 'House mode', desc: 'Home / Away / Vacation / Guests — one tap.', category: 'Home', setup: 'none', icon: '🛡️', envKeys: ['ORB2_HA_TOKEN'] },
   { id: 'briefing', name: 'Today', desc: 'Morning briefing — weather, events, chores, security, presence.', category: 'Productivity', setup: 'none', icon: '☀️' },
   { id: 'familyboard', name: 'Family board', desc: 'Notes between members, delivered when they chat or arrive home.', category: 'Productivity', setup: 'none', icon: '👨‍👩‍👧' },

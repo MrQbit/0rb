@@ -1651,6 +1651,14 @@ async function dispatch(
     const { tryHandleIntentsRoute } = await import('./intents/routes.js')
     const intResp = await tryHandleIntentsRoute(method, pathname, req, ctx.store, ringUser)
     if (intResp) return intResp
+    // ─── Hybrid brain (SPEC §17) — what leaves the box ───
+    const { tryHandleBrainRoute } = await import('./brain/routes.js')
+    const brResp = await tryHandleBrainRoute(method, pathname, req, ctx.store, ringUser)
+    if (brResp) return brResp
+    // ─── Digital twin (SPEC §18) — plan + presence ───
+    const { tryHandleTwinRoute } = await import('./twin/routes.js')
+    const twResp = await tryHandleTwinRoute(method, pathname, req, ctx.store, ringUser)
+    if (twResp) return twResp
   }
   // ─── Remote mode: lan (tailnet for away) vs direct (DynDNS + router port) ───
   if (pathname === '/v1/remote/status' && method === 'GET') {
@@ -3935,8 +3943,15 @@ async function handleChat(
   req.signal?.addEventListener('abort', () => abortController.abort())
   const startedAt = Date.now()
   const fallbackModels = await getFallbackChainForModel(resolvedModel)
-  // Model router: intent-based cloud routing (null → local default model).
-  const routeOverride = routeTurn({ text: chatMessage, channel: 'chat' }) ?? undefined
+  // Hybrid brain (§17): governed route classes + privacy firewall; legacy
+  // heuristic router as fallback when §17 makes no decision.
+  const { decideTurn: brainDecide, firewallAllowsContext: brainFirewall, recordCloudUse: brainRecord } = await import('./brain/policy.js')
+  const brainDecision = await brainDecide(ctx.store, { text: chatMessage, channel: 'chat' })
+  const routeOverride = brainDecision?.provider ?? routeTurn({ text: chatMessage, channel: 'chat' }) ?? undefined
+  const brainContextAllowed = !brainDecision || brainFirewall(brainDecision.class)
+  const brainMeter = (outChars: number) => {
+    if (brainDecision) void brainRecord(ctx.store, brainDecision.class, brainDecision.provider.model, chatMessage.length, outChars).catch(() => {})
+  }
 
   if (!streaming) {
     const toolCalls: any[] = []
@@ -3970,7 +3985,7 @@ async function handleChat(
           fallbackModels,
           userMcpServers,
           extraTools: apiNativeTools,
-          appendSystemPromptExtra: agentContextPrompt() + (await (await import('./channels/turnContext.js')).turnContextExtra(ctx.store, attributionFor(identity).oid || '', String(body.message || ''))),
+          appendSystemPromptExtra: agentContextPrompt() + (brainContextAllowed ? await (await import('./channels/turnContext.js')).turnContextExtra(ctx.store, attributionFor(identity).oid || '', String(body.message || '')) : ''),
         },
         {
           onToolStart: e => {
@@ -4072,6 +4087,7 @@ async function handleChat(
       who: attributionFor(identity).oid || 'owner', text: String(chatMessage || ''),
       reply: String(result.fullText || ''), session: sessionId,
     }).catch(() => { /* best effort */ })
+    brainMeter(String(result.fullText || '').length)
     await ctx.store.setSessionMeta(
       sessionId,
       {
@@ -4340,7 +4356,7 @@ async function handleChat(
               autoApprove: () => true,
               mcpToken,
               extraTools: apiNativeTools,
-              appendSystemPromptExtra: agentContextPrompt() + (await (await import('./channels/turnContext.js')).turnContextExtra(ctx.store, attributionFor(identity).oid || '', String(body.message || ''))),
+              appendSystemPromptExtra: agentContextPrompt() + (brainContextAllowed ? await (await import('./channels/turnContext.js')).turnContextExtra(ctx.store, attributionFor(identity).oid || '', String(body.message || '')) : ''),
             },
             hooks,
           )
@@ -4373,6 +4389,7 @@ async function handleChat(
         )
       }
       } // end of canvas else branch
+      brainMeter(String((result as any)?.fullText || '').length)
 
       // Sticky model + frontend indicator: if the agent fell back to
       // a different model than the one we requested, persist that on

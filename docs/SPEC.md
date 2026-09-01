@@ -533,7 +533,7 @@ the RING speaker with Sonos fallback intact.
 
 ---
 
-## §17 — The hybrid brain: sovereign by default, frontier on demand ◐
+## §17 — The hybrid brain: sovereign by default, frontier on demand ◐ (core ✅ v26.24)
 
 **Doctrine.** The harness is the product; the model is a component.
 Voice, home control, cameras, money, presence: **local, always** — the
@@ -563,6 +563,14 @@ capability instead of a heuristic.
    provider override plumbing already exists (`providerOverride`), so
    this is routing + firewall + metering, not a rework.
 
+**Shipped v26.24:** route classes + per-class/master toggles (all OFF by
+default except deep-chat, and nothing routes without the master + a key);
+firewall-by-construction at both turn-assembly sites (non-dream cloud
+turns carry no household context; images/voice never route); metering →
+ambient journal receipts + monthly cap (over cap → local); Settings
+"What leaves the box" card; Anthropic-direct or OpenRouter provider.
+Remaining for ✅: the outbound payload-grep soak below.
+
 **Done when:** each class togglable and OFF by default except
 `deep-chat`; firewall proven by a test that greps outbound payloads for
 forbidden material (frames/locations/ledger) across a scripted week;
@@ -571,7 +579,7 @@ verified live.
 
 ---
 
-## §18 — The digital twin: a house the orb can point at ☐
+## §18 — The digital twin: a house the orb can point at ◐ (core ✅ v26.24)
 
 **Why.** The orb knows *entities*; it should know *places*. "Where did I
 leave my phone", "turn off everything upstairs", "answer through the
@@ -610,6 +618,18 @@ all want one thing: a spatial model of the home.
      member; per-viewer visibility grants (a member chooses who may see
      their presence) with gift-spoiler-grade enforcement. Presence never
      leaves the box (§17 firewall forbids it categorically).
+
+**Shipped v26.24:** plan model + HA-area seeding (keeps owner edits;
+places bridge speakers by name), Settings "House plan" card (floors,
+reseed, self-only location-share toggle), `house-map` widget (#52) +
+Home op 'house' (auto-seeds on first use), nearest-speaker replies via
+twin geometry in /v1/ring/speak, motion→room inside-presence signals
+(20-min honest fade) surfaced in Home op 'presence', consent hard-block
+live-verified (owner enabling another member's sharing → refused),
+watched-watchers journaling on cross-member queries, /v1/twin API incl.
+the app's future /v1/twin/location contract. Remaining: polygon editor,
+geometric "everything upstairs" control, wake-word member attribution,
+and the outside tier's real data source (the phone app, P-1).
 
 **Done when:** plan editor round-trips (seed from HA areas → edit →
 persist → widget renders); "turn off everything upstairs" resolves by

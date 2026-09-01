@@ -89,6 +89,14 @@ export async function captureCameraEvent(store: Store, o: { trigger: string; cam
   await store.putKv(RING_KEY, JSON.stringify(ring), 0)
   const { logEvent } = await import('../events/journal.js')
   await logEvent(store, { kind: 'camera', summary: `${o.cameraName}: ${o.trigger}`, ref: ev.id, attention: 'notify' })
+  // Digital twin (§18): motion is an inside-presence signal for the room.
+  try {
+    const { getPlan, roomOf, slugify } = await import('../twin/model.js')
+    const { recordRoomSignal } = await import('../twin/presence.js')
+    const plan = await getPlan(store)
+    const room = roomOf(plan, o.camera)?.id || (o.area ? slugify(o.area) : null)
+    if (room) await recordRoomSignal(store, room, 'motion')
+  } catch { /* presence is best-effort */ }
   return ev
 }
 

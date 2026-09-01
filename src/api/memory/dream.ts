@@ -74,6 +74,7 @@ export async function runDreamConsolidation(store: Store, trigger: 'manual' | 's
     sessionId: `dream:${Date.now()}`,
     ownerId: 'dream',
     store,
+    channel: 'dream',      // §17 route class (cloud only if the owner enabled it)
   })
   await store.putKv(LAST_DREAM_KEY, String(Date.now()), 60 * 60 * 24 * 365).catch(() => {})
   // Refresh the semantic index + the relationship graph from the (possibly

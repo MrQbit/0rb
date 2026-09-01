@@ -85,13 +85,28 @@ export async function tryHandleRingRoute(
   // the nearest AirPlay speaker instead (Sonos in the same room).
   if (method === 'POST' && pathname === '/v1/ring/speak') {
     if (!user) return jsonResponse(401, { error: 'authentication required' })
-    const name = new URL(req.url).searchParams.get('speaker') || 'living room'
+    const nameParam = new URL(req.url).searchParams.get('speaker')
     try {
       const { bridgeEnabled, bridgeDevices, bridgeAnnounce } = await import('../connectors/bridge.js')
       if (!bridgeEnabled()) return jsonResponse(503, { error: 'bridge disabled' })
       const { speakers } = await bridgeDevices()
       const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
-      const sp = speakers.find(s => norm(s.name).includes(norm(name)) || norm(name).includes(norm(s.name))) ?? speakers[0]
+      let sp: typeof speakers[number] | undefined
+      if (nameParam) {
+        sp = speakers.find(s => norm(s.name).includes(norm(nameParam)) || norm(nameParam).includes(norm(s.name)))
+      } else {
+        // §18: no speaker named → the twin picks the one nearest the Ring.
+        try {
+          const { getPlan, nearest } = await import('../twin/model.js')
+          const plan = await getPlan(store)
+          const cam = Object.keys(plan.placements).find(k => k.startsWith('camera.') && /ring|living/i.test(k))
+            || Object.keys(plan.placements).find(k => k.startsWith('camera.'))
+          const pick = cam ? nearest(plan, cam, speakers.map(s => s.id)) : null
+          if (pick) sp = speakers.find(s => s.id === pick)
+        } catch { /* twin optional */ }
+        sp ??= speakers.find(s => norm(s.name).includes(norm('living room')))
+      }
+      sp ??= speakers[0]
       if (!sp) return jsonResponse(404, { error: 'no speakers on the network' })
       const wav = new Uint8Array(await req.arrayBuffer())
       if (!wav.length) return jsonResponse(400, { error: 'empty audio body' })

@@ -151,6 +151,18 @@
               </div>
             </div>
           </div>
+          <h4 class="set-h4">House plan — the digital twin</h4>
+          <div class="set-card" id="twinCard">
+            <p class="set-muted small">Where things physically are. Rooms seed from Home Assistant areas; give each a floor, and move devices to the room they really sit in — the orb uses this to answer through the nearest speaker and to say <i>where</i> things happen.</p>
+            <div id="twinRooms" class="set-list"><div class="set-muted">Loading…</div></div>
+            <div class="set-form" style="margin-top:8px;">
+              <button id="twinSeed" class="set-btn ghost">Re-seed from Home Assistant</button>
+            </div>
+            <div class="set-row" style="margin-top:8px;">
+              <div class="grow"><div class="info-label" style="color:var(--ink);">Share my location when away</div><div class="set-muted small">Only you can change this for yourself — it powers leave-by and "get me a ride back" from the phone app. Off means the orb never knows where you are outside the house.</div></div>
+              <button id="twinShare" class="set-btn ghost">…</button>
+            </div>
+          </div>
           <h4 class="set-h4">Home Assistant — deep control</h4>
           <div class="set-card">
             <div class="set-row"><span class="pill-dot" id="haDot"></span><div class="info-label" style="color:var(--ink);">Home Assistant</div><span id="haState" class="set-muted small"></span></div>
@@ -304,6 +316,18 @@
         <div class="set-sec" data-sec="system">
           <h3>General</h3>
           <p class="set-muted">The brain, remote access, storage, and everything that powers the orb.</p>
+          <h4 class="set-h4">What leaves the box</h4>
+          <div class="set-card" id="brainCard">
+            <div class="set-row"><span class="pill-dot" id="brainDot"></span><div class="info-label" style="color:var(--ink);">Cloud reasoning</div><span id="brainState" class="set-muted small"></span></div>
+            <p class="set-muted small">Everything runs on this box by default. When enabled, ONLY the turn types below may use a stronger cloud model — each sends the task alone, never camera frames, locations, money records, or your journal. Every cloud call is logged and budgeted.</p>
+            <div id="brainClasses" class="set-list"></div>
+            <div class="set-form" style="margin-top:8px;">
+              <input id="brainCap" type="number" min="0" step="1" placeholder="Monthly cap $" style="max-width:130px;" />
+              <input id="brainModel" type="text" placeholder="Model (default: claude-sonnet-5)" />
+              <button id="brainSave" class="set-btn ghost">Save</button>
+            </div>
+            <div id="brainSpend" class="set-muted small" style="margin-top:6px;"></div>
+          </div>
           <h4 class="set-h4">Remote access</h4>
           <div class="set-card">
             <div class="set-kv"><span>Tailscale</span><span id="tsState" class="set-muted small">Checking…</span></div>

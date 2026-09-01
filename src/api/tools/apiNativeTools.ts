@@ -460,7 +460,7 @@ export function apiNativeToolDefs(): Array<{ name: string; description: string; 
       name: 'Home',
       description: "Control and check the home's devices through Home Assistant — lights, switches/plugs, thermostats (climate), locks, window shades/blinds (cover), TVs & speakers (media_player), robot vacuums, fans, and door/window & motion sensors. This is how Orb acts as the house. Use op:'list' to see what's available (optionally a `type`), op:'status' to check a device by name, and op:'control' to change one: action on/off/toggle for lights/plugs/switches; lock/unlock for locks; open/close (or set with `value` 0-100) for shades; set with `value` for a thermostat's target temperature; play/pause/on/off (or set volume with `value` 0-100) for media; start/stop/dock for a vacuum. Always refer to devices by their friendly name (e.g. \"kitchen lights\", \"front door\").",
       input_schema: { type: 'object', properties: {
-        op: { type: 'string', enum: ['list', 'status', 'control', 'media', 'lights', 'climate', 'vacuum', 'covers', 'security', 'plugs', 'scenes', 'sensors', 'camera', 'tv', 'camera_events', 'presence', 'automations', 'printer', 'energy', 'mode'], description: "list = overview dashboard; status/control = one device; each FUNCTION op shows a focused widget: media (SPEAKER/receiver remote — when the user names a device pass it as query; TVs automatically get the TV remote instead), tv (dedicated TV remote: power, INPUT/source switching, volume, transport — use for anything TV: 'switch to HDMI 2', 'TV volume'), lights (room-grouped), climate (thermostats), vacuum, covers (shades/blinds), security (locks + door/window/motion sensors), plugs (switches/outlets), scenes, sensors (readings: temperature/humidity/battery), camera (snapshots), camera_events (past motion/door events with stored frames — pass ask:'what did you see…' to answer about the LATEST matching frame), presence (who's home/away), automations (list HA automations with on/off + run), printer (3D printer: live camera, progress, temps, pause/stop); energy (power draw now + today, per metered device); mode {mode:'home'|'away'|'vacation'|'guest', secure?:true} sets the HOUSE MODE — away/vacation = instant alerts incl. motion; guest = mute door nagging; secure:true when leaving also locks every lock and turns lights off (say what was done). Use for 'we're leaving', 'back home', 'guests are over'. ALWAYS prefer the function widget matching what the user is focused on — the overview dashboard (list) is for 'show me everything'." },
+        op: { type: 'string', enum: ['list', 'status', 'control', 'media', 'lights', 'climate', 'vacuum', 'covers', 'security', 'plugs', 'scenes', 'sensors', 'camera', 'tv', 'camera_events', 'presence', 'house', 'automations', 'printer', 'energy', 'mode'], description: "list = overview dashboard; status/control = one device; each FUNCTION op shows a focused widget: media (SPEAKER/receiver remote — when the user names a device pass it as query; TVs automatically get the TV remote instead), tv (dedicated TV remote: power, INPUT/source switching, volume, transport — use for anything TV: 'switch to HDMI 2', 'TV volume'), lights (room-grouped), climate (thermostats), vacuum, covers (shades/blinds), security (locks + door/window/motion sensors), plugs (switches/outlets), scenes, sensors (readings: temperature/humidity/battery), camera (snapshots), camera_events (past motion/door events with stored frames — pass ask:'what did you see…' to answer about the LATEST matching frame), presence (who's home/away; pass member when asked about ONE person — cross-member questions are journaled), house (the DIGITAL TWIN: floors/rooms map widget with device counts + live room activity — use for 'where is…', 'what's happening in the house', room questions), automations (list HA automations with on/off + run), printer (3D printer: live camera, progress, temps, pause/stop); energy (power draw now + today, per metered device); mode {mode:'home'|'away'|'vacation'|'guest', secure?:true} sets the HOUSE MODE — away/vacation = instant alerts incl. motion; guest = mute door nagging; secure:true when leaving also locks every lock and turns lights off (say what was done). Use for 'we're leaving', 'back home', 'guests are over'. ALWAYS prefer the function widget matching what the user is focused on — the overview dashboard (list) is for 'show me everything'." },
         query: { type: 'string', description: "Device name for status/control (e.g. 'living room lights', 'front door', 'bedroom thermostat')." },
         type: { type: 'string', enum: ['light', 'switch', 'climate', 'lock', 'cover', 'media_player', 'vacuum', 'fan', 'sensor', 'camera'], description: 'Optional device type filter for list.' },
         action: { type: 'string', enum: ['on', 'off', 'toggle', 'lock', 'unlock', 'open', 'close', 'play', 'pause', 'start', 'stop', 'dock', 'set', 'source'], description: 'What to do for op:control. source = switch a TV input (pass the input name in `source`).' },
@@ -1650,9 +1650,45 @@ export function buildApiNativeTools(ctx: ApiToolContext): any[] {
           name: p.name, home: p.home, state: p.home ? 'home' : 'away', source: p.source,
         }))
         if (!people.length) return 'No presence yet — the phone apps report it automatically (Settings → Report presence), or configure People in Home Assistant.'
+        // §18: cross-member "where is X" questions are themselves journaled.
+        const who = String(args?.member || args?.query || '').trim()
+        if (who) {
+          const me = (ctx.ownerId || 'owner').replace(/^user:/, '')
+          const { noteWhereQuery } = await import('../twin/presence.js')
+          await noteWhereQuery(ctx.store, me, who).catch(() => {})
+        }
+        // §18: room-level signals from the twin sharpen "home" to a room.
+        let roomsLine = ''
+        try {
+          const { currentRooms } = await import('../twin/presence.js')
+          const { getPlan } = await import('../twin/model.js')
+          const [live, plan] = [await currentRooms(ctx.store), await getPlan(ctx.store)]
+          const parts = Object.entries(live).map(([rid, s]) => {
+            const name = plan.rooms.find(r => r.id === rid)?.name || rid
+            return `${s.member ? s.member.split('@')[0] : 'someone'} in the ${name} (${s.source}, ${Math.round((Date.now() - s.t) / 60000)}m ago)`
+          })
+          if (parts.length) roomsLine = ` Activity: ${parts.join(' · ')}.`
+        } catch { /* twin optional */ }
         emitWidget(ctx.sessionId, { id: 'presence', type: 'presence', title: "Who's home",
           pill: `${people.filter(p => p.home).length}/${people.length} home`, people } as any)
-        return `Presence: ${people.map(p => `${p.name} is ${p.home ? 'home' : 'away'}`).join(' · ')}.`
+        return `Presence: ${people.map(p => `${p.name} is ${p.home ? 'home' : 'away'}`).join(' · ')}.${roomsLine}`
+      }
+      if (op === 'house') {
+        // §18: the digital twin — rooms, placements, live room activity.
+        const { getPlan, devicesIn } = await import('../twin/model.js')
+        const { currentRooms } = await import('../twin/presence.js')
+        let plan = await getPlan(ctx.store)
+        if (!plan.rooms.length) plan = await (await import('../twin/model.js')).seedFromHa(ctx.store)
+        if (!plan.rooms.length) return 'No house plan yet — connect Home Assistant (rooms seed from its areas) or add rooms in Settings → Home → House plan.'
+        const live = await currentRooms(ctx.store)
+        const rooms = plan.rooms.map(r => ({
+          id: r.id, name: r.name, floor: r.floor, x: r.x, y: r.y,
+          devices: devicesIn(plan, r.id).length,
+          active: !!live[r.id], active_source: live[r.id]?.source,
+        }))
+        emitWidget(ctx.sessionId, { id: 'house-map', type: 'house-map', title: 'House',
+          pill: `${rooms.length} rooms`, floors: plan.floors, rooms } as any)
+        return `The house: ${plan.floors.map(f => `${f}: ${rooms.filter(r => r.floor === f).map(r => `${r.name} (${r.devices} devices${r.active ? ', activity' : ''})`).join(', ')}`).join(' · ')}.`
       }
       if (op === 'automations') {
         const autos = (await haStates(['automation'])).map(a => ({

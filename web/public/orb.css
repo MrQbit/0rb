@@ -1212,3 +1212,12 @@ sup.sq { font-size:.58em; color:var(--nv); font-weight:700; margin-left:1px; tra
 .wg-ring-shot img{ width:100%; display:block; }
 .wg-ring-meta{ font-size:12px; color:var(--ink-dim); }
 .wg-ring-evs{ display:flex; flex-direction:column; gap:4px; max-height:150px; overflow-y:auto; }
+
+/* §18 house-map widget */
+.wg-house{display:flex;flex-direction:column;gap:8px;padding:4px 2px;}
+.wg-house-floor{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:2px;}
+.wg-house-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;}
+.wg-house-room{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:color-mix(in srgb, var(--nv) 4%, transparent);}
+.wg-house-room.active{border-color:color-mix(in srgb, var(--nv) 55%, transparent);box-shadow:0 0 0 1px color-mix(in srgb, var(--nv) 30%, transparent) inset;}
+.wg-house-room .t{font-size:13px;font-weight:600;}
+.wg-house-room .s{font-size:11px;color:var(--muted);margin-top:2px;}

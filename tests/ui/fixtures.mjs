@@ -77,6 +77,10 @@ export const FIXTURES = [
   { type: 'ring', title: 'Living Room Ring', entity_id: 'camera.living_room_ring', name: 'Living Room Ring',
     snapshot: '', battery: 74, last_motion: 'now', last_ding: '5:12 PM', siren_entity: 'siren.living_room_ring',
     events: [ { t: Date.now()-3600000, trigger: 'Motion', frame: '' }, { t: Date.now()-7200000, trigger: 'Ding', frame: '' } ] },
+  { type: 'house-map', title: 'House', floors: ['Main', 'Upstairs'], rooms: [
+    { id: 'living-room', name: 'Living Room', floor: 'Main', x: 0, y: 0, devices: 6, active: true, active_source: 'motion' },
+    { id: 'kitchen', name: 'Kitchen', floor: 'Main', x: 3, y: 0, devices: 4, active: false },
+    { id: 'office', name: 'Office', floor: 'Upstairs', x: 0, y: 3, devices: 5, active: false } ] },
   { type: 'order', title: 'Sim Eats', state: 'in-progress', service: 'sim-eats', total_cents: 4730, eta: '12 min',
     items: [ { name: 'Pad See Ew', qty: 1, cents: 1450 }, { name: 'Tom Kha (2x)', qty: 1, cents: 3100 } ] },
   { type: 'energy', title: 'Energy', pill: '412 W', total_w: 412, today_kwh: 6.8,

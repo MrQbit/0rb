@@ -760,6 +760,7 @@
     else if(spec.type==='tv') renderTv(body, spec);
     else if(spec.type==='order') renderOrder(body, spec);
     else if(spec.type==='ring') renderRing(body, spec, wg);
+    else if(spec.type==='house-map') renderHouseMap(body, spec);
     else if(spec.type==='spotify') renderSpotify(body, spec, wg);
     else if(spec.type==='automations') renderAutomations(body, spec);
     else if(spec.type==='printer3d') renderPrinter3d(body, spec, wg);
@@ -1101,6 +1102,24 @@
 
 
   // ── Ring: native device card — feed, motion/ding history, battery, siren ──
+  // §18 — the digital twin: floors as sections, rooms as tiles.
+  function renderHouseMap(body, spec){
+    const wrap=document.createElement('div'); wrap.className='wg-house'; body.appendChild(wrap);
+    const rooms=spec.rooms||[];
+    if(!rooms.length){ wrap.innerHTML='<div class="wg-empty">No rooms yet — they seed from Home Assistant areas, or add them in Settings → Home → House plan.</div>'; return; }
+    (spec.floors||['Main']).forEach(floor=>{
+      const fr=rooms.filter(r=>r.floor===floor);
+      if(!fr.length) return;
+      const h=document.createElement('div'); h.className='wg-house-floor'; h.textContent=floor; wrap.appendChild(h);
+      const grid=document.createElement('div'); grid.className='wg-house-grid'; wrap.appendChild(grid);
+      fr.forEach(r=>{
+        const cell=document.createElement('div'); cell.className='wg-house-room'+(r.active?' active':'');
+        cell.innerHTML=`<div class="t">${esc(r.name)}</div><div class="s">${r.devices||0} device${r.devices===1?'':'s'}${r.active?' · <b>'+esc(r.active_source||'activity')+'</b>':''}</div>`;
+        grid.appendChild(cell);
+      });
+    });
+  }
+
   function renderRing(body, spec, wg){
     const wrap=document.createElement('div'); wrap.className='wg-ring'; body.appendChild(wrap);
     const shot=document.createElement('div'); shot.className='wg-ring-shot';
@@ -2438,6 +2457,7 @@
     loadTailscale();
     loadUsers(); loadChannels(); loadVoiceVision();
     loadCapabilities(); loadFiles(); loadIntegrations(); loadSystem(); loadApps();
+    loadBrain().catch(()=>{});
     loadSmartHome();
     $('#haAddStart')?.addEventListener('click', haStartAdd);
   }
@@ -2514,6 +2534,7 @@
   // ── Smart home: HA status + integrations + pending setup + devices ──
   async function loadSmartHome(){
     loadRing();
+    loadTwin().catch(()=>{});
     const dot=$('#haDot'), state=$('#haState'), open=$('#haOpen'), tokForm=$('#haTokenForm');
     const entries=$('#haEntries'), flowsWrap=$('#haFlowsWrap'), flows=$('#haFlows'), devs=$('#haDevices');
     if(!dot) return;
@@ -3143,6 +3164,62 @@
       if(r.ok){ msg.textContent='Added.'; $('#setMcpName').value=$('#setMcpUrl').value=''; loadIntegrations(); } else msg.textContent='Failed.';
     }catch{ msg.textContent='Failed.'; }
   }
+  // ── §17: What leaves the box ──
+  const BRAIN_DESCR={'deep-chat':'Deep questions — only when you ask it to "think hard". Sends: your question.',
+    planning:'Plans & designs — long multi-step reasoning. Sends: the task text.',
+    'watch-research':'Standing-watch research — background checks that need better reasoning. Sends: the watch goal + its notes.',
+    dream:'Nightly memory consolidation. Sends: conversation summaries and memory notes — the most personal class; enable deliberately.'};
+  async function loadBrain(){
+    const card=$('#brainCard'); if(!card) return;
+    let d=null; try{ d=await (await fetch('/v1/brain',{credentials:'same-origin'})).json(); }catch{}
+    if(!d) return;
+    const dot=$('#brainDot'), st=$('#brainState');
+    dot.className='pill-dot'+(d.enabled&&d.keyed?' ok':'');
+    st.textContent=!d.keyed?'No cloud key configured — 100% local':(d.enabled?`On · ${d.provider_model}`:'Off — 100% local');
+    const list=$('#brainClasses'); list.innerHTML='';
+    const master=document.createElement('div'); master.className='set-item';
+    master.innerHTML=`<div class="grow"><div class="t">Master switch</div><div class="s">One toggle back to fully local, any time.</div></div>`;
+    const mBtn=document.createElement('button'); mBtn.className='set-btn'+(d.enabled?'':' ghost'); mBtn.textContent=d.enabled?'On':'Off';
+    mBtn.onclick=async()=>{ const r=await fetch('/v1/brain',{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({enabled:!d.enabled})}); if(r.ok) loadBrain(); else toast('Owner only'); };
+    master.appendChild(mBtn); list.appendChild(master);
+    Object.entries(d.classes||{}).forEach(([k,on])=>{
+      const row=document.createElement('div'); row.className='set-item';
+      row.innerHTML=`<div class="grow"><div class="t">${esc(k)}</div><div class="s">${esc(BRAIN_DESCR[k]||'')}</div></div>`;
+      const b=document.createElement('button'); b.className='set-btn'+(on?'':' ghost'); b.textContent=on?'On':'Off';
+      b.onclick=async()=>{ const r=await fetch('/v1/brain',{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({classes:{[k]:!on}})}); if(r.ok) loadBrain(); else toast('Owner only'); };
+      row.appendChild(b); list.appendChild(row);
+    });
+    $('#brainCap').value=(d.monthly_cap_cents/100).toFixed(0);
+    $('#brainModel').value=d.model||'';
+    $('#brainSave').onclick=async()=>{
+      const cap=Math.round(Number($('#brainCap').value||20)*100);
+      const r=await fetch('/v1/brain',{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({monthly_cap_cents:cap,model:$('#brainModel').value||''})});
+      if(r.ok){ toast('Saved'); loadBrain(); } else toast('Owner only');
+    };
+    $('#brainSpend').textContent=`This month: $${((d.month_spend_cents||0)/100).toFixed(2)} of $${(d.monthly_cap_cents/100).toFixed(0)} — over the cap, everything runs local.`;
+  }
+
+  // ── §18: House plan (digital twin) ──
+  async function loadTwin(){
+    const card=$('#twinCard'); if(!card) return;
+    let d=null; try{ d=await (await fetch('/v1/twin',{credentials:'same-origin'})).json(); }catch{}
+    if(!d) return;
+    const box=$('#twinRooms'); box.innerHTML='';
+    const rooms=(d.plan&&d.plan.rooms)||[];
+    if(!rooms.length) box.innerHTML='<div class="set-muted">No rooms yet — connect Home Assistant, then re-seed.</div>';
+    rooms.forEach(r=>{
+      const live=d.rooms_live&&d.rooms_live[r.id];
+      const row=document.createElement('div'); row.className='set-item';
+      row.innerHTML=`<div class="grow"><div class="t">${esc(r.name)}${live?' · <b>activity</b>':''}</div><div class="s">floor: ${esc(r.floor)}</div></div>`;
+      const fl=document.createElement('input'); fl.className='set-input'; fl.style.maxWidth='110px'; fl.placeholder='floor'; fl.value=r.floor;
+      fl.onchange=async()=>{ const rr=await fetch('/v1/twin/room/'+r.id,{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({floor:fl.value})}); if(!rr.ok) toast('Owner only'); };
+      row.appendChild(fl); box.appendChild(row);
+    });
+    $('#twinSeed').onclick=async()=>{ const r=await fetch('/v1/twin/seed',{method:'POST',credentials:'same-origin'}); if(r.ok){ toast('Seeded from Home Assistant'); loadTwin(); } else toast('Owner only'); };
+    const sh=$('#twinShare'); sh.textContent=d.my_share?'Sharing: On':'Sharing: Off'; sh.className='set-btn'+(d.my_share?'':' ghost');
+    sh.onclick=async()=>{ const r=await fetch('/v1/twin/share',{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({on:!d.my_share})}); if(r.ok) loadTwin(); else toast('Failed'); };
+  }
+
   async function loadSystem(){
     const list=$('#setSystem'); list.innerHTML='';
     // Model selector — choose the active brain (applies to chat + voice).

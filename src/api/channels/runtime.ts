@@ -54,9 +54,16 @@ export async function runChannelTurn(input: ChannelTurnInput): Promise<string> {
   const previousMessages = ((await input.store.getSession(input.sessionId).catch(() => null)) ?? []) as any[]
   const sessionTtl = Number(process.env.ORB2_API_SESSION_TTL || 604800)
 
-  // Model router: route this turn to a stronger cloud model by intent when
-  // enabled (voice stays local for latency). null → local default.
-  const providerOverride = routeTurn({ text: input.text, channel: input.channel || 'voice' }) ?? undefined
+  // Hybrid brain (SPEC §17): governed route classes with a privacy firewall.
+  // Falls back to the legacy heuristic router when §17 has no decision.
+  const { decideTurn, firewallAllowsContext, recordCloudUse } = await import('../brain/policy.js')
+  const brain = await decideTurn(input.store, { text: input.text, channel: input.channel || 'voice' })
+  const providerOverride = brain?.provider
+    ?? routeTurn({ text: input.text, channel: input.channel || 'voice' })
+    ?? undefined
+  // Firewall: cloud turns (except dream) carry the task alone — no recall
+  // block, no family details.
+  const contextAllowed = !brain || firewallAllowsContext(brain.class)
 
   let full = ''
   try {
@@ -72,7 +79,7 @@ export async function runChannelTurn(input: ChannelTurnInput): Promise<string> {
         extraTools,
         appendSystemPromptExtra: [
           agentContextPrompt(),
-          await (await import('./turnContext.js')).turnContextExtra(input.store, ownerId, input.text),
+          contextAllowed ? await (await import('./turnContext.js')).turnContextExtra(input.store, ownerId, input.text) : '',
           input.vocalContext,
         ].filter(Boolean).join('\n\n'),
       },
@@ -97,6 +104,11 @@ export async function runChannelTurn(input: ChannelTurnInput): Promise<string> {
     void (await import('../memory/episodes.js')).logEpisode(input.store, {
       who: ownerId, text: input.text, reply: result.fullText || full, session: input.sessionId,
     })
+    // §17.3: every cloud turn is metered + journaled (visible, budgeted).
+    if (brain) {
+      void recordCloudUse(input.store, brain.class, brain.provider.model,
+        input.text.length, (result.fullText || full).length).catch(() => {})
+    }
     return result.fullText || full
   } catch (err) {
     const msg = `Sorry, I hit an error: ${(err as Error).message}`
