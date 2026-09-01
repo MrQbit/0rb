@@ -60,19 +60,50 @@ _CUE_RE = re.compile(r"<\s*(laugh|laughs|chuckle|sigh|sighs|gasp|groan|yawn|snif
 app = FastAPI(title="orb2-tts", version="2.0")
 _engine = ENGINE
 _kokoro = None
+_kokoro_by_lang: dict = {}
 _snac_model = None  # SNAC decoder (audio codes → waveform)
+
+# ── Bilingual household support ─────────────────────────────────────────
+# One Kokoro pipeline hard-wired to English G2P mangles Spanish replies
+# into "Spanglish" — each language needs its own pipeline AND a voice
+# trained for it (Kokoro voice ids are language-prefixed: af_* American,
+# ef_* Spanish). We auto-detect the text's language and pick both.
+VOICE_ES = os.environ.get("ORB2_TTS_VOICE_ES", "ef_dora")
+_ES_CHARS = set("¿¡áéíóúñü")
+_ES_WORDS = re.compile(
+    r"\b(el|la|los|las|una|unos|unas|que|es|está|estás|estoy|para|por|con|pero|como|más|qué|"
+    r"hola|gracias|bueno|entendido|puedo|puedes|tienes|tengo|eres|soy|muy|también|dónde|cuándo|"
+    r"aquí|ahora|casa|hacer|ver|todo|nada|algo|este|esta|ese|esa)\b", re.I)
+
+def detect_lang_code(text: str) -> str:
+    """'e' (Spanish) or the configured default. Cheap and biased toward the
+    default — only clearly-Spanish text switches."""
+    if any(c in _ES_CHARS for c in text):
+        return "e"
+    words = text.split()
+    if not words:
+        return LANG_CODE
+    hits = len(_ES_WORDS.findall(text))
+    return "e" if hits / len(words) >= 0.15 else LANG_CODE
+
+def voice_for(lang: str, requested: str) -> str:
+    """Keep the requested voice when it matches the language; otherwise use
+    the language's default (an English voice cannot speak Spanish)."""
+    if lang == "e":
+        return requested if requested.startswith("e") else VOICE_ES
+    return requested if not requested.startswith("e") else DEFAULT_VOICE
 
 
 # ───────────────────────────── Kokoro ─────────────────────────────
 
-def kokoro_pipeline():
-    global _kokoro
-    if _kokoro is None:
+def kokoro_pipeline(lang: str = None):
+    lang = lang or LANG_CODE
+    if lang not in _kokoro_by_lang:
         from kokoro import KPipeline
-        log.info("loading Kokoro pipeline on %s (lang=%s)", DEVICE, LANG_CODE)
-        _kokoro = KPipeline(lang_code=LANG_CODE, device=DEVICE)
-        log.info("Kokoro ready")
-    return _kokoro
+        log.info("loading Kokoro pipeline on %s (lang=%s)", DEVICE, lang)
+        _kokoro_by_lang[lang] = KPipeline(lang_code=lang, device=DEVICE)
+        log.info("Kokoro ready (lang=%s)", lang)
+    return _kokoro_by_lang[lang]
 
 
 def kokoro_stream(text: str, voice: str, speed: float):
@@ -80,7 +111,9 @@ def kokoro_stream(text: str, voice: str, speed: float):
     text = _CUE_RE.sub("", text).strip()
     if not text:
         return
-    for _gs, _ps, audio in kokoro_pipeline()(text, voice=voice, speed=speed):
+    lang = detect_lang_code(text)
+    voice = voice_for(lang, voice)
+    for _gs, _ps, audio in kokoro_pipeline(lang)(text, voice=voice, speed=speed):
         if audio is None:
             continue
         if isinstance(audio, torch.Tensor):
