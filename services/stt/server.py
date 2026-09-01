@@ -211,6 +211,15 @@ def _parse_sensevoice(raw: str):
     return clean, emotion, events, lang
 
 
+import re as _re
+
+def _collapse_hallucination(text: str) -> str:
+    """Whisper hallucinates loops on noise/echo ("no, no, no, ..." x100).
+    Collapse >3 consecutive repeats of the same short token — the agent
+    hears the real content instead of a wall of repetition."""
+    return _re.sub(r"\b(\w{1,12})((?:[,.!?]?\s+\1\b){3,})", r"\1, \1, \1…", text, flags=_re.IGNORECASE)
+
+
 def _transcribe(samples: np.ndarray):
     """Return (text, emotion, events, lang) for the captured utterance."""
     if samples.size == 0:
@@ -240,7 +249,7 @@ def _transcribe(samples: np.ndarray):
             generate_kwargs={} if LANG == "auto" else {"language": LANG},
             return_timestamps=False,
         )
-        return (out.get("text") or "").strip(), "", [], (LANG if LANG != "auto" else "")
+        return _collapse_hallucination((out.get("text") or "").strip()), "", [], (LANG if LANG != "auto" else "")
     # faster-whisper: transcript only, no paralinguistics.
     segments, info = m.transcribe(
         samples,
@@ -249,7 +258,7 @@ def _transcribe(samples: np.ndarray):
         vad_filter=False,
         condition_on_previous_text=False,
     )
-    text = "".join(s.text for s in segments).strip()
+    text = _collapse_hallucination("".join(s.text for s in segments).strip())
     return text, "", [], (getattr(info, "language", "") or "")
 
 

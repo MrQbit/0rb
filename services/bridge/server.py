@@ -133,13 +133,48 @@ async def _sonos_soap(address: str, service: str, action: str, args: dict) -> st
                 raise RuntimeError(f"sonos {action} {r.status}: {text[:150]}")
             return text
 
+def _sonos_ready_wav(source: str) -> str:
+    """Sonos plays 16-bit PCM WAV at 44.1/48 kHz; our TTS is 24 kHz mono —
+    off-spec rates come out as garbage. Resample (audioop.ratecv) + widen to
+    stereo, in place of the original. Non-WAV or already-valid files pass
+    through untouched."""
+    if not source.endswith(".wav"):
+        return source
+    import audioop
+    import wave
+    try:
+        with wave.open(source, "rb") as r:
+            ch, width, rate = r.getnchannels(), r.getsampwidth(), r.getframerate()
+            if rate in (44100, 48000) and width == 2:
+                return source
+            frames = r.readframes(r.getnframes())
+        if width != 2:
+            frames = audioop.lin2lin(frames, width, 2)
+        if ch == 2:
+            frames = audioop.tomono(frames, 2, 0.5, 0.5)
+        frames, _ = audioop.ratecv(frames, 2, 1, rate, 48000, None)
+        frames = audioop.tostereo(frames, 2, 1.0, 1.0)
+        out = source[:-4] + "-48k.wav"
+        with wave.open(out, "wb") as w:
+            w.setnchannels(2); w.setsampwidth(2); w.setframerate(48000)
+            w.writeframes(frames)
+        log.info("sonos transcode: %s %dHz/%dch -> %s 48000Hz/2ch (%d bytes)",
+                 os.path.basename(source), rate, ch, os.path.basename(out), os.path.getsize(out))
+        return out
+    except Exception as e:
+        log.warning("sonos transcode failed (%s) — serving original", e)
+        return source
+
+
 async def sonos_play(dev_id: str, address: str, source: str, volume: float | None, cleanup: str | None):
     """Host `source` at /media/<token> and drive the speaker to play it."""
     import re as _re
     import secrets
+    source = _sonos_ready_wav(source)
     token = secrets.token_urlsafe(12) + os.path.splitext(source)[1]
     media_files[token] = source
     url = f"http://{lan_ip()}:{PORT}/media/{token}"
+    log.info("sonos serving %s (%d bytes) to %s", token, os.path.getsize(source) if os.path.exists(source) else -1, address)
     prev_volume = None
     if volume is not None:
         try:
@@ -176,9 +211,9 @@ async def sonos_play(dev_id: str, address: str, source: str, volume: float | Non
                                       {"InstanceID": 0, "Channel": "Master", "DesiredVolume": prev_volume})
                 except Exception:
                     pass
-            if cleanup:
+            for f in {cleanup, source} - {None}:   # original + transcoded
                 try:
-                    os.unlink(cleanup)
+                    os.unlink(f)
                 except OSError:
                     pass
 
